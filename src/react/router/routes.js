@@ -1,19 +1,29 @@
 import HomePage from '@controleonline/ui-ppc/src/react/pages/displays/displayPage';
 import PPCLayout from '@controleonline/ui-layout/src/react/layouts/PPCLayout';
+import DisplayDetails from '@controleonline/ui-ppc/src/react/pages/displays/DisplayDetails';
 
-const WrappedHomePage = ({navigation}) => (
-  <PPCLayout navigation={navigation}>
-    <HomePage navigation={navigation} />
+const withLayout = Component => props => (
+  <PPCLayout navigation={props.navigation}>
+    <Component {...props} />
   </PPCLayout>
 );
 
 const shopRoutes = [
   {
     name: 'HomePage',
-    component: WrappedHomePage,
+    component: withLayout(HomePage),
     options: {
       headerShown: false,
       title: 'Menu',
+    },
+  },
+  {
+    name: 'DisplayDetails',
+    component: withLayout(DisplayDetails),
+    options: {
+      headerShown: false,
+      title: 'PCP',
+      headerBackButtonMenuEnabled: true,
     },
   },
 ];
