@@ -4,7 +4,7 @@ import { Card, Text, Button } from 'react-native-paper';
 import { useStore } from '@store';
 import OrderProductComponents from './../OrderProductComponents';
 
-const Working = ({ orders, status_working, status_out, onReload }) => {
+const Working = ({ orders = [], total = 0, status_working, status_out, onReload }) => {
     const store = useStore('order_products_queue');
     const { actions } = store;
 
@@ -19,13 +19,13 @@ const Working = ({ orders, status_working, status_out, onReload }) => {
     return (
         <View style={{ width: '100%', padding: 8 }}>
             <Card>
-                <Card.Title title={status_working?.status} />
+                <Card.Title title={`${status_working?.status} (${total})`} />
                 <Card.Content style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                     {orders.map(order => (
                         <Card key={order.id} style={{ width: '100%', marginBottom: 8 }}>
                             <Card.Content>
-                                <Text>Pedido #{order.order_product.order.id}</Text>
-                                <Text>{order.order_product.order.client?.name}</Text>
+                                <Text>Pedido #{order.order_product?.order.id}</Text>
+                                <Text>{order.order_product?.order.client?.name}</Text>
                                 <Text>
                                     Horário do pedido:{' '}
                                     {new Date(order.registerTime).toLocaleTimeString('pt-BR', {
@@ -43,8 +43,8 @@ const Working = ({ orders, status_working, status_out, onReload }) => {
                                     </Text>
                                 )}
                                 <Text>
-                                    {order.order_product.quantity}{' '}
-                                    {order.order_product.product.product}(s)
+                                    {order.order_product?.quantity}{' '}
+                                    {order.order_product?.product.product}(s)
                                 </Text>
                             </Card.Content>
 

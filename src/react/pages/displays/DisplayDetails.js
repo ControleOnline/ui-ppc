@@ -15,7 +15,7 @@ const DisplayDetails = () => {
     const displayQueueStore = useStore('display_queues');
 
     const { currentCompany } = peopleStore.getters;
-    const { actions: orderActions } = orderQueueStore;
+    const { getters, actions: orderActions } = orderQueueStore;
     const { actions: displayQueueActions } = displayQueueStore;
 
     const [loaded, setLoaded] = useState({});
@@ -29,29 +29,41 @@ const DisplayDetails = () => {
         status_out: [],
     });
 
+    const [totals, setTotals] = useState({
+        status_in: 0,
+        status_working: 0,
+        status_out: 0,
+    });
+
     const getResponsiveItemsPerPage = () => {
         if (width > 1024) return 6;
         if (width > 480) return 4;
         return 1;
     };
 
-    const getMyOrders = async (status, statusIds, rows) => {
-        if (!statusIds.length) return;
-
-        try {
-            const result = await orderActions.getItems({
-                status: statusIds,
-                itemsPerPage: rows,
-                'order_product.order.provider': currentCompany?.id,
-            });
-
-            setOrders(prev => ({
-                ...prev,
-                [status]: result,
-            }));
-        } finally {
-            setLoaded(prev => ({ ...prev, [status]: true }));
+    const getMyOrders = async (key, statusIds, rows) => {
+        if (!statusIds.length) {
+            setLoaded(prev => ({ ...prev, [key]: true }));
+            return;
         }
+
+        const result = await orderActions.getItems({
+            status: statusIds,
+            itemsPerPage: rows,
+            'order_product.order.provider': currentCompany?.id,
+        });
+
+        setTotals(prev => ({
+            ...prev,
+            [key]: getters.totalItems ?? 0,
+        }));
+
+        setOrders(prev => ({
+            ...prev,
+            [key]: Array.isArray(result) ? result : [],
+        }));
+
+        setLoaded(prev => ({ ...prev, [key]: true }));
     };
 
     const onRequest = async () => {
@@ -61,24 +73,29 @@ const DisplayDetails = () => {
         const rows = getResponsiveItemsPerPage();
         const result = await displayQueueActions.getItems({ display });
 
-        const statusInIds = [];
-        const statusWorkingIds = [];
-        const statusOutIds = [];
+        const inIds = [];
+        const workingIds = [];
+        const outIds = [];
 
         result.forEach(item => {
-            statusInIds.push(item.queue.status_in?.id);
-            statusWorkingIds.push(item.queue.status_working?.id);
-            statusOutIds.push(item.queue.status_out?.id);
-
-            setStatusIn(item.queue.status_in);
-            setStatusWorking(item.queue.status_working);
-            setStatusOut(item.queue.status_out);
+            if (item.queue.status_in) {
+                inIds.push(item.queue.status_in.id);
+                setStatusIn(item.queue.status_in);
+            }
+            if (item.queue.status_working) {
+                workingIds.push(item.queue.status_working.id);
+                setStatusWorking(item.queue.status_working);
+            }
+            if (item.queue.status_out) {
+                outIds.push(item.queue.status_out.id);
+                setStatusOut(item.queue.status_out);
+            }
         });
 
         await Promise.all([
-            getMyOrders('status_in', statusInIds, rows),
-            getMyOrders('status_working', statusWorkingIds, rows),
-            getMyOrders('status_out', statusOutIds, rows),
+            getMyOrders('status_in', inIds, rows),
+            getMyOrders('status_working', workingIds, rows),
+            getMyOrders('status_out', outIds, rows),
         ]);
     };
 
@@ -98,6 +115,7 @@ const DisplayDetails = () => {
                             <View key={index} style={{ width }}>
                                 <InOut
                                     orders={[order]}
+                                    total={totals.status_in}
                                     status_in={statusIn}
                                     status_working={statusWorking}
                                     onReload={onRequest}
@@ -113,6 +131,7 @@ const DisplayDetails = () => {
                             <View key={index} style={{ width }}>
                                 <Working
                                     orders={[order]}
+                                    total={totals.status_working}
                                     status_working={statusWorking}
                                     status_out={statusOut}
                                     onReload={onRequest}
@@ -128,6 +147,7 @@ const DisplayDetails = () => {
                             <View key={index} style={{ width }}>
                                 <InOut
                                     orders={[order]}
+                                    total={totals.status_out}
                                     status_in={statusOut}
                                     onReload={onRequest}
                                 />

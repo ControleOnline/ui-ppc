@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Card, Text, Button } from 'react-native-paper';
 import { useStore } from '@store';
 
-const InOut = ({ orders, status_in, status_working, onReload }) => {
+const InOut = ({ orders = [], total = 0, status_in, status_working, onReload }) => {
     const store = useStore('order_products_queue');
     const { actions } = store;
 
@@ -18,13 +18,13 @@ const InOut = ({ orders, status_in, status_working, onReload }) => {
     return (
         <View style={{ width: '100%', padding: 8 }}>
             <Card>
-                <Card.Title title={status_in?.status} />
+                <Card.Title title={`${status_in?.status} (${total})`} />
                 <Card.Content style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                     {orders.map(order => (
                         <Card key={order.id} style={{ width: '100%', marginBottom: 8 }}>
                             <Card.Content>
-                                <Text>Pedido #{order.order_product.order.id}</Text>
-                                <Text>{order.order_product.order.client?.name}</Text>
+                                <Text>Pedido #{order.order_product?.order.id}</Text>
+                                <Text>{order.order_product?.order.client?.name}</Text>
                                 <Text>
                                     Horário do pedido:{' '}
                                     {new Date(order.registerTime).toLocaleTimeString('pt-BR', {
@@ -42,8 +42,8 @@ const InOut = ({ orders, status_in, status_working, onReload }) => {
                                     </Text>
                                 )}
                                 <Text>
-                                    {order.order_product.quantity}{' '}
-                                    {order.order_product.product.product}(s)
+                                    {order.order_product?.quantity}{' '}
+                                    {order.order_product?.product.product}(s)
                                 </Text>
                             </Card.Content>
 
