@@ -2,7 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 import { Card, Text, Button } from 'react-native-paper';
 import { useStore } from '@store';
-import OrderProductComponents from './../OrderProductComponents';
+import OrderProductComponents from './../../OrderProductComponents';
 
 const Working = ({ orders = [], total = 0, status_working, status_out, onReload }) => {
     const store = useStore('order_products_queue');
