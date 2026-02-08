@@ -4,17 +4,21 @@ import {
   FlatList,
   useWindowDimensions,
   StyleSheet,
+  Pressable,
+  Text,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
 import DisplayCard from '@controleonline/ui-ppc/src/react/components/DisplayCard';
+import { env } from '@env';
 
-const DisplaysPage = ({ navigation }) => {
+const DisplaysPage = () => {
   const { width } = useWindowDimensions();
   const displaysStore = useStore('displays');
   const peopleStore = useStore('people');
+  const navigation = useNavigation();
 
   const { actions, items, isLoading, error } = displaysStore;
   const { currentCompany } = peopleStore.getters;
@@ -40,10 +44,21 @@ const DisplaysPage = ({ navigation }) => {
     [navigation]
   );
 
+  const addDisplay = useCallback(() => {
+    navigation.navigate('DisplayForm', {
+      display: null,
+      display_type: 'orders',
+    });
+  }, [navigation]);
+
   const renderItem = useCallback(
     ({ item }) => (
       <View style={styles.itemWrapper}>
-        <DisplayCard item={item} onPress={() => openDisplay(item)} />
+        <DisplayCard
+          item={item}
+          onPress={() => openDisplay(item)}
+          editable={env.APP_TYPE === 'MANAGER'}
+        />
       </View>
     ),
     [openDisplay]
@@ -52,6 +67,12 @@ const DisplaysPage = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StateStore store="displays" />
+
+      {env.APP_TYPE === 'MANAGER' && (
+        <Pressable style={styles.addButton} onPress={addDisplay}>
+          <Text style={styles.addButtonText}>Adicionar Display</Text>
+        </Pressable>
+      )}
 
       {!isLoading && !error && (
         <FlatList
@@ -82,6 +103,17 @@ const styles = StyleSheet.create({
   },
   itemWrapper: {
     flex: 1,
+  },
+  addButton: {
+    backgroundColor: '#2196F3',
+    margin: 16,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 
