@@ -1,27 +1,34 @@
-import React from 'react';
+// QueuesList.js
+import React, { useState, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import QueueBlock from './QueueBlock';
 
-type QueuesListProps = {
-  queues: Array<any>; // ajuste o tipo conforme sua interface real
-};
+export default function QueuesList({ queues, onQueueUpdate }) {
+  const [queueState, setQueueState] = useState([...queues]);
 
-export default function QueuesList({ queues }: QueuesListProps) {
-  if (!queues?.length) return null;
+  const handleQueueUpdate = useCallback(
+    (updatedQueue) => {
+      setQueueState((prev) =>
+        prev.map((dq) =>
+          dq.queue.id === updatedQueue.id ? { ...dq, queue: { ...dq.queue, ...updatedQueue } } : dq
+        )
+      );
+      if (onQueueUpdate) onQueueUpdate(updatedQueue);
+    },
+    [onQueueUpdate]
+  );
+
+  if (!queueState?.length) return null;
 
   return (
     <View style={styles.queuesWrapper}>
-      {queues.map((dq) => (
-        <QueueBlock key={dq.queue.id} queue={dq.queue} />
+      {queueState.map((dq) => (
+        <QueueBlock key={dq.queue.id} queue={dq.queue} onQueueUpdate={handleQueueUpdate} />
       ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  queuesWrapper: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: 6,
-  },
+  queuesWrapper: { width: '100%', alignItems: 'center', marginTop: 6 },
 });
