@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { SafeAreaView, View, useWindowDimensions, ScrollView } from 'react-native';
+import { View, useWindowDimensions, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useFocusEffect } from '@react-navigation/native';
 import { useStore } from '@store';
 import InOut from './Status/InOut';
