@@ -19,7 +19,7 @@ const shopRoutes = [
   },
   {
     name: 'DisplayDetails',
-    component: withLayout(DisplayDetails),
+    component: DisplayDetails,
     options: {
       headerShown: false,
       title: 'PCP',

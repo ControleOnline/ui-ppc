@@ -9,16 +9,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { useStore } from '@store'
+import { useRoute } from '@react-navigation/native';
+
 
 const Orders = () => {
+    const route = useRoute();
     const { width } = useWindowDimensions()
 
-    const peopleStore = useStore('people')
     const queuesStore = useStore('queues')
-
-    const { currentCompany } = peopleStore.getters
     const { getters, actions } = queuesStore
     const { items: orders } = getters
+    const display = decodeURIComponent(route.params?.id);
 
     const columns = useMemo(() => {
         if (width >= 1800) return 6
@@ -38,13 +39,13 @@ const Orders = () => {
 
     useFocusEffect(
         useCallback(() => {
-            if (currentCompany?.id) {
+            if (display) {
                 actions.ordersQueue({
-                    provider: currentCompany.id,
+
                     status: 104,
                 })
             }
-        }, [currentCompany?.id])
+        }, [])
     )
 
     const getItemColor = (order, product) => {
