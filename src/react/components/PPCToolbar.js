@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 
-export default function BottomToolbar({ navigation }) {
+export default function PPCToolbar({ navigation }) {
   return (
     <View style={{ flexDirection: 'row', padding: 12, justifyContent: 'space-around' }}>
       <TouchableOpacity onPress={() => navigation.navigate('HomePage')}>

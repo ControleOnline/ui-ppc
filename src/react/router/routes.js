@@ -1,11 +1,11 @@
 import HomePage from '@controleonline/ui-ppc/src/react/pages/displays/displayPage';
-import PPCLayout from '@controleonline/ui-layout/src/react/layouts/PPCLayout';
+import DefaultLayout from '@controleonline/ui-layout/src/react/layouts/DefaultLayout';
 import DisplayDetails from '@controleonline/ui-ppc/src/react/pages/displays/DisplayDetails';
 
 const withLayout = Component => props => (
-  <PPCLayout navigation={props.navigation}>
+  <DefaultLayout navigation={props.navigation}>
     <Component {...props} />
-  </PPCLayout>
+  </DefaultLayout>
 );
 
 const shopRoutes = [
