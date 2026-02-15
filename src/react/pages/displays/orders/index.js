@@ -112,7 +112,6 @@ const Orders = () => {
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <FlatList
-                onPress={() => navigation.navigate('OrderDetails', { order: item })}
                 data={orders}
                 key={columns}
                 numColumns={columns}
@@ -124,12 +123,15 @@ const Orders = () => {
                     )
 
                     return (
-                        <View style={styles.card}>
+                        <Pressable
+                            style={styles.card}
+                            onPress={() => navigation.navigate('OrderDetails', { order: item })}
+                        >
                             <OrderHeader order={item} showId={true} />
                             {hierarchy.map(node =>
                                 renderNode(item, node)
                             )}
-                        </View>
+                        </Pressable>
                     )
                 }}
             />
