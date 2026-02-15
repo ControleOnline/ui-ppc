@@ -5,15 +5,16 @@ import {
     Text,
     StyleSheet,
     useWindowDimensions,
+    Button,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
+import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader';
 import { useStore } from '@store'
-import { useRoute } from '@react-navigation/native';
-
 
 const Orders = () => {
     const route = useRoute();
+    const navigation = useNavigation();
     const { width } = useWindowDimensions()
 
     const queuesStore = useStore('queues')
@@ -41,7 +42,6 @@ const Orders = () => {
         useCallback(() => {
             if (display) {
                 actions.ordersQueue({
-
                     status: 104,
                 })
             }
@@ -112,6 +112,7 @@ const Orders = () => {
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <FlatList
+                onPress={() => navigation.navigate('OrderDetails', { order: item })}
                 data={orders}
                 key={columns}
                 numColumns={columns}
@@ -124,11 +125,7 @@ const Orders = () => {
 
                     return (
                         <View style={styles.card}>
-                            <View style={styles.header}>
-                                <Text style={styles.title}>#{item.id}</Text>
-                                <Text style={styles.app}>{item.app}</Text>
-                            </View>
-
+                            <OrderHeader order={item} showId={true} />
                             {hierarchy.map(node =>
                                 renderNode(item, node)
                             )}
