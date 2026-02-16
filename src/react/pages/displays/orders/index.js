@@ -5,22 +5,24 @@ import {
     Text,
     StyleSheet,
     useWindowDimensions,
-    Button,
+    Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader';
+import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import { useStore } from '@store'
+import OrderProducts from '@controleonline/ui-ppc/src/react/components/OrderProducts'
+
 
 const Orders = () => {
-    const route = useRoute();
-    const navigation = useNavigation();
+    const route = useRoute()
+    const navigation = useNavigation()
     const { width } = useWindowDimensions()
 
     const queuesStore = useStore('queues')
     const { getters, actions } = queuesStore
     const { items: orders } = getters
-    const display = decodeURIComponent(route.params?.id);
+    const display = decodeURIComponent(route.params?.id || '')
 
     const columns = useMemo(() => {
         if (width >= 1800) return 6
@@ -45,68 +47,7 @@ const Orders = () => {
                     status: 104,
                 })
             }
-        }, [])
-    )
-
-    const getItemColor = (order, product) => {
-        const queue = product.orderProductQueues?.[0]
-        if (queue?.status?.color) return queue.status.color
-        if (order.status?.color) return order.status.color
-        return '#333'
-    }
-
-    const buildHierarchyByGroup = products => {
-        const roots = []
-        let currentRoot = null
-        let currentCustom = null
-
-        products.forEach(p => {
-            const node = { ...p, children: [] }
-
-            if (!p.productGroup) {
-                roots.push(node)
-                currentRoot = node
-                currentCustom = null
-                return
-            }
-
-            if (currentCustom) {
-                currentCustom.children.push(node)
-                return
-            }
-
-            if (currentRoot) {
-                currentRoot.children.push(node)
-            }
-
-            if (p.product?.type === 'custom') {
-                currentCustom = node
-            }
-        })
-
-        return roots
-    }
-
-    const renderNode = (order, node, level = 0) => (
-        <View key={node.id}>
-            <View
-                style={[
-                    styles.itemRow,
-                    {
-                        marginLeft: level * 14 * scale,
-                        borderLeftColor: getItemColor(order, node),
-                    },
-                ]}
-            >
-                <Text style={level === 0 ? styles.text : styles.subText}>
-                    {node.quantity} x {node.product.product}
-                </Text>
-            </View>
-
-            {node.children.map(child =>
-                renderNode(order, child, level + 1)
-            )}
-        </View>
+        }, [display])
     )
 
     return (
@@ -117,23 +58,21 @@ const Orders = () => {
                 numColumns={columns}
                 keyExtractor={item => String(item.id)}
                 contentContainerStyle={styles.list}
-                renderItem={({ item }) => {
-                    const hierarchy = buildHierarchyByGroup(
-                        item.orderProducts || []
-                    )
-
-                    return (
-                        <Pressable
-                            style={styles.card}
-                            onPress={() => navigation.navigate('OrderDetails', { order: item })}
-                        >
-                            <OrderHeader order={item} showId={true} />
-                            {hierarchy.map(node =>
-                                renderNode(item, node)
-                            )}
-                        </Pressable>
-                    )
-                }}
+                renderItem={({ item }) => (
+                    <Pressable
+                        style={styles.card}
+                        onPress={() =>
+                            navigation.navigate('OrderDetails', { order: item })
+                        }
+                    >
+                        <OrderHeader order={item} showId={true} />
+                        <OrderProducts
+                            order={item}
+                            scale={scale}
+                            styles={styles}
+                        />
+                    </Pressable>
+                )}
             />
         </SafeAreaView>
     )
@@ -156,22 +95,6 @@ const createStyles = scale =>
             borderRadius: 8,
             borderWidth: 1,
             borderColor: '#2a2a2a',
-        },
-        header: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 6 * scale,
-        },
-        title: {
-            color: '#fff',
-            fontSize: 12 * scale,
-            fontWeight: '700',
-        },
-        app: {
-            color: '#19afbd',
-            fontSize: 10 * scale,
-            fontWeight: '600',
         },
         itemRow: {
             marginTop: 4 * scale,
