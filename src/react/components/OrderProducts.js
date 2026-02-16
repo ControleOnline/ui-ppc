@@ -10,6 +10,16 @@ const OrderProducts = ({ order, scale, styles }) => {
         return '#333'
     }
 
+    const sortProducts = products => {
+        return [...products].sort((a, b) => {
+            if (!a.productGroup && b.productGroup) return -1
+            if (a.productGroup && !b.productGroup) return 1
+            if (a.productGroup === b.productGroup)
+                return a.id - b.id
+            return (a.productGroup || 0) - (b.productGroup || 0)
+        })
+    }
+
     const buildHierarchyByGroup = products => {
         const roots = []
         let currentRoot = null
@@ -65,7 +75,8 @@ const OrderProducts = ({ order, scale, styles }) => {
     )
 
     const hierarchy = useMemo(() => {
-        return buildHierarchyByGroup(order.orderProducts || [])
+        const ordered = sortProducts(order.orderProducts || [])
+        return buildHierarchyByGroup(ordered)
     }, [order])
 
     return (

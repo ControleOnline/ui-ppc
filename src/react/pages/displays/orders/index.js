@@ -65,7 +65,7 @@ const Orders = () => {
                             navigation.navigate('OrderDetails', { order: item })
                         }
                     >
-                        <OrderHeader order={item} showId={true} />
+                        <OrderHeader order={item} showControls={false} />
                         <OrderProducts
                             order={item}
                             scale={scale}
