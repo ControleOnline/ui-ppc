@@ -2,16 +2,15 @@ import React, { useCallback, useMemo } from 'react'
 import {
     FlatList,
     View,
-    Text,
     StyleSheet,
     useWindowDimensions,
     Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import { useStore } from '@store'
 import OrderProducts from '@controleonline/ui-ppc/src/react/components/OrderProducts'
+import KDSOrderHeader from '@controleonline/ui-ppc/src/react/components/KDSOrderHeader'
 
 
 const Orders = () => {
@@ -25,17 +24,18 @@ const Orders = () => {
     const display = decodeURIComponent(route.params?.id || '')
 
     const columns = useMemo(() => {
-        if (width >= 1800) return 6
-        if (width >= 1400) return 5
-        if (width >= 1100) return 4
-        if (width >= 800) return 3
+        if (width >= 2200) return 5
+        if (width >= 1700) return 4
+        if (width >= 1300) return 3
+        if (width >= 900) return 2
         return 1
     }, [width])
 
     const scale = useMemo(() => {
-        if (width >= 1800) return 0.85
-        if (width >= 1400) return 0.9
-        return 0.95
+        if (width >= 2200) return 1.15
+        if (width >= 1700) return 1.05
+        if (width >= 1300) return 0.97
+        return 0.92
     }, [width])
 
     const styles = useMemo(() => createStyles(scale), [scale])
@@ -62,10 +62,10 @@ const Orders = () => {
                     <Pressable
                         style={styles.card}
                         onPress={() =>
-                            navigation.navigate('OrderDetails', { order: item })
+                            navigation.navigate('OrderDetails', { order: item, kds: true })
                         }
                     >
-                        <OrderHeader order={item} showControls={false} />
+                        <KDSOrderHeader order={item} compact />
                         <OrderProducts
                             order={item}
                             scale={scale}
@@ -82,32 +82,45 @@ const createStyles = scale =>
     StyleSheet.create({
         container: {
             flex: 1,
-            backgroundColor: '#0e0e0e',
+            backgroundColor: '#060A11',
         },
         list: {
-            padding: 6 * scale,
+            padding: 8 * scale,
         },
         card: {
             flex: 1,
-            backgroundColor: '#1a1a1a',
-            padding: 8 * scale,
-            margin: 4 * scale,
-            borderRadius: 8,
+            backgroundColor: '#0D141D',
+            padding: 10 * scale,
+            margin: 5 * scale,
+            borderRadius: 14,
             borderWidth: 1,
-            borderColor: '#2a2a2a',
+            borderColor: '#1E293B',
+            minHeight: 260 * scale,
         },
         itemRow: {
-            marginTop: 4 * scale,
-            paddingLeft: 6 * scale,
-            borderLeftWidth: 4,
+            marginTop: 6 * scale,
+            paddingVertical: 5 * scale,
+            paddingLeft: 8 * scale,
+            borderLeftWidth: 5,
+            borderRadius: 10,
+            backgroundColor: '#101927',
         },
         text: {
-            color: '#fff',
-            fontSize: 11 * scale,
+            color: '#F8FAFC',
+            fontSize: 16 * scale,
+            fontWeight: '700',
         },
         subText: {
-            color: '#aaa',
-            fontSize: 9 * scale,
+            color: '#CBD5E1',
+            fontSize: 13 * scale,
+            fontWeight: '500',
+        },
+        qtyText: {
+            color: '#FACC15',
+            fontWeight: '900',
+        },
+        statusMarker: {
+            fontWeight: '900',
         },
     })
 

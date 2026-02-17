@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { View, Text } from 'react-native'
 
-const OrderProducts = ({ order, scale, styles }) => {
+const OrderProducts = ({ order, scale, styles, indentStep = 16 }) => {
 
     const getItemColor = (order, product) => {
         const queue = product.orderProductQueues?.[0]
@@ -18,6 +18,14 @@ const OrderProducts = ({ order, scale, styles }) => {
                 return a.id - b.id
             return (a.productGroup || 0) - (b.productGroup || 0)
         })
+    }
+
+    const inferLevelByName = productName => {
+        const text = String(productName || '').toLowerCase()
+        if (text.includes('terceiro nivel') || text.includes('terceiro nível')) return 2
+        if (text.includes('segundo nivel') || text.includes('segundo nível')) return 1
+        if (text.includes('primeiro nivel') || text.includes('primeiro nível')) return 0
+        return 0
     }
 
     const buildHierarchyByGroup = products => {
@@ -58,13 +66,16 @@ const OrderProducts = ({ order, scale, styles }) => {
                 style={[
                     styles.itemRow,
                     {
-                        marginLeft: level * 14 * scale,
+                        marginLeft: level * indentStep * scale,
                         borderLeftColor: getItemColor(order, node),
+                        opacity: level === 0 ? 1 : 0.96,
                     },
                 ]}
             >
-                <Text style={level === 0 ? styles.text : styles.subText}>
-                    {node.quantity} x {node.product.product}
+                <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
+                    <Text style={[styles.statusMarker, { color: getItemColor(order, node) }]}>● </Text>
+                    <Text style={styles.qtyText}>{node.quantity}x </Text>
+                    {node.product.product}
                 </Text>
             </View>
 
@@ -76,13 +87,21 @@ const OrderProducts = ({ order, scale, styles }) => {
 
     const hierarchy = useMemo(() => {
         const ordered = sortProducts(order.orderProducts || [])
+        const hasGroupInfo = ordered.some(item => !!item.productGroup)
+        if (!hasGroupInfo) {
+            return ordered.map(item => ({
+                ...item,
+                children: [],
+                __level: inferLevelByName(item?.product?.product),
+            }))
+        }
         return buildHierarchyByGroup(ordered)
     }, [order])
 
     return (
         <>
             {hierarchy.map(node =>
-                renderNode(node)
+                renderNode(node, node.__level || 0)
             )}
         </>
     )
