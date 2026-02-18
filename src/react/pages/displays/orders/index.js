@@ -5,13 +5,13 @@ import {
     StyleSheet,
     useWindowDimensions,
     Pressable,
+    Text,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import { useStore } from '@store'
 import OrderProducts from '@controleonline/ui-ppc/src/react/components/OrderProducts'
 import KDSOrderHeader from '@controleonline/ui-ppc/src/react/components/KDSOrderHeader'
-
 
 const Orders = () => {
     const route = useRoute()
@@ -20,7 +20,7 @@ const Orders = () => {
 
     const queuesStore = useStore('queues')
     const { getters, actions } = queuesStore
-    const { items: orders } = getters
+    const { items: orders, totalItems } = getters
     const display = decodeURIComponent(route.params?.id || '')
 
     const columns = useMemo(() => {
@@ -44,7 +44,7 @@ const Orders = () => {
         useCallback(() => {
             if (display) {
                 actions.ordersQueue({
-                    status: 104,
+                    status: { realStatus: ['open'] },
                 })
             }
         }, [display])
@@ -52,6 +52,13 @@ const Orders = () => {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Pedidos na fila</Text>
+                <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{totalItems || 0}</Text>
+                </View>
+            </View>
+
             <FlatList
                 data={orders}
                 key={columns}
@@ -83,6 +90,34 @@ const createStyles = scale =>
         container: {
             flex: 1,
             backgroundColor: '#060A11',
+        },
+        header: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16 * scale,
+            paddingVertical: 12 * scale,
+            backgroundColor: '#0B1220',
+            borderBottomWidth: 1,
+            borderBottomColor: '#1E293B',
+        },
+        headerTitle: {
+            color: '#F8FAFC',
+            fontSize: 22 * scale,
+            fontWeight: '900',
+        },
+        badge: {
+            minWidth: 50 * scale,
+            paddingHorizontal: 14 * scale,
+            paddingVertical: 6 * scale,
+            borderRadius: 999,
+            backgroundColor: '#FACC15',
+            alignItems: 'center',
+        },
+        badgeText: {
+            color: '#000',
+            fontSize: 18 * scale,
+            fontWeight: '900',
         },
         list: {
             padding: 8 * scale,
