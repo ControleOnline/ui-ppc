@@ -1,11 +1,27 @@
-import React from 'react'
-import { View, Text, Image, StyleSheet } from 'react-native'
+import React, { useEffect, useRef, useState } from 'react'
+import { View, Text, Image, StyleSheet, Animated } from 'react-native'
 import Formatter from '@controleonline/ui-common/src/utils/formatter'
 import { getOrderChannelLabel, getOrderChannelLogo } from '@assets/ppc/channels'
 
 const BRAND_LOGO = require('@assets/ppc/logo 512x512 r.png')
 
+const WAITING_RULES = [
+  { max: 5, color: '#22C55E', blink: false },
+  { max: 10, color: '#FACC15', blink: false },
+  { max: Infinity, color: '#EF4444', blink: true },
+]
+
 const normalizeText = value => String(value || '').trim()
+
+const getWaitingMinutes = orderDate => {
+  if (!orderDate) return 0
+  const diff = Date.now() - new Date(orderDate).getTime()
+  return Math.max(0, Math.floor(diff / 60000))
+}
+
+const getWaitingConfig = minutes => {
+  return WAITING_RULES.find(rule => minutes <= rule.max) || WAITING_RULES[0]
+}
 
 const extractExtraEntries = extraData => {
   if (!extraData) return []
@@ -79,6 +95,52 @@ const getCustomerContact = order => {
 }
 
 const KDSOrderHeader = ({ order, compact = false, showCustomer = false }) => {
+  const isOpen = order?.status?.realStatus === 'open'
+
+  const [waitingMinutes, setWaitingMinutes] = useState(
+    getWaitingMinutes(order?.orderDate),
+  )
+
+  const blinkAnim = useRef(new Animated.Value(1)).current
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const interval = setInterval(() => {
+      setWaitingMinutes(getWaitingMinutes(order?.orderDate))
+    }, 60000)
+
+    return () => clearInterval(interval)
+  }, [order?.orderDate, isOpen])
+
+  const waitingConfig = getWaitingConfig(waitingMinutes)
+
+  useEffect(() => {
+    if (!isOpen) {
+      blinkAnim.setValue(1)
+      return
+    }
+
+    if (waitingConfig.blink) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(blinkAnim, {
+            toValue: 0.2,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(blinkAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start()
+    } else {
+      blinkAnim.setValue(1)
+    }
+  }, [waitingConfig.blink, isOpen])
+
   const channelLogo = getOrderChannelLogo(order)
   const channelLabel = getOrderChannelLabel(order)
   const statusColor = order?.status?.color || '#6B7280'
@@ -93,9 +155,25 @@ const KDSOrderHeader = ({ order, compact = false, showCustomer = false }) => {
           <Image source={BRAND_LOGO} style={styles.brandLogo} resizeMode="contain" />
           <View>
             <Text style={styles.orderId}>Pedido #{order?.id}</Text>
-            <Text style={styles.orderTime}>
-              {Formatter.formatDateYmdTodmY(order?.orderDate, true)}
-            </Text>
+            <View style={styles.timeRow}>
+              <Text style={styles.orderTime}>
+                {Formatter.formatDateYmdTodmY(order?.orderDate, true)}
+              </Text>
+
+              {isOpen && (
+                <Animated.Text
+                  style={[
+                    styles.waitingTime,
+                    {
+                      color: waitingConfig.color,
+                      opacity: waitingConfig.blink ? blinkAnim : 1,
+                    },
+                  ]}
+                >
+                  {`  •  ${waitingMinutes} min`}
+                </Animated.Text>
+              )}
+            </View>
           </View>
         </View>
 
@@ -169,10 +247,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   orderTime: {
     color: '#98A2B3',
     fontSize: 13,
-    marginTop: 2,
+  },
+  waitingTime: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   rightInfo: {
     alignItems: 'flex-end',
