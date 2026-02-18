@@ -24,7 +24,7 @@ const DisplayDetails = () => {
         return <ProductsDisplay display={display} />;
     }
 
-    if (display.displayType === 'orders') {
+    if (display.displayType === 'orders' || display.displayType === 'tv') {
         return <OrdersDisplay display={display} />;
     }
 

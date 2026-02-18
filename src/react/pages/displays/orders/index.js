@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback, useMemo, useState, useEffect } from 'react'
 import {
     FlatList,
     View,
@@ -6,6 +6,7 @@ import {
     useWindowDimensions,
     Pressable,
     Text,
+    ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
@@ -20,8 +21,9 @@ const Orders = () => {
 
     const queuesStore = useStore('queues')
     const { getters, actions } = queuesStore
-    const { items: orders, totalItems } = getters
+    const { items, totalItems, isLoading } = getters
     const display = decodeURIComponent(route.params?.id || '')
+    const [orders, setOrders] = useState([])
 
     const columns = useMemo(() => {
         if (width >= 2200) return 5
@@ -40,22 +42,53 @@ const Orders = () => {
 
     const styles = useMemo(() => createStyles(scale), [scale])
 
+    const fetchOrders = useCallback(() => {
+        if (!display) return
+        actions.ordersQueue({
+            status: { realStatus: ['open'] },
+        }).then((data)=>{
+            setOrders(data);
+        })
+    }, [display])
+
     useFocusEffect(
         useCallback(() => {
-            if (display) {
-                actions.ordersQueue({
-                    status: { realStatus: ['open'] },
-                })
-            }
-        }, [display])
+            fetchOrders()
+        }, [fetchOrders])
     )
+
+    useFocusEffect(
+        useCallback(() => {
+            if (items && items.length)
+                setOrders(items)
+        }, [items])
+    )
+
+    useEffect(() => {
+        if (totalItems > 0 && display.displayType == 'orders') return
+
+        const interval = setInterval(() => {
+            fetchOrders()
+        }, 15000)
+
+        return () => clearInterval(interval)
+    }, [totalItems, fetchOrders])
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Pedidos na fila</Text>
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{totalItems || 0}</Text>
+
+                <View style={styles.headerRight}>
+                    {isLoading ? (
+                        <ActivityIndicator
+                            size="small"
+                            color="#FACC15"
+                            style={styles.loader}
+                        />
+                    ) : <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{totalItems || 0}</Text>
+                    </View>}
                 </View>
             </View>
 
@@ -106,6 +139,10 @@ const createStyles = scale =>
             fontSize: 22 * scale,
             fontWeight: '900',
         },
+        headerRight: {
+            flexDirection: 'row',
+            alignItems: 'center',
+        },
         badge: {
             minWidth: 50 * scale,
             paddingHorizontal: 14 * scale,
@@ -118,6 +155,9 @@ const createStyles = scale =>
             color: '#000',
             fontSize: 18 * scale,
             fontWeight: '900',
+        },
+        loader: {
+            marginLeft: 10 * scale,
         },
         list: {
             padding: 8 * scale,
