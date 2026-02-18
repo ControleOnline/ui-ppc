@@ -18,12 +18,13 @@ const Orders = () => {
     const route = useRoute()
     const navigation = useNavigation()
     const { width } = useWindowDimensions()
-
+    const peopleStore = useStore('people');
     const queuesStore = useStore('queues')
     const { getters, actions } = queuesStore
     const { items, totalItems, isLoading } = getters
     const display = decodeURIComponent(route.params?.id || '')
     const [orders, setOrders] = useState([])
+    const { currentCompany } = peopleStore.getters;
 
     const columns = useMemo(() => {
         if (width >= 2200) return 5
@@ -43,10 +44,11 @@ const Orders = () => {
     const styles = useMemo(() => createStyles(scale), [scale])
 
     const fetchOrders = useCallback(() => {
-        if (!display) return
+        if (!display || !currentCompany) return
         actions.ordersQueue({
             status: { realStatus: ['open'] },
-        }).then((data)=>{
+            provider: currentCompany?.id
+        }).then((data) => {
             setOrders(data);
         })
     }, [display])
@@ -54,7 +56,7 @@ const Orders = () => {
     useFocusEffect(
         useCallback(() => {
             fetchOrders()
-        }, [fetchOrders])
+        }, [fetchOrders, currentCompany])
     )
 
     useFocusEffect(
