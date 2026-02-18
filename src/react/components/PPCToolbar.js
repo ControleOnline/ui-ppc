@@ -8,6 +8,10 @@ export default function PPCToolbar({ navigation }) {
         <Text>Home</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity onPress={() => navigation.navigate('ProfilePage')}>
+        <Text>Profile</Text>
+      </TouchableOpacity>
+
       {/* depois quando existir a rota */}
       {/* <TouchableOpacity onPress={() => navigation.navigate('Kitchen')}> */}
       {/*   <Text>Cozinha</Text> */}
