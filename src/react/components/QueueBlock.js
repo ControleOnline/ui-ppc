@@ -46,10 +46,11 @@ export default function QueueBlock({ queue, onQueueUpdate }) {
     if (!statusObj) return null;
     return (
       <View style={styles.statusRow}>
+        <View style={[styles.statusDot, { backgroundColor: statusObj.color || '#64748B' }]} />
         <Text style={styles.statusText}>{statusObj.name || statusObj.status}</Text>
         {env.APP_TYPE === 'MANAGER' && (
           <Pressable onPress={() => handleEditClick(statusObj, type)} style={styles.editButton}>
-            <Text style={styles.icon}>✏️</Text>
+            <Text style={styles.editIcon}>✎</Text>
           </Pressable>
         )}
       </View>
@@ -65,7 +66,7 @@ export default function QueueBlock({ queue, onQueueUpdate }) {
             style={styles.addButton}
             onPress={() => navigation.navigate('QueueAddProducts', { queue })}
           >
-            <Text style={styles.icon}>＋</Text>
+            <Text style={styles.addIcon}>+</Text>
           </Pressable>
         )}
       </View>
@@ -101,15 +102,81 @@ export default function QueueBlock({ queue, onQueueUpdate }) {
 }
 
 const styles = StyleSheet.create({
-  queueBlock: { alignItems: 'center', marginTop: 10 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  queueTitle: { backgroundColor: '#F5C542', color: '#000', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 14, fontSize: 13, fontWeight: '600' },
-  addButton: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
-  statusRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 1 },
-  statusText: { fontSize: 13, color: '#E0E0E0', textAlign: 'center' },
-  editButton: { marginLeft: 6 },
-  icon: { fontSize: 16 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '80%', backgroundColor: '#FFF', borderRadius: 12, padding: 20 },
-  modalTitle: { fontSize: 16, fontWeight: '600', marginBottom: 10 },
+  queueBlock: { alignItems: 'center', marginTop: 8, width: '100%' },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    justifyContent: 'center',
+  },
+  queueTitle: {
+    backgroundColor: '#FACC15',
+    color: '#111827',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  addButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    backgroundColor: '#FACC15',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    backgroundColor: '#101927',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 99,
+    marginRight: 7,
+  },
+  statusText: {
+    fontSize: 13,
+    color: '#CBD5E1',
+    textAlign: 'center',
+    fontWeight: '700',
+  },
+  editButton: {
+    marginLeft: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E293B',
+  },
+  addIcon: { fontSize: 14, color: '#0F172A', fontWeight: '900', lineHeight: 14 },
+  editIcon: { fontSize: 12, color: '#E2EDFC', fontWeight: '900', lineHeight: 12 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(2,9,18,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '84%',
+    maxWidth: 420,
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#DDE6F2',
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10, color: '#0F172A' },
 });

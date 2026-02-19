@@ -1,9 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import QueueBlock from './QueueBlock';
 
 export default function QueuesList({ queues, onQueueUpdate }) {
   const [queueState, setQueueState] = useState([...queues]);
+
+  useEffect(() => {
+    setQueueState([...(queues || [])]);
+  }, [queues]);
 
   const handleQueueUpdate = useCallback(
     (updatedQueue) => {
@@ -38,6 +42,7 @@ const styles = StyleSheet.create({
   queuesWrapper: {
     width: '100%',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 4,
+    gap: 2,
   },
 });
