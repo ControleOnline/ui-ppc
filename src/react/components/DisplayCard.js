@@ -38,16 +38,24 @@ const normalizeDisplayQueues = (value) => {
     .filter((row) => !!row?.queue);
 };
 
-const extractDisplayId = (value) => {
+const parseEntityId = (value) => {
   if (!value) return null;
   if (typeof value === 'number') return value;
-  if (typeof value === 'string') return Number(value.replace(/\D/g, '')) || null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/^\d+$/.test(trimmed)) return Number(trimmed);
+    const iriMatch = trimmed.match(/\/(\d+)(?:\/)?$/);
+    if (iriMatch?.[1]) return Number(iriMatch[1]);
+    return null;
+  }
   if (typeof value.id === 'number') return value.id;
-  if (typeof value.id === 'string') return Number(value.id.replace(/\D/g, '')) || null;
-  if (value.id && typeof value.id === 'object') return extractDisplayId(value.id);
-  if (value['@id']) return Number(String(value['@id']).replace(/\D/g, '')) || null;
+  if (typeof value.id === 'string') return parseEntityId(value.id);
+  if (value.id && typeof value.id === 'object') return parseEntityId(value.id);
+  if (value['@id']) return parseEntityId(String(value['@id']));
   return null;
 };
+
+const extractDisplayId = parseEntityId;
 
 const LOCAL_LINKS_KEY = 'ppc_display_queue_links_v1';
 
@@ -70,7 +78,7 @@ const writeLocalLinks = (links) => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export default function DisplayCard({ item, onPress, onLinked }) {
+export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPress, onLinked }) {
   const navigation = useNavigation();
   const displaysStore = useStore('displays');
   const queuesStore = useStore('queues');
@@ -78,6 +86,7 @@ export default function DisplayCard({ item, onPress, onLinked }) {
   const statusStore = useStore('status');
   const peopleStore = useStore('people');
   const { actions } = displaysStore;
+  const displaysItems = displaysStore.items || [];
   const { currentCompany } = peopleStore.getters;
 
   const [queues, setQueues] = useState(
@@ -109,52 +118,36 @@ export default function DisplayCard({ item, onPress, onLinked }) {
   };
 
   const getQueueIdentity = (queue) => {
-    const id = queue?.id ?? null;
+    const id = parseEntityId(queue?.id) || parseEntityId(queue?.['@id']) || parseEntityId(queue);
     const iri = queue?.['@id'] || null;
     return {
-      id: id || getId(queue) || iri || null,
+      id: id || null,
       iri,
     };
   };
 
+  const mergeQueueOptions = useCallback((...lists) => {
+    const merged = lists.flat().filter(Boolean);
+    const seen = new Set();
+
+    return merged.filter((queue) => {
+      const identity = getQueueIdentity(queue);
+      const key = String(identity.id || identity.iri || '');
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, []);
+
   const loadLinkedQueues = useCallback(
     async (displayId) => {
       if (!displayId) return [];
-
-      const attempts = [
-        { display: displayId },
-        { display: `/displays/${displayId}` },
-        { 'display.id': displayId },
-      ];
-
-      for (const params of attempts) {
-        try {
-          const result = await displayQueuesStore.actions.getItems(params);
-          const normalized = normalizeDisplayQueues(result);
-          const onlyCurrentDisplay = normalized.filter((row) => {
-            const rowDisplayId = extractDisplayId(row.display);
-            if (!rowDisplayId) return true;
-            return rowDisplayId === Number(displayId);
-          });
-          if (onlyCurrentDisplay.length) return onlyCurrentDisplay;
-        } catch (err) {
-          // keep trying fallback filter shapes
-        }
-      }
-
-      try {
-        const allLinks = await displayQueuesStore.actions.getItems({});
-        const normalizedAll = normalizeDisplayQueues(allLinks);
-        const fromAll = normalizedAll.filter((row) => {
-          const rowDisplayId = extractDisplayId(row.display);
-          return rowDisplayId === Number(displayId);
-        });
-        if (fromAll.length) return fromAll;
-      } catch (err) {
-        // ignore
-      }
-
-      return [];
+      const linked = await displayQueuesStore.actions.getItems({
+        display: `/displays/${displayId}`,
+        itemsPerPage: 1000,
+        pagination: false,
+      });
+      return normalizeDisplayQueues(linked);
     },
     [displayQueuesStore.actions]
   );
@@ -173,6 +166,12 @@ export default function DisplayCard({ item, onPress, onLinked }) {
     const displayId = getId(item);
 
     const hydrateQueues = async () => {
+      const prefetched = normalizeDisplayQueues(prefetchedDisplayQueues);
+      if (prefetched.length > 0) {
+        if (!cancelled) setQueues(shapeQueuesForCard(prefetched));
+        return;
+      }
+
       const queuesFromItem = normalizeDisplayQueues(
         item.displayQueue || item.display_queue || item.displayQueues
       );
@@ -190,46 +189,18 @@ export default function DisplayCard({ item, onPress, onLinked }) {
         return;
       }
 
-      try {
-        const linkedQueues = await loadLinkedQueues(displayId);
-        if (linkedQueues.length > 0) {
-          const shaped = shapeQueuesForCard(linkedQueues);
-          if (!cancelled) setQueues(shaped);
-          const firstQueue = shaped?.[0]?.queue;
-          if (firstQueue?.id) {
-            const links = readLocalLinks();
-            links[String(displayId)] = firstQueue;
-            writeLocalLinks(links);
-          }
-        } else {
-          const links = readLocalLinks();
-          const localQueue = links[String(displayId)];
-          if (!cancelled && localQueue?.id) {
-            setQueues([
-              {
-                id: `local-${displayId}-${localQueue.id}`,
-                display: item,
-                queue: localQueue,
-              },
-            ]);
-          } else if (!cancelled) {
-            setQueues([]);
-          }
-        }
-      } catch (error) {
-        const links = readLocalLinks();
-        const localQueue = links[String(displayId)];
-        if (!cancelled && localQueue?.id) {
-          setQueues([
-            {
-              id: `local-${displayId}-${localQueue.id}`,
-              display: item,
-              queue: localQueue,
-            },
-          ]);
-        } else if (!cancelled) {
-          setQueues([]);
-        }
+      const links = readLocalLinks();
+      const localQueue = links[String(displayId)];
+      if (!cancelled && localQueue?.id) {
+        setQueues([
+          {
+            id: `local-${displayId}-${localQueue.id}`,
+            display: item,
+            queue: localQueue,
+          },
+        ]);
+      } else if (!cancelled) {
+        setQueues([]);
       }
     };
 
@@ -237,7 +208,7 @@ export default function DisplayCard({ item, onPress, onLinked }) {
     return () => {
       cancelled = true;
     };
-  }, [item.id, item.displayQueue, item.display_queue, item.displayQueues, loadLinkedQueues, shapeQueuesForCard]);
+  }, [item.id, item.displayQueue, item.display_queue, item.displayQueues, prefetchedDisplayQueues, shapeQueuesForCard]);
 
   const handleQueueUpdate = useCallback(
     (updatedQueue) => {
@@ -265,14 +236,61 @@ export default function DisplayCard({ item, onPress, onLinked }) {
     setLinkError('');
     setLinkingQueue(true);
     try {
-      let result = await queuesStore.actions.getItems({ company: currentCompany.id });
-      let options = Array.isArray(result) ? result : [];
-      if (!options.length) {
-        result = await queuesStore.actions.getItems({});
-        options = Array.isArray(result) ? result : [];
-      }
+      const companyIri = `/people/${currentCompany.id}`;
+      let resultByIri = await queuesStore.actions.getItems({
+        company: companyIri,
+        itemsPerPage: 1000,
+        pagination: false,
+      });
+      let optionsByIri = Array.isArray(resultByIri) ? resultByIri : [];
+
+      // Fallback for APIs that still filter by numeric id.
+      let resultById = await queuesStore.actions.getItems({
+        company: currentCompany.id,
+        itemsPerPage: 1000,
+        pagination: false,
+      });
+      let optionsById = Array.isArray(resultById) ? resultById : [];
+
+      // Keep previous behavior as last fallback: load all queues.
+      let resultAll = await queuesStore.actions.getItems({
+        itemsPerPage: 1000,
+        pagination: false,
+      });
+      let optionsAll = Array.isArray(resultAll) ? resultAll : [];
+
+      // If queue includes company relation, filter all by current company.
+      optionsAll = optionsAll.filter((queue) => {
+        const company = queue?.company;
+        if (!company) return true;
+        const companyId =
+          parseEntityId(company?.id) ||
+          parseEntityId(company?.['@id']) ||
+          parseEntityId(company);
+        return !companyId || companyId === Number(currentCompany.id);
+      });
+
+      let options = mergeQueueOptions(optionsByIri, optionsById, optionsAll);
+
+      // Keep queues already shown in the current list visible in selector.
+      const queuesFromVisibleCards = (Array.isArray(displaysItems) ? displaysItems : [])
+        .flatMap((displayRow) =>
+          normalizeDisplayQueues(
+            displayRow?.displayQueue || displayRow?.display_queue || displayRow?.displayQueues
+          ).map((row) => row?.queue)
+        );
+      const queuesFromLocalLinks = Object.values(readLocalLinks() || {});
+
+      // Keep already linked queues visible in selector even when API filtering is inconsistent.
+      options = mergeQueueOptions(
+        options,
+        queuesFromVisibleCards,
+        queuesFromLocalLinks,
+        queues.map((row) => row?.queue)
+      );
       setQueueOptions(options);
-      const firstId = options?.[0]?.id || getId(options?.[0]) || options?.[0]?.['@id'];
+      const firstIdentity = getQueueIdentity(options?.[0]);
+      const firstId = firstIdentity.id || firstIdentity.iri;
       setSelectedQueueId(firstId ? String(firstId) : '');
       setNewQueueName('');
       setLinkModalVisible(true);
@@ -281,7 +299,7 @@ export default function DisplayCard({ item, onPress, onLinked }) {
     } finally {
       setLinkingQueue(false);
     }
-  }, [currentCompany?.id, queuesStore.actions]);
+  }, [currentCompany?.id, displaysItems, getQueueIdentity, mergeQueueOptions, queues, queuesStore.actions]);
 
   const linkQueueToDisplay = useCallback(
     async (selectedQueue) => {
@@ -289,8 +307,12 @@ export default function DisplayCard({ item, onPress, onLinked }) {
       if (!displayId || !selectedQueue) return;
 
       if (item.displayType === 'products' && queues.length > 0) {
+        const existingQueue = queues[0]?.queue;
         setLinkModalVisible(false);
-        navigation.navigate('QueueAddProducts', { queue: queues[0].queue });
+        navigation.navigate('QueueAddProducts', {
+          queueId: existingQueue?.id,
+          queueName: existingQueue?.queue,
+        });
         return;
       }
 
@@ -334,7 +356,10 @@ export default function DisplayCard({ item, onPress, onLinked }) {
       writeLocalLinks(links);
       if (onLinked) onLinked();
       setLinkModalVisible(false);
-      navigation.navigate('QueueAddProducts', { queue: selectedQueue });
+      navigation.navigate('QueueAddProducts', {
+        queueId: selectedQueue?.id || getId(selectedQueue),
+        queueName: selectedQueue?.queue,
+      });
     },
     [displayQueuesStore.actions, item, loadLinkedQueues, navigation, onLinked, queues, shapeQueuesForCard]
   );
@@ -491,7 +516,12 @@ export default function DisplayCard({ item, onPress, onLinked }) {
       }
 
       if (!linkId) {
-        throw new Error('Nao foi possivel identificar o vinculo para remover.');
+        setQueues([]);
+        const links = readLocalLinks();
+        delete links[String(displayId)];
+        writeLocalLinks(links);
+        if (onLinked) onLinked();
+        return;
       }
 
       await displayQueuesStore.actions.remove(linkId);
@@ -502,7 +532,16 @@ export default function DisplayCard({ item, onPress, onLinked }) {
       writeLocalLinks(links);
       if (onLinked) onLinked();
     } catch (err) {
-      setLinkError(getApiErrorMessage(err, 'Nao foi possivel desvincular a fila.'));
+      // If API already removed the link, treat as successful unlink.
+      if (Number(err?.status || err?.code) === 404) {
+        setQueues([]);
+        const links = readLocalLinks();
+        delete links[String(displayId)];
+        writeLocalLinks(links);
+        if (onLinked) onLinked();
+      } else {
+        setLinkError(getApiErrorMessage(err, 'Nao foi possivel desvincular a fila.'));
+      }
     } finally {
       setUnlinkingQueue(false);
     }

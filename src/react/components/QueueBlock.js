@@ -64,7 +64,12 @@ export default function QueueBlock({ queue, onQueueUpdate }) {
         {env.APP_TYPE === 'MANAGER' && (
           <Pressable
             style={styles.addButton}
-            onPress={() => navigation.navigate('QueueAddProducts', { queue })}
+            onPress={() =>
+              navigation.navigate('QueueAddProducts', {
+                queueId: queue?.id,
+                queueName: queue?.queue,
+              })
+            }
           >
             <Text style={styles.addIcon}>+</Text>
           </Pressable>

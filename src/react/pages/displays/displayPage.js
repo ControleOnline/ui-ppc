@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   FlatList,
@@ -17,15 +17,33 @@ import DisplayCard from '@controleonline/ui-ppc/src/react/components/DisplayCard
 import { env } from '@env';
 
 const BRAND_LOGO = require('@assets/ppc/logo 512x512 r.png');
+const parseEntityId = (value) => {
+  if (!value) return null;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/^\d+$/.test(trimmed)) return Number(trimmed);
+    const iriMatch = trimmed.match(/\/(\d+)(?:\/)?$/);
+    if (iriMatch?.[1]) return Number(iriMatch[1]);
+    return null;
+  }
+  if (typeof value.id === 'number') return value.id;
+  if (typeof value.id === 'string') return parseEntityId(value.id);
+  if (value['@id']) return parseEntityId(String(value['@id']));
+  return null;
+};
 
 const DisplaysPage = () => {
   const { width } = useWindowDimensions();
   const displaysStore = useStore('displays');
+  const displayQueuesStore = useStore('display_queues');
   const peopleStore = useStore('people');
   const navigation = useNavigation();
 
   const { actions, items, isLoading, error } = displaysStore;
+  const { actions: displayQueuesActions } = displayQueuesStore;
   const { currentCompany } = peopleStore.getters;
+  const [displayQueuesRows, setDisplayQueuesRows] = useState([]);
 
   const numColumns = useMemo(() => {
     if (width >= 1700) return 4;
@@ -35,16 +53,46 @@ const DisplaysPage = () => {
   }, [width]);
   const isCompact = width < 920;
 
-  const refreshDisplays = useCallback(() => {
+  const refreshDisplays = useCallback(async () => {
     if (!currentCompany?.id) return;
-    actions.getItems({ company: currentCompany.id });
-  }, [actions, currentCompany?.id]);
+    const displays = await actions.getItems({ company: currentCompany.id });
+    const displayIds = (Array.isArray(displays) ? displays : [])
+      .map((row) => parseEntityId(row?.id || row?.['@id'] || row))
+      .filter(Boolean);
+
+    if (!displayIds.length) {
+      setDisplayQueuesRows([]);
+      return;
+    }
+
+    const linked = await displayQueuesActions.getItems({
+      itemsPerPage: 1000,
+      pagination: false,
+    });
+    const linkedRows = Array.isArray(linked) ? linked : [];
+    const filtered = linkedRows.filter((row) => {
+      const displayId = parseEntityId(row?.display?.id || row?.display?.['@id'] || row?.display);
+      return displayId && displayIds.includes(displayId);
+    });
+    setDisplayQueuesRows(filtered);
+  }, [actions, currentCompany?.id, displayQueuesActions]);
 
   useFocusEffect(
     useCallback(() => {
       refreshDisplays();
     }, [refreshDisplays])
   );
+
+  const prefetchedByDisplay = useMemo(() => {
+    const grouped = {};
+    (Array.isArray(displayQueuesRows) ? displayQueuesRows : []).forEach((row) => {
+      const displayId = parseEntityId(row?.display?.id || row?.display?.['@id'] || row?.display);
+      if (!displayId) return;
+      if (!grouped[displayId]) grouped[displayId] = [];
+      grouped[displayId].push(row);
+    });
+    return grouped;
+  }, [displayQueuesRows]);
 
   const openDisplay = useCallback(
     (item) => {
@@ -65,13 +113,14 @@ const DisplaysPage = () => {
       <View style={styles.itemWrapper}>
         <DisplayCard
           item={item}
+          prefetchedDisplayQueues={prefetchedByDisplay[item.id] || []}
           onPress={() => openDisplay(item)}
           onLinked={refreshDisplays}
           editable={env.APP_TYPE === 'MANAGER'}
         />
       </View>
     ),
-    [openDisplay, refreshDisplays]
+    [openDisplay, prefetchedByDisplay, refreshDisplays]
   );
 
   return (

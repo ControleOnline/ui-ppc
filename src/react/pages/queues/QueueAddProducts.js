@@ -5,7 +5,9 @@ import { Text, List, IconButton, TextInput } from 'react-native-paper';
 import { useStore } from '@store';
 
 export default function QueueAddProducts({ route }) {
-    const { queue } = route.params || {};
+    const params = route.params || {};
+    const queueId = Number(params.queueId || params.queue?.id || params.queue || 0) || null;
+    const queueName = params.queueName || params.queue?.queue || (queueId ? `Fila #${queueId}` : 'Fila');
 
     const productsStore = useStore('products');
     const peopleStore = useStore('people');
@@ -29,8 +31,8 @@ export default function QueueAddProducts({ route }) {
     );
 
     const queueProducts = useMemo(
-        () => items?.filter(p => p.queue?.id === queue?.id) || [],
-        [items, queue],
+        () => items?.filter(p => Number(p.queue?.id) === Number(queueId)) || [],
+        [items, queueId],
     );
 
     const availableProducts = useMemo(
@@ -44,9 +46,10 @@ export default function QueueAddProducts({ route }) {
     );
 
     const addToQueue = product => {
+        if (!queueId) return;
         productActions.save({
             id: product.id,
-            queue: `/queues/${queue.id}`,
+            queue: `/queues/${queueId}`,
         });
     };
 
@@ -59,16 +62,20 @@ export default function QueueAddProducts({ route }) {
 
     return (
         <View style={styles.container}>
-            <Text variant="titleLarge">{queue.queue}</Text>
+            <Text variant="titleLarge">{queueName}</Text>
+            {!queueId && (
+                <Text style={styles.errorText}>Fila inválida. Volte e selecione a fila novamente.</Text>
+            )}
 
             <TextInput
                 label="Adicionar produto"
                 value={search}
                 onChangeText={setSearch}
                 style={styles.input}
+                editable={!!queueId}
             />
 
-            {!!search && (
+            {!!search && !!queueId && (
                 <FlatList
                     data={availableProducts}
                     keyExtractor={item => String(item.id)}
@@ -88,21 +95,23 @@ export default function QueueAddProducts({ route }) {
                 Produtos na fila
             </Text>
 
-            <FlatList
-                data={queueProducts}
-                keyExtractor={item => String(item.id)}
-                renderItem={({ item }) => (
-                    <List.Item
-                        title={item.product}
-                        right={() => (
-                            <IconButton
-                                icon="close"
-                                onPress={() => removeFromQueue(item)}
-                            />
-                        )}
-                    />
-                )}
-            />
+            {!!queueId && (
+                <FlatList
+                    data={queueProducts}
+                    keyExtractor={item => String(item.id)}
+                    renderItem={({ item }) => (
+                        <List.Item
+                            title={item.product}
+                            right={() => (
+                                <IconButton
+                                    icon="close"
+                                    onPress={() => removeFromQueue(item)}
+                                />
+                            )}
+                        />
+                    )}
+                />
+            )}
         </View>
     );
 }
@@ -111,4 +120,5 @@ const styles = StyleSheet.create({
     container: { flex: 1, padding: 16 },
     input: { marginVertical: 12 },
     section: { marginTop: 16 },
+    errorText: { marginTop: 8, color: '#B42318', fontWeight: '700' },
 });
