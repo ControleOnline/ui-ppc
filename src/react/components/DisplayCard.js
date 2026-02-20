@@ -1,6 +1,6 @@
 // DisplayCard.js
 import React, { useState, useCallback, useEffect } from 'react';
-import { Pressable, StyleSheet, Modal, View, TextInput, Text, TouchableOpacity } from 'react-native';
+import { Pressable, StyleSheet, Modal, View, TextInput, Text, TouchableOpacity, Alert } from 'react-native';
 import { Card, Text as PaperText, Button, RadioButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -104,6 +104,7 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
   const [linkError, setLinkError] = useState('');
   const [creatingQueue, setCreatingQueue] = useState(false);
   const [unlinkingQueue, setUnlinkingQueue] = useState(false);
+  const [deletingDisplay, setDeletingDisplay] = useState(false);
 
   const getId = (value) => {
     return extractDisplayId(value);
@@ -226,6 +227,48 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
       setModalVisible(false);
     });
   };
+
+  const deleteDisplay = useCallback(async () => {
+    const displayId = getId(item);
+    if (!displayId) return;
+
+    setDeletingDisplay(true);
+    try {
+      await actions.remove(displayId);
+
+      const links = readLocalLinks();
+      delete links[String(displayId)];
+      writeLocalLinks(links);
+
+      setModalVisible(false);
+      if (onLinked) onLinked();
+    } catch (err) {
+      Alert.alert('Erro', getApiErrorMessage(err, 'Nao foi possivel excluir o display.'));
+    } finally {
+      setDeletingDisplay(false);
+    }
+  }, [actions, item, onLinked]);
+
+  const confirmDeleteDisplay = useCallback(() => {
+    if (deletingDisplay) return;
+    const confirmMessage = `Deseja excluir o display "${item.display}"?`;
+
+    // Web manager flow: use native browser confirm to guarantee action dispatch.
+    if (typeof globalThis?.confirm === 'function') {
+      const accepted = globalThis.confirm(confirmMessage);
+      if (accepted) deleteDisplay();
+      return;
+    }
+
+    Alert.alert(
+      'Excluir display',
+      confirmMessage,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: deleteDisplay },
+      ]
+    );
+  }, [deleteDisplay, deletingDisplay, item.display]);
 
   const openLinkQueueModal = useCallback(async () => {
     if (!currentCompany?.id) {
@@ -570,9 +613,11 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
             <View style={styles.titleRow}>
               <PaperText style={[styles.displayTitle, titleSizing]}>{item.display}</PaperText>
               {env.APP_TYPE === 'MANAGER' && (
-                <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.editIcon}>
-                  <Text style={styles.editIconText}>✎</Text>
-                </TouchableOpacity>
+                <View style={styles.cardActions}>
+                  <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.editIcon}>
+                    <Text style={styles.editIconText}>✎</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
             <View style={styles.typePill}>
@@ -705,6 +750,15 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
               <Button mode="contained" onPress={saveDisplay} style={{ marginTop: 10 }}>
                 Salvar
               </Button>
+              <Button
+                mode="outlined"
+                onPress={confirmDeleteDisplay}
+                style={{ marginTop: 10, borderColor: '#EF4444' }}
+                textColor="#B91C1C"
+                disabled={deletingDisplay}
+              >
+                {deletingDisplay ? 'Excluindo...' : 'Excluir display'}
+              </Button>
               <Button onPress={() => setModalVisible(false)} style={{ marginTop: 5 }}>
                 Cancelar
               </Button>
@@ -765,8 +819,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     maxWidth: '92%',
   },
-  editIcon: {
+  cardActions: {
     marginLeft: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editIcon: {
     backgroundColor: '#111827',
     borderWidth: 1,
     borderColor: '#334155',
