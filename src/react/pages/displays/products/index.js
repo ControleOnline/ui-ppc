@@ -112,48 +112,83 @@ const DisplayProducts = () => {
             <ScrollView>
                 {loaded.status_in && (
                     <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-                        {orders.status_in.map((order, index) => (
-                            <View key={index} style={{ width }}>
+                        {orders.status_in.length > 0 ? (
+                            orders.status_in.map((order, index) => (
+                                <View key={index} style={{ width }}>
+                                    <InOut
+                                        orders={[order]}
+                                        total={totals.status_in}
+                                        status_in={statusIn}
+                                        status_working={statusWorking}
+                                        onReload={onRequest}
+                                    />
+                                </View>
+                            ))
+                        ) : (
+                            <View style={{ width }}>
                                 <InOut
-                                    orders={[order]}
+                                    orders={[]}
                                     total={totals.status_in}
                                     status_in={statusIn}
                                     status_working={statusWorking}
                                     onReload={onRequest}
                                 />
                             </View>
-                        ))}
+                        )}
                     </ScrollView>
                 )}
 
                 {loaded.status_working && (
                     <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-                        {orders.status_working.map((order, index) => (
-                            <View key={index} style={{ width }}>
+                        {orders.status_working.length > 0 ? (
+                            orders.status_working.map((order, index) => (
+                                <View key={index} style={{ width }}>
+                                    <Working
+                                        orders={[order]}
+                                        total={totals.status_working}
+                                        status_working={statusWorking}
+                                        status_out={statusOut}
+                                        onReload={onRequest}
+                                    />
+                                </View>
+                            ))
+                        ) : (
+                            <View style={{ width }}>
                                 <Working
-                                    orders={[order]}
+                                    orders={[]}
                                     total={totals.status_working}
                                     status_working={statusWorking}
                                     status_out={statusOut}
                                     onReload={onRequest}
                                 />
                             </View>
-                        ))}
+                        )}
                     </ScrollView>
                 )}
 
                 {loaded.status_out && (
                     <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-                        {orders.status_out.map((order, index) => (
-                            <View key={index} style={{ width }}>
+                        {orders.status_out.length > 0 ? (
+                            orders.status_out.map((order, index) => (
+                                <View key={index} style={{ width }}>
+                                    <InOut
+                                        orders={[order]}
+                                        total={totals.status_out}
+                                        status_in={statusOut}
+                                        onReload={onRequest}
+                                    />
+                                </View>
+                            ))
+                        ) : (
+                            <View style={{ width }}>
                                 <InOut
-                                    orders={[order]}
+                                    orders={[]}
                                     total={totals.status_out}
                                     status_in={statusOut}
                                     onReload={onRequest}
                                 />
                             </View>
-                        ))}
+                        )}
                     </ScrollView>
                 )}
             </ScrollView>
