@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, Pressable, Modal, ScrollView } from 'react-native';
 import { Text, Button, RadioButton } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import { env } from '@env';
+import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 
 export default function QueueBlock({ queue, onQueueUpdate }) {
   const navigation = useNavigation();
@@ -11,6 +12,8 @@ export default function QueueBlock({ queue, onQueueUpdate }) {
   const queueStore = useStore('queues');
   const { actions: actionsQueue } = queueStore;
   const { actions, items } = statusStore;
+  const { ppcColors } = usePpcTheme();
+  const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [statusList, setStatusList] = useState([]);
@@ -106,7 +109,8 @@ export default function QueueBlock({ queue, onQueueUpdate }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (ppcColors) =>
+  StyleSheet.create({
   queueBlock: { alignItems: 'center', marginTop: 8, width: '100%' },
   titleRow: {
     flexDirection: 'row',
@@ -116,8 +120,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   queueTitle: {
-    backgroundColor: '#FACC15',
-    color: '#111827',
+    backgroundColor: ppcColors.accent,
+    color: ppcColors.pillTextDark,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
@@ -130,7 +134,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 999,
-    backgroundColor: '#FACC15',
+    backgroundColor: ppcColors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -140,8 +144,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#1E293B',
-    backgroundColor: '#101927',
+    borderColor: ppcColors.border,
+    backgroundColor: ppcColors.cardBgSoft,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
@@ -153,7 +157,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 13,
-    color: '#CBD5E1',
+    color: ppcColors.textSecondary,
     textAlign: 'center',
     fontWeight: '700',
   },
@@ -164,24 +168,24 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1E293B',
+    backgroundColor: ppcColors.border,
   },
-  addIcon: { fontSize: 14, color: '#0F172A', fontWeight: '900', lineHeight: 14 },
-  editIcon: { fontSize: 12, color: '#E2EDFC', fontWeight: '900', lineHeight: 12 },
+  addIcon: { fontSize: 14, color: ppcColors.textDark, fontWeight: '900', lineHeight: 14 },
+  editIcon: { fontSize: 12, color: ppcColors.textPrimary, fontWeight: '900', lineHeight: 12 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(2,9,18,0.8)',
+    backgroundColor: ppcColors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     width: '84%',
     maxWidth: 420,
-    backgroundColor: '#FFF',
+    backgroundColor: ppcColors.modalBg,
     borderRadius: 14,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#DDE6F2',
+    borderColor: ppcColors.border,
   },
-  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10, color: '#0F172A' },
+  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10, color: ppcColors.textDark },
 });

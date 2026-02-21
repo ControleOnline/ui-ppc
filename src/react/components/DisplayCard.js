@@ -1,5 +1,5 @@
 // DisplayCard.js
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, Modal, View, TextInput, Text, TouchableOpacity, Alert } from 'react-native';
 import { Card, Text as PaperText, Button, RadioButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import QueuesList from './QueuesList';
 import { useStore } from '@store';
 import { env } from '@env';
+import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 
 const iconByType = {
   products: 'silverware-fork-knife',
@@ -88,6 +89,8 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
   const { actions } = displaysStore;
   const displaysItems = displaysStore.items || [];
   const { currentCompany } = peopleStore.getters;
+  const { ppcColors, isDark } = usePpcTheme();
+  const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
   const [queues, setQueues] = useState(
     normalizeDisplayQueues(item.displayQueue || item.display_queue || item.displayQueues)
@@ -590,7 +593,11 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
     }
   }, [displayQueuesStore.actions, item, loadLinkedQueues, onLinked, queues]);
 
-  const accent = typeAccentByType[item.displayType] || '#FACC15';
+  const accent =
+    (item.displayType === 'orders' ? ppcColors.accentInfo : ppcColors.accent) ||
+    typeAccentByType[item.displayType] ||
+    '#FACC15';
+  const accentSoft = isDark ? `${accent}C0` : `${accent}8A`;
   const titleSizing = getTitleStyleByName(item.display);
 
   return (
@@ -600,7 +607,7 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
         style={({ pressed }) => [styles.cardPressable, pressed && styles.cardPressed]}
       >
         <Card style={styles.displayCard}>
-          <View style={[styles.typeAccent, { backgroundColor: accent }]} />
+          <View style={[styles.typeAccent, { backgroundColor: accentSoft }]} />
           <View style={styles.cardGlow} />
           <Card.Content style={styles.cardContent}>
             <View style={styles.iconWrap}>
@@ -770,20 +777,21 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (ppcColors) =>
+  StyleSheet.create({
   cardPressable: { flex: 1 },
   cardPressed: { opacity: 0.96, transform: [{ scale: 0.992 }] },
   displayCard: {
     flex: 1,
     minHeight: 260,
     borderRadius: 18,
-    backgroundColor: '#0D141D',
+    backgroundColor: ppcColors.cardBg,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: ppcColors.borderSoft,
     overflow: 'hidden',
   },
   typeAccent: {
-    height: 2,
+    height: 1,
     width: '100%',
   },
   cardGlow: {
@@ -793,8 +801,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     top: -80,
     right: -70,
-    backgroundColor: '#1E293B',
-    opacity: 0.38,
+    backgroundColor: ppcColors.border,
+    opacity: 0.24,
   },
   cardContent: {
     alignItems: 'center',
@@ -810,8 +818,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#1E293B',
-    backgroundColor: '#101927',
+    borderColor: ppcColors.border,
+    backgroundColor: ppcColors.cardBgSoft,
   },
   titleRow: {
     flexDirection: 'row',
@@ -825,9 +833,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editIcon: {
-    backgroundColor: '#111827',
+    backgroundColor: ppcColors.pillTextDark,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: ppcColors.borderSoft,
     width: 24,
     height: 24,
     borderRadius: 999,
@@ -835,21 +843,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   editIconText: {
-    color: '#E2E8F0',
+    color: ppcColors.textSecondary,
     fontSize: 14,
     lineHeight: 16,
   },
   displayTitle: {
     fontWeight: '900',
-    color: '#F8FAFC',
+    color: ppcColors.textPrimary,
     textAlign: 'center',
   },
   typePill: {
     marginTop: 6,
     marginBottom: 12,
-    backgroundColor: '#0C1219',
+    backgroundColor: ppcColors.panelBg,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: ppcColors.border,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 3,
@@ -866,8 +874,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#FACC15',
-    backgroundColor: '#0C1219',
+    borderColor: ppcColors.accent,
+    backgroundColor: ppcColors.panelBg,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
@@ -875,7 +883,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   linkQueueButtonText: {
-    color: '#FACC15',
+    color: ppcColors.accent,
     fontWeight: '800',
     fontSize: 12,
     textTransform: 'uppercase',
@@ -886,13 +894,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#EF4444',
-    backgroundColor: '#1A0D10',
+    borderColor: ppcColors.danger,
+    backgroundColor: ppcColors.dangerBg,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   unlinkQueueButtonText: {
-    color: '#FCA5A5',
+    color: ppcColors.dangerText,
     fontWeight: '800',
     fontSize: 12,
     textTransform: 'uppercase',
@@ -900,7 +908,7 @@ const styles = StyleSheet.create({
   },
   linkQueueErrorText: {
     marginTop: 8,
-    color: '#FCA5A5',
+    color: ppcColors.dangerText,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
@@ -908,35 +916,35 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(2,9,18,0.8)',
+    backgroundColor: ppcColors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     width: '84%',
     maxWidth: 420,
-    backgroundColor: '#FBFCFF',
+    backgroundColor: ppcColors.modalBg,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ppcColors.border,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 4 },
-  modalLabel: { fontSize: 14, fontWeight: '700', marginTop: 12, color: '#334155' },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: ppcColors.textDark, marginBottom: 4 },
+  modalLabel: { fontSize: 14, fontWeight: '700', marginTop: 12, color: ppcColors.borderSoft },
   createQueueDivider: {
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: ppcColors.border,
     marginTop: 10,
     marginBottom: 2,
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: '#C9D5E3',
+    borderColor: ppcColors.border,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginTop: 6,
-    color: '#0F172A',
+    color: ppcColors.textDark,
     backgroundColor: '#FFFFFF',
   },
   createQueueButton: {

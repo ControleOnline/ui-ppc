@@ -13,6 +13,8 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import { useStore } from '@store'
 import OrderProducts from '@controleonline/ui-ppc/src/react/components/OrderProducts'
 import KDSOrderHeader from '@controleonline/ui-ppc/src/react/components/KDSOrderHeader'
+import AppearanceToggle from '@controleonline/ui-ppc/src/react/components/AppearanceToggle'
+import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme'
 
 const Orders = () => {
     const route = useRoute()
@@ -25,6 +27,7 @@ const Orders = () => {
     const display = decodeURIComponent(route.params?.id || '')
     const [orders, setOrders] = useState([])
     const { currentCompany } = peopleStore.getters;
+    const { ppcColors, isDark, toggleAppearanceMode } = usePpcTheme()
 
     const columns = useMemo(() => {
         if (width >= 2200) return 5
@@ -41,7 +44,7 @@ const Orders = () => {
         return 0.92
     }, [width])
 
-    const styles = useMemo(() => createStyles(scale), [scale])
+    const styles = useMemo(() => createStyles(scale, ppcColors), [scale, ppcColors])
 
     const fetchOrders = useCallback(() => {
         if (!display || !currentCompany) return
@@ -82,10 +85,16 @@ const Orders = () => {
                 <Text style={styles.headerTitle}>Pedidos na fila</Text>
 
                 <View style={styles.headerRight}>
+                    <AppearanceToggle
+                        isDark={isDark}
+                        onToggle={toggleAppearanceMode}
+                        ppcColors={ppcColors}
+                        compact
+                    />
                     {isLoading ? (
                         <ActivityIndicator
                             size="small"
-                            color="#FACC15"
+                            color={ppcColors.accent}
                             style={styles.loader}
                         />
                     ) : <View style={styles.badge}>
@@ -120,11 +129,11 @@ const Orders = () => {
     )
 }
 
-const createStyles = scale =>
+const createStyles = (scale, ppcColors) =>
     StyleSheet.create({
         container: {
             flex: 1,
-            backgroundColor: '#060A11',
+            backgroundColor: ppcColors.appBg,
         },
         header: {
             flexDirection: 'row',
@@ -132,29 +141,30 @@ const createStyles = scale =>
             justifyContent: 'space-between',
             paddingHorizontal: 16 * scale,
             paddingVertical: 12 * scale,
-            backgroundColor: '#0B1220',
+            backgroundColor: ppcColors.panelBg,
             borderBottomWidth: 1,
-            borderBottomColor: '#1E293B',
+            borderBottomColor: ppcColors.border,
         },
         headerTitle: {
-            color: '#F8FAFC',
+            color: ppcColors.textPrimary,
             fontSize: 22 * scale,
             fontWeight: '900',
         },
         headerRight: {
             flexDirection: 'row',
             alignItems: 'center',
+            gap: 10 * scale,
         },
         badge: {
             minWidth: 50 * scale,
             paddingHorizontal: 14 * scale,
             paddingVertical: 6 * scale,
             borderRadius: 999,
-            backgroundColor: '#FACC15',
+            backgroundColor: ppcColors.accent,
             alignItems: 'center',
         },
         badgeText: {
-            color: '#000',
+            color: ppcColors.textDark,
             fontSize: 18 * scale,
             fontWeight: '900',
         },
@@ -166,12 +176,12 @@ const createStyles = scale =>
         },
         card: {
             flex: 1,
-            backgroundColor: '#0D141D',
+            backgroundColor: ppcColors.cardBg,
             padding: 10 * scale,
             margin: 5 * scale,
             borderRadius: 14,
             borderWidth: 1,
-            borderColor: '#1E293B',
+            borderColor: ppcColors.border,
             minHeight: 260 * scale,
         },
         itemRow: {
@@ -180,20 +190,20 @@ const createStyles = scale =>
             paddingLeft: 8 * scale,
             borderLeftWidth: 5,
             borderRadius: 10,
-            backgroundColor: '#101927',
+            backgroundColor: ppcColors.cardBgSoft,
         },
         text: {
-            color: '#F8FAFC',
+            color: ppcColors.textPrimary,
             fontSize: 16 * scale,
             fontWeight: '700',
         },
         subText: {
-            color: '#CBD5E1',
+            color: ppcColors.textSecondary,
             fontSize: 13 * scale,
             fontWeight: '500',
         },
         qtyText: {
-            color: '#FACC15',
+            color: ppcColors.accent,
             fontWeight: '900',
         },
         statusMarker: {

@@ -14,7 +14,9 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
 import DisplayCard from '@controleonline/ui-ppc/src/react/components/DisplayCard';
+import AppearanceToggle from '@controleonline/ui-ppc/src/react/components/AppearanceToggle';
 import { env } from '@env';
+import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 
 const BRAND_LOGO = require('@assets/ppc/logo 512x512 r.png');
 const parseEntityId = (value) => {
@@ -44,6 +46,8 @@ const DisplaysPage = () => {
   const { actions: displayQueuesActions } = displayQueuesStore;
   const { currentCompany } = peopleStore.getters;
   const [displayQueuesRows, setDisplayQueuesRows] = useState([]);
+  const { ppcColors, isDark, toggleAppearanceMode } = usePpcTheme();
+  const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
   const numColumns = useMemo(() => {
     if (width >= 1700) return 4;
@@ -142,6 +146,7 @@ const DisplaysPage = () => {
             </View>
           </View>
           <View style={[styles.heroActions, isCompact && styles.heroActionsCompact]}>
+            <AppearanceToggle isDark={isDark} onToggle={toggleAppearanceMode} ppcColors={ppcColors} />
             <View style={styles.countPill}>
               <Text style={styles.countNumber}>{items?.length || 0}</Text>
               <Text style={styles.countLabel}>displays</Text>
@@ -168,17 +173,17 @@ const DisplaysPage = () => {
       )}
       {isLoading && (
         <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color="#FACC15" />
+          <ActivityIndicator size="large" color={ppcColors.accent} />
         </View>
       )}
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (ppcColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#060A11',
+    backgroundColor: ppcColors.appBg,
   },
   hero: {
     marginHorizontal: 14,
@@ -186,11 +191,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 18,
     overflow: 'hidden',
-    backgroundColor: '#0B1220',
+    backgroundColor: ppcColors.panelBg,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: ppcColors.border,
     borderTopWidth: 2,
-    borderTopColor: '#FACC15',
+    borderTopColor: ppcColors.accent,
     position: 'relative',
   },
   heroGlow: {
@@ -200,7 +205,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 999,
-    backgroundColor: '#1E293B',
+    backgroundColor: ppcColors.border,
     opacity: 0.5,
   },
   heroTopRow: {
@@ -225,8 +230,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#334155',
-    backgroundColor: '#111827',
+    borderColor: ppcColors.borderSoft,
+    backgroundColor: ppcColors.pillTextDark,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -235,14 +240,14 @@ const styles = StyleSheet.create({
     height: 28,
   },
   heroTitle: {
-    color: '#F1F5F9',
+    color: ppcColors.textPrimary,
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
   heroSubtitle: {
     marginTop: 2,
-    color: '#94A3B8',
+    color: ppcColors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -262,19 +267,19 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#FACC15',
-    backgroundColor: '#0C1219',
+    borderColor: ppcColors.accent,
+    backgroundColor: ppcColors.panelBg,
     alignItems: 'center',
     minWidth: 76,
   },
   countNumber: {
-    color: '#FACC15',
+    color: ppcColors.accent,
     fontSize: 18,
     fontWeight: '900',
     lineHeight: 20,
   },
   countLabel: {
-    color: '#E2E8F0',
+    color: ppcColors.textSecondary,
     fontSize: 10,
     textTransform: 'uppercase',
     fontWeight: '700',
@@ -293,16 +298,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   addButton: {
-    backgroundColor: '#0C1219',
+    backgroundColor: ppcColors.panelBg,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 999,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: ppcColors.border,
   },
   addButtonText: {
-    color: '#FACC15',
+    color: ppcColors.accent,
     fontWeight: '800',
     fontSize: 14,
   },
