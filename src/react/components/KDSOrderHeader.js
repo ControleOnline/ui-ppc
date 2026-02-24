@@ -19,63 +19,43 @@ const getWaitingMinutes = orderDate => {
   return Math.max(0, Math.floor(diff / 60000))
 }
 
-const getWaitingConfig = minutes => {
-  return WAITING_RULES.find(rule => minutes <= rule.max) || WAITING_RULES[0]
-}
+const getWaitingConfig = minutes =>
+  WAITING_RULES.find(rule => minutes <= rule.max)
 
 const extractExtraEntries = extraData => {
-  if (!extraData) return []
+  if (!Array.isArray(extraData)) return []
 
-  if (Array.isArray(extraData)) {
-    return extraData
-      .map((item, index) => ({
-        id: item?.id || `extra-${index}`,
-        context:
-          item?.extra_fields?.context ||
-          item?.extraField?.context ||
-          item?.label ||
-          item?.key ||
-          'Info',
-        value: item?.value || item?.content || '',
-      }))
-      .filter(item => item.value)
-  }
-
-  if (typeof extraData === 'object') {
-    return Object.entries(extraData)
-      .filter(([, value]) => typeof value === 'string' && value.trim())
-      .map(([context, value], index) => ({
-        id: `extra-object-${index}`,
-        context,
-        value,
-      }))
-  }
-
-  return []
+  return extraData
+    .filter(
+      item =>
+        item?.value &&
+        item?.extra_fields?.name === 'code' &&
+        item?.extra_fields?.context
+    )
+    .map(item => ({
+      id: item.id,
+      context: item.extra_fields.context,
+      value: item.value,
+    }))
 }
 
 const isChannelEntry = context =>
-  /ifood|food99|99|instagram|insta|keeta|whats|messenger|facebook/i.test(String(context || ''))
+  /ifood|food99|99|instagram|insta|keeta|whats|messenger|facebook/i.test(
+    String(context || ''),
+  )
 
 const getExternalOrderRef = order => {
   const entries = extractExtraEntries(order?.extraData)
   const preferred = entries.find(item => isChannelEntry(item.context))
-  const first = entries[0]
-  const fallback = normalizeText(
-    order?.externalCode || order?.externalId || order?.reference || order?.code,
-  )
-
-  return normalizeText(preferred?.value || first?.value || fallback)
+  return normalizeText(preferred?.value)
 }
 
 const getCustomerName = order =>
   normalizeText(
     order?.client?.name ||
       order?.person?.name ||
-      order?.person?.person ||
       order?.customer?.name ||
-      order?.customerName ||
-      order?.name,
+      order?.customerName,
   )
 
 const getCustomerContact = order => {
@@ -88,10 +68,12 @@ const getCustomerContact = order => {
     : order?.client?.phone
 
   if (phoneSource && typeof phoneSource === 'object' && phoneSource.phone) {
-    return normalizeText(`+${phoneSource.ddi || ''} (${phoneSource.ddd || ''}) ${phoneSource.phone}`)
+    return normalizeText(
+      `+${phoneSource.ddi || ''} (${phoneSource.ddd || ''}) ${phoneSource.phone}`,
+    )
   }
 
-  return normalizeText(email || phoneSource || order?.person?.phone || order?.person?.email)
+  return normalizeText(email || phoneSource)
 }
 
 const KDSOrderHeader = ({ order, compact = false, showCustomer = false }) => {
@@ -105,11 +87,9 @@ const KDSOrderHeader = ({ order, compact = false, showCustomer = false }) => {
 
   useEffect(() => {
     if (!isOpen) return
-
     const interval = setInterval(() => {
       setWaitingMinutes(getWaitingMinutes(order?.orderDate))
     }, 60000)
-
     return () => clearInterval(interval)
   }, [order?.orderDate, isOpen])
 
@@ -121,7 +101,7 @@ const KDSOrderHeader = ({ order, compact = false, showCustomer = false }) => {
       return
     }
 
-    if (waitingConfig.blink) {
+    if (waitingConfig?.blink) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(blinkAnim, {
@@ -139,7 +119,7 @@ const KDSOrderHeader = ({ order, compact = false, showCustomer = false }) => {
     } else {
       blinkAnim.setValue(1)
     }
-  }, [waitingConfig.blink, isOpen])
+  }, [waitingConfig?.blink, isOpen])
 
   const channelLogo = getOrderChannelLogo(order)
   const channelLabel = getOrderChannelLabel(order)
@@ -165,8 +145,8 @@ const KDSOrderHeader = ({ order, compact = false, showCustomer = false }) => {
                   style={[
                     styles.waitingTime,
                     {
-                      color: waitingConfig.color,
-                      opacity: waitingConfig.blink ? blinkAnim : 1,
+                      color: waitingConfig?.color,
+                      opacity: waitingConfig?.blink ? blinkAnim : 1,
                     },
                   ]}
                 >
@@ -180,22 +160,24 @@ const KDSOrderHeader = ({ order, compact = false, showCustomer = false }) => {
         <View style={styles.rightInfo}>
           <View style={[styles.statusBadge, { borderColor: statusColor }]}>
             <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-            <Text style={styles.statusText}>{order?.status?.status || 'Status'}</Text>
+            <Text style={styles.statusText}>
+              {order?.status?.status}
+            </Text>
           </View>
-          <Text style={styles.orderPrice}>{Formatter.formatMoney(order?.price)}</Text>
+          <Text style={styles.orderPrice}>
+            {Formatter.formatMoney(order?.price)}
+          </Text>
         </View>
       </View>
 
       <View style={styles.bottomRow}>
         <View style={styles.channelWrap}>
-          {channelLogo ? (
+          {channelLogo && (
             <Image source={channelLogo} style={styles.channelLogo} resizeMode="contain" />
-          ) : (
-            <View style={styles.channelFallback}>
-              <Text style={styles.channelFallbackText}>{channelLabel[0] || 'B'}</Text>
-            </View>
           )}
-          <Text style={styles.channelText}>{externalOrderRef || channelLabel}</Text>
+          <Text style={styles.channelText}>
+            {externalOrderRef || channelLabel}
+          </Text>
         </View>
       </View>
 
@@ -204,6 +186,7 @@ const KDSOrderHeader = ({ order, compact = false, showCustomer = false }) => {
           {customerName}
         </Text>
       )}
+
       {showCustomer && !!customerContact && (
         <Text numberOfLines={1} style={styles.customerContactText}>
           {customerContact}
@@ -306,20 +289,6 @@ const styles = StyleSheet.create({
     height: 22,
     marginRight: 8,
     borderRadius: 4,
-  },
-  channelFallback: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    marginRight: 8,
-    backgroundColor: '#FACC15',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  channelFallbackText: {
-    color: '#0B1016',
-    fontSize: 12,
-    fontWeight: '800',
   },
   channelText: {
     color: '#D1D5DB',
