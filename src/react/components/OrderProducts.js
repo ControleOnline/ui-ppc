@@ -74,7 +74,7 @@ const OrderProducts = ({ order, scale, styles, indentStep = 16 }) => {
             >
                 <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
                     <Text style={[styles.statusMarker, { color: getItemColor(order, node) }]}>● </Text>
-                    <Text style={styles.qtyText}>{node.quantity}x </Text>
+                    {(node.quantity > 1 || node.quantity < 1) && <Text style={styles.qtyText}>{node.quantity}x </Text>}
                     {node.product.product}
                 </Text>
             </View>
