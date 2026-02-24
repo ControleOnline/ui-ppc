@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useStore } from '@store';
 
 const APPEARANCE_KEY = 'ppc_appearance_mode_v1';
+const APPEARANCE_EVENT = 'ppc-appearance-change';
 const DARK = 'dark';
 const LIGHT = 'light';
 
@@ -18,6 +19,11 @@ export const writePpcAppearanceMode = (mode) => {
   const nextMode = mode === LIGHT ? LIGHT : DARK;
   try {
     globalThis?.localStorage?.setItem(APPEARANCE_KEY, nextMode);
+    globalThis?.dispatchEvent?.(
+      new CustomEvent(APPEARANCE_EVENT, {
+        detail: { mode: nextMode },
+      })
+    );
   } catch (e) {
     // noop
   }
@@ -97,8 +103,16 @@ export const usePpcTheme = () => {
 
   useEffect(() => {
     const onStorage = () => setMode(readPpcAppearanceMode());
+    const onAppearanceChange = (event) => {
+      const nextMode = event?.detail?.mode === LIGHT ? LIGHT : DARK;
+      setMode(nextMode);
+    };
     globalThis?.addEventListener?.('storage', onStorage);
-    return () => globalThis?.removeEventListener?.('storage', onStorage);
+    globalThis?.addEventListener?.(APPEARANCE_EVENT, onAppearanceChange);
+    return () => {
+      globalThis?.removeEventListener?.('storage', onStorage);
+      globalThis?.removeEventListener?.(APPEARANCE_EVENT, onAppearanceChange);
+    };
   }, []);
 
   const ppcColors = useMemo(

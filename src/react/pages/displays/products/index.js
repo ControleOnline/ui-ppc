@@ -1,22 +1,29 @@
-import React, { useState, useCallback } from 'react';
-import { View, useWindowDimensions, ScrollView } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, useWindowDimensions, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useFocusEffect } from '@react-navigation/native';
 import { useStore } from '@store';
+import { api } from '@controleonline/ui-common/src/api';
 import InOut from './Status/InOut';
 import Working from './Status/Working';
+import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 
 const DisplayProducts = () => {
     const route = useRoute();
     const { width } = useWindowDimensions();
-    const display = decodeURIComponent(route.params?.id);
+    const display = decodeURIComponent(
+        route.params?.id ||
+        (typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('id') || ''
+            : '')
+    );
 
     const peopleStore = useStore('people');
-    const orderQueueStore = useStore('order_products_queue');
     const displayQueueStore = useStore('display_queues');
+    const { ppcColors } = usePpcTheme();
+    const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
     const { currentCompany } = peopleStore.getters;
-    const { getters, actions: orderActions } = orderQueueStore;
     const { actions: displayQueueActions } = displayQueueStore;
 
     const [loaded, setLoaded] = useState({});
@@ -44,31 +51,38 @@ const DisplayProducts = () => {
 
     const getMyOrders = async (key, statusIds, rows) => {
         if (!statusIds.length) {
+            setTotals(prev => ({ ...prev, [key]: 0 }));
+            setOrders(prev => ({ ...prev, [key]: [] }));
             setLoaded(prev => ({ ...prev, [key]: true }));
             return;
         }
 
-        const result = await orderActions.getItems({
-            status: statusIds,
-            itemsPerPage: rows,
-            'order_product.order.provider': currentCompany?.id,
-        });
+        try {
+            const response = await api.fetch('order_product_queues', {
+                params: {
+                    status: [...new Set(statusIds)],
+                    itemsPerPage: rows,
+                    'order_product.order.provider': currentCompany?.id,
+                },
+            });
 
-        setTotals(prev => ({
-            ...prev,
-            [key]: getters.totalItems ?? 0,
-        }));
+            setTotals(prev => ({
+                ...prev,
+                [key]: Number(response?.totalItems) || 0,
+            }));
 
-        setOrders(prev => ({
-            ...prev,
-            [key]: Array.isArray(result) ? result : [],
-        }));
-
-        setLoaded(prev => ({ ...prev, [key]: true }));
+            setOrders(prev => ({
+                ...prev,
+                [key]: Array.isArray(response?.member) ? response.member : [],
+            }));
+        } finally {
+            setLoaded(prev => ({ ...prev, [key]: true }));
+        }
     };
 
     const onRequest = async () => {
         setOrders({ status_in: [], status_working: [], status_out: [] });
+        setTotals({ status_in: 0, status_working: 0, status_out: 0 });
         setLoaded({});
 
         const rows = getResponsiveItemsPerPage();
@@ -78,7 +92,7 @@ const DisplayProducts = () => {
         const workingIds = [];
         const outIds = [];
 
-        result.forEach(item => {
+        (Array.isArray(result) ? result : []).forEach(item => {
             if (item.queue.status_in) {
                 inIds.push(item.queue.status_in.id);
                 setStatusIn(item.queue.status_in);
@@ -108,8 +122,8 @@ const DisplayProducts = () => {
     );
 
     return (
-        <SafeAreaView style={{ flex: 1 }}>
-            <ScrollView>
+        <SafeAreaView style={styles.container}>
+            <ScrollView contentContainerStyle={styles.content}>
                 {loaded.status_in && (
                     <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
                         {orders.status_in.length > 0 ? (
@@ -195,5 +209,18 @@ const DisplayProducts = () => {
         </SafeAreaView>
     );
 };
+
+const createStyles = (ppcColors) =>
+    StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: ppcColors.appBg,
+        },
+        content: {
+            paddingVertical: 8,
+            backgroundColor: ppcColors.appBg,
+            minHeight: '100%',
+        },
+    });
 
 export default DisplayProducts;

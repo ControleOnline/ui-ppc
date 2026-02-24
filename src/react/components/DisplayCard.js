@@ -1,6 +1,6 @@
 // DisplayCard.js
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Pressable, StyleSheet, Modal, View, TextInput, Text, TouchableOpacity, Alert } from 'react-native';
+import { Pressable, StyleSheet, Modal, View, TextInput, Text, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { Card, Text as PaperText, Button, RadioButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -679,56 +679,91 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
 
       <Modal visible={linkModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Vincular Fila</Text>
+          <View style={styles.linkModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Vincular Fila</Text>
+              <Text style={styles.modalSubtitle}>Conecte uma fila existente ou crie uma nova</Text>
+            </View>
             <Text style={styles.modalLabel}>Escolha uma fila existente</Text>
 
-            {queueOptions.length > 0 ? (
-              <RadioButton.Group
-                onValueChange={(value) => setSelectedQueueId(String(value))}
-                value={selectedQueueId}
+            <ScrollView
+              style={styles.linkModalList}
+              contentContainerStyle={styles.linkModalListContent}
+              showsVerticalScrollIndicator
+            >
+              {queueOptions.length > 0 ? (
+                <RadioButton.Group
+                  onValueChange={(value) => setSelectedQueueId(String(value))}
+                  value={selectedQueueId}
+                >
+                  {queueOptions.map((queue) => {
+                    const queueKey = queue.id || getId(queue) || queue?.['@id'];
+                    const queueValue = String(queue.id || getId(queue) || queue?.['@id']);
+                    return (
+                      <View
+                        key={queueKey}
+                        style={[
+                          styles.linkModalItemWrap,
+                          String(selectedQueueId) === queueValue && styles.linkModalItemWrapSelected,
+                        ]}
+                      >
+                        <RadioButton.Item
+                          label={queue.queue || `Fila #${queueValue}`}
+                          value={queueValue}
+                          color={ppcColors.accent}
+                          uncheckedColor={ppcColors.borderSoft}
+                          labelStyle={styles.linkModalRadioLabel}
+                          style={styles.linkModalRadioItem}
+                        />
+                      </View>
+                    );
+                  })}
+                </RadioButton.Group>
+              ) : (
+                <Text style={styles.linkModalHintText}>
+                  {linkingQueue ? 'Carregando filas...' : 'Nenhuma fila disponivel nesta empresa.'}
+                </Text>
+              )}
+            </ScrollView>
+
+            <View style={styles.linkModalFooter}>
+              <View style={styles.createQueueDivider} />
+              <Text style={styles.modalLabel}>Ou crie uma nova fila</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newQueueName}
+                onChangeText={setNewQueueName}
+                placeholder="Nome da nova fila"
+                placeholderTextColor={ppcColors.textSecondary}
+              />
+              <Button
+                mode="outlined"
+                onPress={createQueueAndBind}
+                style={styles.createQueueButton}
+                textColor={ppcColors.accent}
+                disabled={creatingQueue || linkingQueue}
               >
-                {queueOptions.map((queue) => (
-                  <RadioButton.Item
-                    key={queue.id || getId(queue) || queue?.['@id']}
-                    label={queue.queue || `Fila #${queue.id || getId(queue) || queue?.['@id']}`}
-                    value={String(queue.id || getId(queue) || queue?.['@id'])}
-                  />
-                ))}
-              </RadioButton.Group>
-            ) : (
-              <Text style={styles.linkQueueErrorText}>Nenhuma fila disponivel nesta empresa.</Text>
-            )}
+                {creatingQueue ? 'Criando...' : 'Criar e Vincular'}
+              </Button>
 
-            <View style={styles.createQueueDivider} />
-            <Text style={styles.modalLabel}>Ou crie uma nova fila</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={newQueueName}
-              onChangeText={setNewQueueName}
-              placeholder="Nome da nova fila"
-              placeholderTextColor="#7B8290"
-            />
-            <Button
-              mode="outlined"
-              onPress={createQueueAndBind}
-              style={styles.createQueueButton}
-              disabled={creatingQueue || linkingQueue}
-            >
-              {creatingQueue ? 'Criando...' : 'Criar e Vincular'}
-            </Button>
-
-            <Button
-              mode="contained"
-              onPress={bindSelectedQueue}
-              style={{ marginTop: 10 }}
-              disabled={!queueOptions.length || !selectedQueueId || linkingQueue || creatingQueue || unlinkingQueue}
-            >
-              {linkingQueue ? 'Vinculando...' : 'Vincular'}
-            </Button>
-            <Button onPress={() => setLinkModalVisible(false)} style={{ marginTop: 5 }}>
-              Cancelar
-            </Button>
+              <Button
+                mode="contained"
+                onPress={bindSelectedQueue}
+                style={styles.linkModalBindButton}
+                buttonColor={ppcColors.accent}
+                textColor={ppcColors.pillTextDark}
+                disabled={!queueOptions.length || !selectedQueueId || linkingQueue || creatingQueue || unlinkingQueue}
+              >
+                {linkingQueue ? 'Vinculando...' : 'Vincular'}
+              </Button>
+              <Button
+                onPress={() => setLinkModalVisible(false)}
+                style={styles.linkModalCancelButton}
+                textColor={ppcColors.textSecondary}
+              >
+                Cancelar
+              </Button>
+            </View>
           </View>
         </View>
       </Modal>
@@ -736,8 +771,11 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
       {env.APP_TYPE === 'MANAGER' && (
         <Modal visible={modalVisible} transparent animationType="slide">
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Editar Display</Text>
+            <View style={styles.editModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Editar Display</Text>
+                <Text style={styles.modalSubtitle}>Atualize nome e tipo do painel</Text>
+              </View>
 
               <Text style={styles.modalLabel}>Nome do Display</Text>
               <TextInput
@@ -745,28 +783,66 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
                 value={editDisplay}
                 onChangeText={setEditDisplay}
                 placeholder="Nome do display"
-                placeholderTextColor="#7B8290"
+                placeholderTextColor={ppcColors.textSecondary}
               />
 
               <Text style={styles.modalLabel}>Tipo do Display</Text>
               <RadioButton.Group onValueChange={setEditType} value={editType}>
-                <RadioButton.Item label="Orders" value="orders" />
-                <RadioButton.Item label="Products" value="products" />
+                <View
+                  style={[
+                    styles.radioItemWrap,
+                    editType === 'orders' && styles.radioItemWrapSelected,
+                  ]}
+                >
+                  <RadioButton.Item
+                    label="Orders"
+                    value="orders"
+                    color={ppcColors.accentInfo}
+                    uncheckedColor={ppcColors.borderSoft}
+                    labelStyle={styles.radioLabel}
+                    style={styles.radioItem}
+                  />
+                </View>
+                <View
+                  style={[
+                    styles.radioItemWrap,
+                    editType === 'products' && styles.radioItemWrapSelected,
+                  ]}
+                >
+                  <RadioButton.Item
+                    label="Products"
+                    value="products"
+                    color={ppcColors.accent}
+                    uncheckedColor={ppcColors.borderSoft}
+                    labelStyle={styles.radioLabel}
+                    style={styles.radioItem}
+                  />
+                </View>
               </RadioButton.Group>
 
-              <Button mode="contained" onPress={saveDisplay} style={{ marginTop: 10 }}>
+              <Button
+                mode="contained"
+                onPress={saveDisplay}
+                style={styles.editModalSaveButton}
+                buttonColor={ppcColors.accent}
+                textColor={ppcColors.pillTextDark}
+              >
                 Salvar
               </Button>
               <Button
                 mode="outlined"
                 onPress={confirmDeleteDisplay}
-                style={{ marginTop: 10, borderColor: '#EF4444' }}
-                textColor="#B91C1C"
+                style={styles.editModalDeleteButton}
+                textColor={ppcColors.dangerText}
                 disabled={deletingDisplay}
               >
                 {deletingDisplay ? 'Excluindo...' : 'Excluir display'}
               </Button>
-              <Button onPress={() => setModalVisible(false)} style={{ marginTop: 5 }}>
+              <Button
+                onPress={() => setModalVisible(false)}
+                style={styles.editModalCancelButton}
+                textColor={ppcColors.textSecondary}
+              >
                 Cancelar
               </Button>
             </View>
@@ -919,6 +995,7 @@ const createStyles = (ppcColors) =>
     backgroundColor: ppcColors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 14,
   },
   modalContent: {
     width: '84%',
@@ -929,13 +1006,83 @@ const createStyles = (ppcColors) =>
     borderWidth: 1,
     borderColor: ppcColors.border,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: ppcColors.textDark, marginBottom: 4 },
+  linkModalContent: {
+    width: '100%',
+    maxWidth: 460,
+    maxHeight: '92%',
+    backgroundColor: ppcColors.cardBg,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: ppcColors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: ppcColors.textPrimary, marginBottom: 4 },
+  modalHeader: {
+    paddingBottom: 10,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: ppcColors.border,
+  },
+  modalSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '600',
+    color: ppcColors.textSecondary,
+  },
   modalLabel: { fontSize: 14, fontWeight: '700', marginTop: 12, color: ppcColors.borderSoft },
   createQueueDivider: {
     height: 1,
     backgroundColor: ppcColors.border,
     marginTop: 10,
     marginBottom: 2,
+  },
+  linkModalList: {
+    maxHeight: 330,
+    marginTop: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ppcColors.border,
+    backgroundColor: ppcColors.cardBgSoft,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+  },
+  linkModalListContent: {
+    paddingBottom: 2,
+  },
+  linkModalItemWrap: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: ppcColors.cardBg,
+    marginBottom: 8,
+  },
+  linkModalItemWrapSelected: {
+    borderColor: ppcColors.accent,
+    backgroundColor: ppcColors.cardBgSoft,
+  },
+  linkModalRadioItem: {
+    minHeight: 42,
+  },
+  linkModalRadioLabel: {
+    color: ppcColors.textPrimary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  linkModalHintText: {
+    color: ppcColors.textSecondary,
+    fontWeight: '600',
+    fontSize: 13,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  linkModalFooter: {
+    marginTop: 2,
+    backgroundColor: ppcColors.cardBg,
   },
   modalInput: {
     borderWidth: 1,
@@ -944,10 +1091,67 @@ const createStyles = (ppcColors) =>
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginTop: 6,
-    color: ppcColors.textDark,
-    backgroundColor: '#FFFFFF',
+    color: ppcColors.textPrimary,
+    backgroundColor: ppcColors.cardBgSoft,
+  },
+  editModalContent: {
+    width: '100%',
+    maxWidth: 460,
+    backgroundColor: ppcColors.cardBg,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: ppcColors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  radioItemWrap: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: ppcColors.cardBgSoft,
+  },
+  radioItemWrapSelected: {
+    borderColor: ppcColors.accent,
+    backgroundColor: ppcColors.cardBg,
+  },
+  radioItem: {
+    minHeight: 42,
+  },
+  radioLabel: {
+    color: ppcColors.textPrimary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  editModalSaveButton: {
+    marginTop: 14,
+    borderRadius: 12,
+  },
+  editModalDeleteButton: {
+    marginTop: 10,
+    borderColor: ppcColors.danger,
+    borderRadius: 12,
+    backgroundColor: ppcColors.dangerBg,
+  },
+  editModalCancelButton: {
+    marginTop: 4,
+    borderRadius: 12,
   },
   createQueueButton: {
     marginTop: 10,
+    borderRadius: 12,
+    borderColor: ppcColors.accent,
+  },
+  linkModalBindButton: {
+    marginTop: 10,
+    borderRadius: 12,
+  },
+  linkModalCancelButton: {
+    marginTop: 4,
+    borderRadius: 12,
   },
 });

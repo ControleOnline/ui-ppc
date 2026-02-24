@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useStore } from '@store';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 
 export default function DisplayForm() {
   const route = useRoute();
@@ -22,6 +23,8 @@ export default function DisplayForm() {
 
   const { currentCompany } = peopleStore.getters;
   const { display, display_type } = route.params || {};
+  const { ppcColors } = usePpcTheme();
+  const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
   const [displayValue, setDisplayValue] = useState(display?.display || '');
   const [type, setType] = useState(display?.display_type || display_type || 'orders');
@@ -138,115 +141,188 @@ export default function DisplayForm() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.label}>Display</Text>
-      <TextInput
-        style={styles.input}
-        value={displayValue}
-        onChangeText={(value) => {
-          setDisplayValue(value);
-          if (formError) setFormError('');
-        }}
-        placeholder="Digite o display"
-      />
+      <View style={styles.formCard}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{display ? 'Editar Display' : 'Novo Display'}</Text>
+          <Text style={styles.subtitle}>Configure nome e tipo do painel de produção</Text>
+        </View>
 
-      <Text style={styles.label}>Tipo</Text>
-      <View style={styles.typesWrapper}>
-        {['orders', 'products'].map((t) => (
-          <Pressable
-            key={t}
-            style={[styles.typeButton, type === t && styles.typeButtonSelected]}
-            onPress={() => setType(t)}
-          >
-            <Text style={type === t ? styles.typeTextSelected : styles.typeText}>
-              {t}
+        <Text style={styles.label}>Display</Text>
+        <TextInput
+          style={styles.input}
+          value={displayValue}
+          onChangeText={(value) => {
+            setDisplayValue(value);
+            if (formError) setFormError('');
+          }}
+          placeholder="Digite o display"
+          placeholderTextColor={ppcColors.textSecondary}
+        />
+
+        <Text style={styles.label}>Tipo</Text>
+        <View style={styles.typesWrapper}>
+          {['orders', 'products'].map((t) => (
+            <Pressable
+              key={t}
+              style={[styles.typeButton, type === t && styles.typeButtonSelected]}
+              onPress={() => setType(t)}
+            >
+              <Text style={type === t ? styles.typeTextSelected : styles.typeText}>
+                {t}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Pressable
+          style={[
+            styles.saveButton,
+            (!displayValue?.trim() || saving) && styles.saveButtonDisabled,
+          ]}
+          onPress={saveDisplay}
+          disabled={saving}
+        >
+          <Text style={styles.saveButtonText}>
+            {saving ? 'Salvando...' : display ? 'Atualizar' : 'Criar'}
+          </Text>
+        </Pressable>
+
+        {!!formError && <Text style={styles.errorText}>{formError}</Text>}
+
+        {type === 'products' && (
+          <View style={styles.hintBox}>
+            <Text style={styles.hintText}>
+              Dica: displays de produtos dependem de fila/status vinculados para liberar o botão de adicionar produtos.
             </Text>
-          </Pressable>
-        ))}
+          </View>
+        )}
       </View>
-
-      <Pressable
-        style={[
-          styles.saveButton,
-          (!displayValue?.trim() || saving) && styles.saveButtonDisabled,
-        ]}
-        onPress={saveDisplay}
-        disabled={saving}
-      >
-        <Text style={styles.saveButtonText}>
-          {saving ? 'Salvando...' : display ? 'Atualizar' : 'Criar'}
-        </Text>
-      </Pressable>
-
-      {!!formError && <Text style={styles.errorText}>{formError}</Text>}
-
-      {type === 'products' && (
-        <Text style={styles.hintText}>
-          Dica: o display de produtos depende de fila/status já vinculados para exibir o botão de adicionar produtos.
-        </Text>
-      )}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    backgroundColor: '#ECEFF1',
-    gap: 16,
-  },
-  label: {
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 8,
-  },
-  typesWrapper: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  typeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-  typeButtonSelected: {
-    backgroundColor: '#2196F3',
-    borderColor: '#1976D2',
-  },
-  typeText: {
-    color: '#000',
-  },
-  typeTextSelected: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  saveButton: {
-    backgroundColor: '#2196F3',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  errorText: {
-    color: '#B42318',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  hintText: {
-    color: '#475467',
-    fontSize: 12,
-  },
-});
+const createStyles = (ppcColors) =>
+  StyleSheet.create({
+    container: {
+      minHeight: '100%',
+      padding: 16,
+      backgroundColor: ppcColors.appBg,
+      justifyContent: 'center',
+    },
+    formCard: {
+      width: '100%',
+      maxWidth: 760,
+      alignSelf: 'center',
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      backgroundColor: ppcColors.cardBg,
+      padding: 18,
+      shadowColor: '#000',
+      shadowOpacity: 0.24,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 8,
+    },
+    header: {
+      borderBottomWidth: 1,
+      borderBottomColor: ppcColors.border,
+      paddingBottom: 10,
+      marginBottom: 14,
+    },
+    title: {
+      color: ppcColors.textPrimary,
+      fontSize: 28,
+      lineHeight: 32,
+      fontWeight: '900',
+    },
+    subtitle: {
+      marginTop: 4,
+      color: ppcColors.textSecondary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    label: {
+      fontWeight: '800',
+      marginBottom: 8,
+      color: ppcColors.textPrimary,
+      fontSize: 14,
+    },
+    input: {
+      backgroundColor: ppcColors.cardBgSoft,
+      color: ppcColors.textPrimary,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      padding: 12,
+      borderRadius: 12,
+      marginBottom: 14,
+    },
+    typesWrapper: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 18,
+    },
+    typeButton: {
+      minWidth: 120,
+      paddingVertical: 9,
+      paddingHorizontal: 16,
+      backgroundColor: ppcColors.cardBgSoft,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      alignItems: 'center',
+    },
+    typeButtonSelected: {
+      backgroundColor: ppcColors.accent,
+      borderColor: ppcColors.accent,
+    },
+    typeText: {
+      color: ppcColors.textPrimary,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+      fontSize: 12,
+    },
+    typeTextSelected: {
+      color: ppcColors.pillTextDark,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+      fontSize: 12,
+    },
+    saveButton: {
+      backgroundColor: ppcColors.accent,
+      padding: 12,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    saveButtonDisabled: {
+      opacity: 0.6,
+    },
+    saveButtonText: {
+      color: ppcColors.pillTextDark,
+      fontWeight: '900',
+      fontSize: 15,
+    },
+    errorText: {
+      marginTop: 10,
+      color: ppcColors.dangerText,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    hintBox: {
+      marginTop: 12,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      borderRadius: 12,
+      backgroundColor: ppcColors.cardBgSoft,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    hintText: {
+      color: ppcColors.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
+      lineHeight: 17,
+    },
+  });
