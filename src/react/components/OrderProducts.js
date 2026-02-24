@@ -60,30 +60,46 @@ const OrderProducts = ({ order, scale, styles, indentStep = 16 }) => {
         return roots
     }
 
-    const renderNode = (node, level = 0) => (
-        <View key={node.id}>
-            <View
-                style={[
-                    styles.itemRow,
-                    {
-                        marginLeft: level * indentStep * scale,
-                        borderLeftColor: getItemColor(order, node),
-                        opacity: level === 0 ? 1 : 0.96,
-                    },
-                ]}
-            >
-                <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
-                    <Text style={[styles.statusMarker, { color: getItemColor(order, node) }]}>● </Text>
-                    {(node.quantity > 1 || node.quantity < 1) && <Text style={styles.qtyText}>{node.quantity}x </Text>}
-                    {node.product.product}
-                </Text>
-            </View>
+    const renderNode = (node, level = 0) => {
+        const isZero = Number(node.quantity) === 0
+        const isPositive = Number(node.quantity) > 0
 
-            {node.children.map(child =>
-                renderNode(child, level + 1)
-            )}
-        </View>
-    )
+        return (
+            <View key={node.id}>
+                <View
+                    style={[
+                        styles.itemRow,
+                        {
+                            marginLeft: level * indentStep * scale,
+                            borderLeftWidth: 3,
+                            borderLeftColor: isZero ? 'red' : getItemColor(order, node),
+                            opacity: level === 0 ? 1 : 0.96,
+                        },
+                    ]}
+                >
+                    {isPositive && (
+                        <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
+                            <Text style={[styles.statusMarker, { color: getItemColor(order, node) }]}>● </Text>
+                            <Text style={styles.qtyText}>{node.quantity}x </Text>
+                            {node.product.product}
+                        </Text>
+                    )}
+
+                    {isZero && (
+                        <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
+                            <Text style={[styles.statusMarker, { color: 'red' }]}>● </Text>
+                            <Text style={{ color: 'red', fontWeight: 'bold' }}>REMOVER </Text>
+                            {node.product.product}
+                        </Text>
+                    )}
+                </View>
+
+                {node.children.map(child =>
+                    renderNode(child, level + 1)
+                )}
+            </View>
+        )
+    }
 
     const hierarchy = useMemo(() => {
         const ordered = sortProducts(order.orderProducts || [])
