@@ -33,7 +33,7 @@
                 <q-item-label caption>
                   Horário do pedido:
                   {{
-                    new Date(order.registerTime).toLocaleTimeString("pt-BR", {
+                    new Date(order.registerTime).toLocaleTimeString("pt-br", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })
@@ -42,7 +42,7 @@
                 <q-item-label caption v-if="order.registerTime != order.updateTime">
                   Iniciou nesse status:
                   {{
-                    new Date(order.updateTime).toLocaleTimeString("pt-BR", {
+                    new Date(order.updateTime).toLocaleTimeString("pt-br", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })

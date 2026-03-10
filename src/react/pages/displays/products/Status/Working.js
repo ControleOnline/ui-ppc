@@ -42,7 +42,7 @@ const Working = ({ orders = [], total = 0, status_working, status_out, onReload 
                                 <Text style={styles.orderSubtitle}>{order.order_product?.order.client?.name}</Text>
                                 <Text style={styles.orderMeta}>
                                     Horário do pedido:{' '}
-                                    {new Date(order.registerTime).toLocaleTimeString('pt-BR', {
+                                    {new Date(order.registerTime).toLocaleTimeString('pt-br', {
                                         hour: '2-digit',
                                         minute: '2-digit',
                                     })}
@@ -50,7 +50,7 @@ const Working = ({ orders = [], total = 0, status_working, status_out, onReload 
                                 {order.registerTime !== order.updateTime && (
                                     <Text style={styles.orderMeta}>
                                         Iniciou nesse status:{' '}
-                                        {new Date(order.updateTime).toLocaleTimeString('pt-BR', {
+                                        {new Date(order.updateTime).toLocaleTimeString('pt-br', {
                                             hour: '2-digit',
                                             minute: '2-digit',
                                         })}
