@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import { useStore } from '@store'
 import OrderProducts from '@controleonline/ui-ppc/src/react/components/OrderProducts'
-import KDSOrderHeader from '@controleonline/ui-ppc/src/react/components/KDSOrderHeader'
+import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import AppearanceToggle from '@controleonline/ui-ppc/src/react/components/AppearanceToggle'
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme'
 
@@ -116,7 +116,7 @@ const Orders = () => {
                             navigation.navigate('OrderDetails', { order: item, kds: true })
                         }
                     >
-                        <KDSOrderHeader order={item} compact />
+                        <OrderHeader order={item} compact />
                         <OrderProducts
                             order={item}
                             scale={scale}
