@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Pressable,
   Text,
-  ActivityIndicator,
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,52 +15,10 @@ import { useStore } from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
 import DisplayCard from '@controleonline/ui-ppc/src/react/components/DisplayCard';
 import { env } from '@env';
-import { colors as fallbackColors } from '@controleonline/../../src/styles/colors';
-import {
-  resolveThemePalette,
-  withOpacity,
-} from '@controleonline/../../src/styles/branding';
+import { withOpacity } from '@controleonline/../../src/styles/branding';
+import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 
 const BRAND_LOGO = require('@assets/ppc/logo 512x512 r.png');
-
-const buildDisplayTheme = (palette = {}, themeColors = {}) => {
-  const accent = themeColors['ppc-accent'] || palette.primary || '#FACC15';
-  const secondaryAccent =
-    themeColors['ppc-accent-info'] || palette.secondary || '#38BDF8';
-
-  return {
-    appBg: palette.background || '#F8FAFC',
-    panelBg: themeColors['ppc-panel-bg-light'] || '#FFFFFF',
-    cardBg: themeColors['ppc-card-bg-light'] || '#FFFFFF',
-    cardBgSoft:
-      themeColors['ppc-card-bg-soft-light'] || withOpacity(accent, 0.07),
-    modalBg: themeColors['ppc-modal-bg'] || '#FFFFFF',
-    textPrimary:
-      themeColors['ppc-text-primary-light'] || palette.text || '#0F172A',
-    textSecondary:
-      themeColors['ppc-text-secondary-light'] ||
-      palette.textSecondary ||
-      '#475569',
-    textDark: themeColors['ppc-text-dark'] || palette.text || '#0F172A',
-    border:
-      themeColors['ppc-border-light'] ||
-      withOpacity(palette.primary || accent, 0.16),
-    borderSoft:
-      themeColors['ppc-border-soft-light'] ||
-      withOpacity(palette.primary || accent, 0.3),
-    overlay: themeColors['ppc-overlay-light'] || 'rgba(15,23,42,0.32)',
-    accent,
-    accentInfo: secondaryAccent,
-    danger: themeColors['ppc-danger'] || '#EF4444',
-    dangerBg: themeColors['ppc-danger-bg-light'] || '#FFF1F2',
-    dangerText: themeColors['ppc-danger-text'] || '#DC2626',
-    pillTextDark: themeColors['ppc-pill-text-dark-light'] || '#0F172A',
-    primary: palette.primary || accent,
-    mode: 'light',
-    isLight: true,
-    isDark: false,
-  };
-};
 
 const parseEntityId = (value) => {
   if (!value) return null;
@@ -83,36 +40,12 @@ const DisplaysPage = () => {
   const { width } = useWindowDimensions();
   const displaysStore = useStore('displays');
   const displayQueuesStore = useStore('display_queues');
-  const peopleStore = useStore('people');
-  const themeStore = useStore('theme');
   const navigation = useNavigation();
+  const { ppcColors, brandColors, currentCompany } = useDisplayTheme();
 
   const { actions, items, isLoading, error } = displaysStore;
   const { actions: displayQueuesActions } = displayQueuesStore;
-  const { currentCompany } = peopleStore.getters;
-  const themeColors = themeStore?.getters?.colors || {};
   const [displayQueuesRows, setDisplayQueuesRows] = useState([]);
-
-  const brandColors = useMemo(
-    () =>
-      resolveThemePalette(
-        {
-          ...themeColors,
-          ...(currentCompany?.theme?.colors || {}),
-        },
-        fallbackColors,
-      ),
-    [currentCompany?.id, currentCompany?.theme?.colors, themeColors],
-  );
-
-  const ppcColors = useMemo(
-    () =>
-      buildDisplayTheme(brandColors, {
-        ...themeColors,
-        ...(currentCompany?.theme?.colors || {}),
-      }),
-    [brandColors, currentCompany?.id, currentCompany?.theme?.colors, themeColors],
-  );
 
   const styles = useMemo(
     () => createStyles(ppcColors, brandColors),
@@ -125,6 +58,7 @@ const DisplaysPage = () => {
     if (width >= 760) return 2;
     return 1;
   }, [width]);
+  const skeletonCount = useMemo(() => Math.max(numColumns * 2, 3), [numColumns]);
   const isCompact = width < 920;
 
   const refreshDisplays = useCallback(async () => {
@@ -248,8 +182,27 @@ const DisplaysPage = () => {
         />
       )}
       {isLoading && (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color={ppcColors.accent} />
+        <View style={styles.skeletonWrap}>
+          {Array.from({ length: skeletonCount }).map((_, index) => (
+            <View key={`display-skeleton-${index}`} style={styles.skeletonCard}>
+              <View style={styles.skeletonHeaderRow}>
+                <View style={styles.skeletonCircle} />
+                <View style={styles.skeletonTitleWrap}>
+                  <View style={[styles.skeletonLine, styles.skeletonLineLong]} />
+                  <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                </View>
+              </View>
+              <View style={styles.skeletonPillsRow}>
+                <View style={[styles.skeletonPill, styles.skeletonPillWide]} />
+                <View style={styles.skeletonPill} />
+                <View style={styles.skeletonPill} />
+              </View>
+              <View style={styles.skeletonFooterRow}>
+                <View style={styles.skeletonTag} />
+                <View style={styles.skeletonAction} />
+              </View>
+            </View>
+          ))}
         </View>
       )}
     </SafeAreaView>
@@ -394,10 +347,92 @@ const createStyles = (ppcColors, brandColors) =>
       shadowRadius: 16,
       elevation: 5,
     },
-    loaderWrap: {
+    skeletonWrap: {
       flex: 1,
-      justifyContent: 'center',
+      paddingHorizontal: 14,
+      paddingTop: 2,
+      paddingBottom: 24,
+      gap: 12,
+    },
+    skeletonCard: {
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: ppcColors.borderSoft,
+      backgroundColor: ppcColors.cardBg,
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+    },
+    skeletonHeaderRow: {
+      flexDirection: 'row',
       alignItems: 'center',
+    },
+    skeletonCircle: {
+      width: 40,
+      height: 40,
+      borderRadius: 999,
+      backgroundColor: ppcColors.cardBgSoft,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      marginRight: 10,
+    },
+    skeletonTitleWrap: {
+      flex: 1,
+      gap: 8,
+    },
+    skeletonLine: {
+      borderRadius: 999,
+      backgroundColor: ppcColors.cardBgSoft,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      height: 12,
+    },
+    skeletonLineLong: {
+      width: '68%',
+    },
+    skeletonLineShort: {
+      width: '44%',
+      height: 10,
+    },
+    skeletonPillsRow: {
+      marginTop: 14,
+      flexDirection: 'row',
+      gap: 8,
+    },
+    skeletonPill: {
+      height: 28,
+      borderRadius: 999,
+      backgroundColor: ppcColors.cardBgSoft,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      width: 78,
+    },
+    skeletonPillWide: {
+      width: 112,
+    },
+    skeletonFooterRow: {
+      marginTop: 14,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: ppcColors.border,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    skeletonTag: {
+      width: 86,
+      height: 22,
+      borderRadius: 999,
+      backgroundColor: ppcColors.cardBgSoft,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+    },
+    skeletonAction: {
+      width: 138,
+      height: 28,
+      borderRadius: 999,
+      backgroundColor: ppcColors.cardBgSoft,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
     },
   });
 

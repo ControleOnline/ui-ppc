@@ -4,10 +4,18 @@ import { Card, Text, Button } from 'react-native-paper';
 import { useStore } from '@store';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 
-const InOut = ({ orders = [], total = 0, status_in, status_working, onReload }) => {
+const InOut = ({
+    orders = [],
+    total = 0,
+    status_in,
+    status_working,
+    onReload,
+    ppcColorsOverride = null,
+}) => {
     const store = useStore('order_products_queue');
     const { actions } = store;
-    const { ppcColors } = usePpcTheme();
+    const { ppcColors: defaultPpcColors } = usePpcTheme();
+    const ppcColors = ppcColorsOverride || defaultPpcColors;
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
     const start = async order => {

@@ -1,6 +1,6 @@
 // DisplayCard.js
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Pressable, StyleSheet, Modal, View, TextInput, Text, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { Pressable, StyleSheet, View, TextInput, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Card, Text as PaperText, Button, RadioButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import { env } from '@env';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import { withOpacity } from '@controleonline/../../src/styles/branding';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
+import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
 
 const iconByType = {
   products: 'silverware-fork-knife',
@@ -94,6 +95,7 @@ export default function DisplayCard({
   const displayQueuesStore = useStore('display_queues');
   const statusStore = useStore('status');
   const peopleStore = useStore('people');
+  const messageApi = useMessage();
   const { actions } = displaysStore;
   const displaysItems = displaysStore.items || [];
   const { currentCompany } = peopleStore.getters;
@@ -121,6 +123,8 @@ export default function DisplayCard({
   const [creatingQueue, setCreatingQueue] = useState(false);
   const [unlinkingQueue, setUnlinkingQueue] = useState(false);
   const [deletingDisplay, setDeletingDisplay] = useState(false);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [confirmUnlinkVisible, setConfirmUnlinkVisible] = useState(false);
 
   const getId = (value) => {
     return extractDisplayId(value);
@@ -238,11 +242,41 @@ export default function DisplayCard({
     []
   );
 
-  const saveDisplay = () => {
-    actions.save({ id: item.id, display: editDisplay, displayType: editType }).then(() => {
+  const showErrorToast = useCallback(
+    (message) => {
+      if (typeof messageApi?.showError === 'function') {
+        messageApi.showError(message);
+        return;
+      }
+      if (typeof messageApi?.showToast === 'function') {
+        messageApi.showToast(message, { position: 'top', offsetTop: 86 });
+      }
+    },
+    [messageApi],
+  );
+
+  const showSuccessToast = useCallback(
+    (message) => {
+      if (typeof messageApi?.showSuccess === 'function') {
+        messageApi.showSuccess(message);
+        return;
+      }
+      if (typeof messageApi?.showToast === 'function') {
+        messageApi.showToast(message, { position: 'top', offsetTop: 86 });
+      }
+    },
+    [messageApi],
+  );
+
+  const saveDisplay = useCallback(async () => {
+    try {
+      await actions.save({ id: item.id, display: editDisplay, displayType: editType });
       setModalVisible(false);
-    });
-  };
+      showSuccessToast('Display atualizado com sucesso.');
+    } catch (err) {
+      showErrorToast(getApiErrorMessage(err, 'Nao foi possivel salvar o display.'));
+    }
+  }, [actions, editDisplay, editType, item.id, showErrorToast, showSuccessToast]);
 
   const deleteDisplay = useCallback(async () => {
     const displayId = getId(item);
@@ -257,38 +291,25 @@ export default function DisplayCard({
       writeLocalLinks(links);
 
       setModalVisible(false);
+      setConfirmDeleteVisible(false);
       if (onLinked) onLinked();
+      showSuccessToast('Display excluido com sucesso.');
     } catch (err) {
-      Alert.alert('Erro', getApiErrorMessage(err, 'Nao foi possivel excluir o display.'));
+      showErrorToast(getApiErrorMessage(err, 'Nao foi possivel excluir o display.'));
     } finally {
       setDeletingDisplay(false);
     }
-  }, [actions, item, onLinked]);
+  }, [actions, item, onLinked, showErrorToast, showSuccessToast]);
 
   const confirmDeleteDisplay = useCallback(() => {
     if (deletingDisplay) return;
-    const confirmMessage = `Deseja excluir o display "${item.display}"?`;
-
-    // Web manager flow: use native browser confirm to guarantee action dispatch.
-    if (typeof globalThis?.confirm === 'function') {
-      const accepted = globalThis.confirm(confirmMessage);
-      if (accepted) deleteDisplay();
-      return;
-    }
-
-    Alert.alert(
-      'Excluir display',
-      confirmMessage,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Excluir', style: 'destructive', onPress: deleteDisplay },
-      ]
-    );
-  }, [deleteDisplay, deletingDisplay, item.display]);
+    setConfirmDeleteVisible(true);
+  }, [deletingDisplay]);
 
   const openLinkQueueModal = useCallback(async () => {
     if (!currentCompany?.id) {
       setLinkError('Empresa nao encontrada para vincular a fila.');
+      showErrorToast('Empresa nao encontrada para vincular a fila.');
       return;
     }
 
@@ -355,10 +376,19 @@ export default function DisplayCard({
       setLinkModalVisible(true);
     } catch (err) {
       setLinkError(getApiErrorMessage(err, 'Nao foi possivel carregar as filas.'));
+      showErrorToast(getApiErrorMessage(err, 'Nao foi possivel carregar as filas.'));
     } finally {
       setLinkingQueue(false);
     }
-  }, [currentCompany?.id, displaysItems, getQueueIdentity, mergeQueueOptions, queues, queuesStore.actions]);
+  }, [
+    currentCompany?.id,
+    displaysItems,
+    getQueueIdentity,
+    mergeQueueOptions,
+    queues,
+    queuesStore.actions,
+    showErrorToast,
+  ]);
 
   const linkQueueToDisplay = useCallback(
     async (selectedQueue) => {
@@ -415,12 +445,22 @@ export default function DisplayCard({
       writeLocalLinks(links);
       if (onLinked) onLinked();
       setLinkModalVisible(false);
+      showSuccessToast('Fila vinculada com sucesso.');
       navigation.navigate('QueueAddProducts', {
         queueId: selectedQueue?.id || getId(selectedQueue),
         queueName: selectedQueue?.queue,
       });
     },
-    [displayQueuesStore.actions, item, loadLinkedQueues, navigation, onLinked, queues, shapeQueuesForCard]
+    [
+      displayQueuesStore.actions,
+      item,
+      loadLinkedQueues,
+      navigation,
+      onLinked,
+      queues,
+      shapeQueuesForCard,
+      showSuccessToast,
+    ]
   );
 
   const bindSelectedQueue = useCallback(async () => {
@@ -590,6 +630,8 @@ export default function DisplayCard({
       delete links[String(displayId)];
       writeLocalLinks(links);
       if (onLinked) onLinked();
+      setConfirmUnlinkVisible(false);
+      showSuccessToast('Fila desvinculada com sucesso.');
     } catch (err) {
       // If API already removed the link, treat as successful unlink.
       if (Number(err?.status || err?.code) === 404) {
@@ -598,13 +640,24 @@ export default function DisplayCard({
         delete links[String(displayId)];
         writeLocalLinks(links);
         if (onLinked) onLinked();
+        setConfirmUnlinkVisible(false);
+        showSuccessToast('Fila desvinculada com sucesso.');
       } else {
         setLinkError(getApiErrorMessage(err, 'Nao foi possivel desvincular a fila.'));
+        showErrorToast(getApiErrorMessage(err, 'Nao foi possivel desvincular a fila.'));
       }
     } finally {
       setUnlinkingQueue(false);
     }
-  }, [displayQueuesStore.actions, item, loadLinkedQueues, onLinked, queues]);
+  }, [
+    displayQueuesStore.actions,
+    item,
+    loadLinkedQueues,
+    onLinked,
+    queues,
+    showErrorToast,
+    showSuccessToast,
+  ]);
 
   const accent =
     (item.displayType === 'orders' ? ppcColors.accentInfo : ppcColors.accent) ||
@@ -646,8 +699,8 @@ export default function DisplayCard({
                     >
                       <MaterialCommunityIcons
                         name="pencil"
-                        size={12}
-                        color={ppcColors.textSecondary}
+                        size={13}
+                        color={ppcColors.textPrimary}
                       />
                     </TouchableOpacity>
                   </View>
@@ -661,12 +714,7 @@ export default function DisplayCard({
                 ppcColorsOverride={ppcColorsOverride}
               />
             </View>
-            <View
-              style={[
-                styles.footerRow,
-                !canManageQueue && styles.footerRowCentered,
-              ]}
-            >
+            <View style={styles.footerRow}>
               <View style={styles.typePill}>
                 <PaperText style={[styles.displayType, { color: accent }]}>
                   {String(item.displayType || '').toUpperCase()}
@@ -682,7 +730,7 @@ export default function DisplayCard({
                   onPress={(event) => {
                     event?.stopPropagation?.();
                     if (hasLinkedQueue) {
-                      unlinkQueue();
+                      setConfirmUnlinkVisible(true);
                     } else {
                       openLinkQueueModal();
                     }
@@ -710,6 +758,7 @@ export default function DisplayCard({
                   </Text>
                 </Pressable>
               )}
+              {!canManageQueue && <View style={styles.footerSpacer} />}
             </View>
             <View style={styles.feedbackWrap}>
               {!!linkError && (
@@ -722,12 +771,29 @@ export default function DisplayCard({
         </Card>
       </Pressable>
 
-      <Modal visible={linkModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.linkModalContent}>
+      <AnimatedModal
+        visible={linkModalVisible}
+        onRequestClose={() => setLinkModalVisible(false)}
+        style={{ justifyContent: 'flex-end' }}
+      >
+        <View style={styles.editSheetRoot}>
+          <Pressable style={styles.editSheetBackdrop} onPress={() => setLinkModalVisible(false)} />
+            <View style={styles.editSheetWrap}>
+              <View style={styles.editSheetHandle} />
+            <View style={styles.linkModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Vincular Fila</Text>
-              <Text style={styles.modalSubtitle}>Conecte uma fila existente ou crie uma nova</Text>
+              <View style={styles.modalHeaderRow}>
+                <View style={styles.modalHeaderTextWrap}>
+                  <Text style={styles.modalTitle}>Vincular fila</Text>
+                  <Text style={styles.modalSubtitle}>Conecte uma fila existente ou crie uma nova</Text>
+                </View>
+                <Pressable
+                  onPress={() => setLinkModalVisible(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
+                </Pressable>
+              </View>
             </View>
             <Text style={styles.modalLabel}>Escolha uma fila existente</Text>
 
@@ -811,18 +877,33 @@ export default function DisplayCard({
             </View>
           </View>
         </View>
-      </Modal>
+      </View>
+      </AnimatedModal>
 
       {env.APP_TYPE === 'MANAGER' && (
-        <AnimatedModal visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+        <AnimatedModal
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+          style={{ justifyContent: 'flex-end' }}
+        >
           <View style={styles.editSheetRoot}>
             <Pressable style={styles.editSheetBackdrop} onPress={() => setModalVisible(false)} />
             <View style={styles.editSheetWrap}>
               <View style={styles.editSheetHandle} />
               <View style={styles.editModalContent}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Editar display</Text>
-                  <Text style={styles.modalSubtitle}>Nome e tipo do painel</Text>
+                  <View style={styles.modalHeaderRow}>
+                    <View style={styles.modalHeaderTextWrap}>
+                      <Text style={styles.modalTitle}>Editar display</Text>
+                      <Text style={styles.modalSubtitle}>Nome e tipo do painel</Text>
+                    </View>
+                    <Pressable
+                      onPress={() => setModalVisible(false)}
+                      style={styles.modalCloseButton}
+                    >
+                      <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
+                    </Pressable>
+                  </View>
                 </View>
 
                 <Text style={styles.modalLabel}>Nome do display</Text>
@@ -886,18 +967,109 @@ export default function DisplayCard({
                 >
                   {deletingDisplay ? 'Excluindo...' : 'Excluir display'}
                 </Button>
-                <Button
-                  onPress={() => setModalVisible(false)}
-                  style={styles.editModalCancelButton}
-                  textColor={ppcColors.textSecondary}
-                >
-                  Fechar
-                </Button>
               </View>
             </View>
           </View>
         </AnimatedModal>
       )}
+
+      <AnimatedModal
+        visible={confirmDeleteVisible}
+        onRequestClose={() => setConfirmDeleteVisible(false)}
+        style={{ justifyContent: 'flex-end' }}
+      >
+        <View style={styles.editSheetRoot}>
+          <Pressable style={styles.editSheetBackdrop} onPress={() => setConfirmDeleteVisible(false)} />
+          <View style={styles.editSheetWrap}>
+            <View style={styles.editSheetHandle} />
+            <View style={styles.confirmModalContent}>
+              <View style={styles.modalHeaderRow}>
+                <Text style={styles.modalTitle}>Excluir display</Text>
+                <Pressable
+                  onPress={() => setConfirmDeleteVisible(false)}
+                  style={styles.modalCloseButton}
+                  disabled={deletingDisplay}
+                >
+                  <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
+                </Pressable>
+              </View>
+              <Text style={styles.confirmModalMessage}>
+                Deseja excluir o display "{item.display}"?
+              </Text>
+              <View style={styles.confirmModalActions}>
+                <Button
+                  mode="outlined"
+                  onPress={() => setConfirmDeleteVisible(false)}
+                  style={styles.confirmCancelButton}
+                  textColor={ppcColors.textSecondary}
+                  disabled={deletingDisplay}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={deleteDisplay}
+                  style={styles.confirmDangerButton}
+                  buttonColor={ppcColors.danger}
+                  textColor="#FFFFFF"
+                  disabled={deletingDisplay}
+                >
+                  {deletingDisplay ? 'Excluindo...' : 'Excluir'}
+                </Button>
+              </View>
+            </View>
+          </View>
+        </View>
+      </AnimatedModal>
+
+      <AnimatedModal
+        visible={confirmUnlinkVisible}
+        onRequestClose={() => setConfirmUnlinkVisible(false)}
+        style={{ justifyContent: 'flex-end' }}
+      >
+        <View style={styles.editSheetRoot}>
+          <Pressable style={styles.editSheetBackdrop} onPress={() => setConfirmUnlinkVisible(false)} />
+          <View style={styles.editSheetWrap}>
+            <View style={styles.editSheetHandle} />
+            <View style={styles.confirmModalContent}>
+              <View style={styles.modalHeaderRow}>
+                <Text style={styles.modalTitle}>Desvincular fila</Text>
+                <Pressable
+                  onPress={() => setConfirmUnlinkVisible(false)}
+                  style={styles.modalCloseButton}
+                  disabled={unlinkingQueue}
+                >
+                  <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
+                </Pressable>
+              </View>
+              <Text style={styles.confirmModalMessage}>
+                Confirma o desvinculo desta fila do display?
+              </Text>
+              <View style={styles.confirmModalActions}>
+                <Button
+                  mode="outlined"
+                  onPress={() => setConfirmUnlinkVisible(false)}
+                  style={styles.confirmCancelButton}
+                  textColor={ppcColors.textSecondary}
+                  disabled={unlinkingQueue}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={unlinkQueue}
+                  style={styles.confirmDangerButton}
+                  buttonColor={ppcColors.danger}
+                  textColor="#FFFFFF"
+                  disabled={unlinkingQueue}
+                >
+                  {unlinkingQueue ? 'Desvinculando...' : 'Desvincular'}
+                </Button>
+              </View>
+            </View>
+          </View>
+        </View>
+      </AnimatedModal>
     </>
   );
 }
@@ -930,16 +1102,17 @@ const createStyles = (ppcColors) =>
     opacity: 0.18,
   },
   cardContent: {
+    flex: 1,
     alignItems: 'stretch',
     paddingTop: 12,
     paddingBottom: 12,
     paddingHorizontal: 14,
-    minHeight: 222,
+    minHeight: 236,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     marginBottom: 8,
   },
   iconWrap: {
@@ -957,7 +1130,7 @@ const createStyles = (ppcColors) =>
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    maxWidth: '78%',
+    flex: 1,
   },
   cardActions: {
     marginLeft: 6,
@@ -965,9 +1138,9 @@ const createStyles = (ppcColors) =>
     alignItems: 'center',
   },
   editIcon: {
-    backgroundColor: ppcColors.cardBgSoft,
+    backgroundColor: ppcColors.panelBg,
     borderWidth: 1,
-    borderColor: ppcColors.borderSoft,
+    borderColor: ppcColors.border,
     width: 22,
     height: 22,
     borderRadius: 999,
@@ -992,19 +1165,25 @@ const createStyles = (ppcColors) =>
     marginTop: 8,
     width: '100%',
     justifyContent: 'flex-start',
+    flexGrow: 1,
   },
   footerRow: {
-    marginTop: 10,
+    marginTop: 'auto',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: ppcColors.border,
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 10,
   },
-  footerRowCentered: {
-    justifyContent: 'center',
+  footerSpacer: {
+    flex: 1,
   },
   feedbackWrap: {
     width: '100%',
+    minHeight: 14,
   },
   linkQueueButton: {
     borderRadius: 999,
@@ -1053,41 +1232,46 @@ const createStyles = (ppcColors) =>
     textAlign: 'center',
     paddingHorizontal: 8,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: ppcColors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-  },
-  modalContent: {
-    width: '84%',
-    maxWidth: 420,
-    backgroundColor: ppcColors.modalBg,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: ppcColors.border,
-  },
   linkModalContent: {
     width: '100%',
-    maxWidth: 460,
-    maxHeight: '92%',
-    backgroundColor: ppcColors.cardBg,
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
+    maxHeight: '88%',
+    backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 20,
+    borderTopWidth: 1,
     borderColor: ppcColors.border,
     shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -3 },
     elevation: 8,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: ppcColors.textPrimary, marginBottom: 4 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: ppcColors.textPrimary, marginBottom: 2 },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  modalHeaderTextWrap: {
+    flex: 1,
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: ppcColors.border,
+    backgroundColor: ppcColors.cardBgSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   modalHeader: {
     paddingBottom: 10,
-    marginBottom: 8,
+    marginBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: ppcColors.border,
   },
@@ -1097,7 +1281,7 @@ const createStyles = (ppcColors) =>
     fontWeight: '600',
     color: ppcColors.textSecondary,
   },
-  modalLabel: { fontSize: 14, fontWeight: '700', marginTop: 12, color: ppcColors.borderSoft },
+  modalLabel: { fontSize: 14, fontWeight: '700', marginTop: 12, color: ppcColors.textSecondary },
   createQueueDivider: {
     height: 1,
     backgroundColor: ppcColors.border,
@@ -1105,7 +1289,7 @@ const createStyles = (ppcColors) =>
     marginBottom: 2,
   },
   linkModalList: {
-    maxHeight: 330,
+    maxHeight: 300,
     marginTop: 6,
     borderRadius: 12,
     borderWidth: 1,
@@ -1159,19 +1343,52 @@ const createStyles = (ppcColors) =>
   },
   editModalContent: {
     width: '100%',
-    maxWidth: 520,
-    backgroundColor: ppcColors.cardBg,
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 18,
-    borderWidth: 1,
+    maxHeight: '88%',
+    backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 20,
+    borderTopWidth: 1,
     borderColor: ppcColors.border,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -3 },
     elevation: 6,
+  },
+  confirmModalContent: {
+    width: '100%',
+    backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderColor: ppcColors.border,
+  },
+  confirmModalMessage: {
+    marginTop: 8,
+    color: ppcColors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  confirmModalActions: {
+    marginTop: 14,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  confirmCancelButton: {
+    flex: 1,
+    borderColor: ppcColors.borderSoft,
+    borderRadius: 12,
+  },
+  confirmDangerButton: {
+    flex: 1,
+    borderRadius: 12,
   },
   editSheetRoot: {
     flex: 1,
@@ -1179,18 +1396,19 @@ const createStyles = (ppcColors) =>
   },
   editSheetBackdrop: {
     flex: 1,
+    backgroundColor: withOpacity(ppcColors.overlay || '#0F172A', 0.55),
   },
   editSheetWrap: {
-    paddingHorizontal: 12,
-    paddingBottom: 12,
+    paddingHorizontal: 0,
+    paddingBottom: 10,
   },
   editSheetHandle: {
     alignSelf: 'center',
     width: 54,
     height: 5,
     borderRadius: 999,
-    backgroundColor: withOpacity(ppcColors.textSecondary, 0.25),
-    marginBottom: 8,
+    backgroundColor: withOpacity(ppcColors.textSecondary, 0.24),
+    marginBottom: 6,
   },
   radioItemWrap: {
     marginTop: 8,
@@ -1220,10 +1438,6 @@ const createStyles = (ppcColors) =>
     borderColor: ppcColors.danger,
     borderRadius: 12,
     backgroundColor: ppcColors.dangerBg,
-  },
-  editModalCancelButton: {
-    marginTop: 4,
-    borderRadius: 12,
   },
   createQueueButton: {
     marginTop: 10,

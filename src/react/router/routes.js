@@ -9,6 +9,7 @@ const shopRoutes = [
       headerShown: true,
       headerBackVisible: true,
       title: 'PCP',
+      showBottomToolBar: true,
     },
   },
 ];

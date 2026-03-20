@@ -6,11 +6,11 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useStore } from '@store';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
+import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
+import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
 
 export default function DisplayForm() {
   const route = useRoute();
@@ -20,16 +20,43 @@ export default function DisplayForm() {
   const displayQueuesStore = useStore('display_queues');
   const statusStore = useStore('status');
   const peopleStore = useStore('people');
+  const messageApi = useMessage();
 
   const { currentCompany } = peopleStore.getters;
   const { display, display_type } = route.params || {};
-  const { ppcColors } = usePpcTheme();
+  const { ppcColors } = useDisplayTheme();
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
   const [displayValue, setDisplayValue] = useState(display?.display || '');
   const [type, setType] = useState(display?.display_type || display_type || 'orders');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+
+  const showErrorToast = useCallback(
+    (message) => {
+      if (typeof messageApi?.showError === 'function') {
+        messageApi.showError(message);
+        return;
+      }
+      if (typeof messageApi?.showToast === 'function') {
+        messageApi.showToast(message, { position: 'top', offsetTop: 86 });
+      }
+    },
+    [messageApi],
+  );
+
+  const showWarningToast = useCallback(
+    (message) => {
+      if (typeof messageApi?.showWarning === 'function') {
+        messageApi.showWarning(message);
+        return;
+      }
+      if (typeof messageApi?.showToast === 'function') {
+        messageApi.showToast(message, { position: 'top', offsetTop: 86 });
+      }
+    },
+    [messageApi],
+  );
 
   const getId = (value) => {
     if (!value) return null;
@@ -56,7 +83,7 @@ export default function DisplayForm() {
         statuses.find((status) =>
           String(status?.realStatus || '')
             .toLowerCase()
-            .includes(key)
+            .includes(key),
         );
 
       const statusIn = statusByReal('in') || statuses[0];
@@ -66,16 +93,17 @@ export default function DisplayForm() {
       const queueName = displayValue?.trim() || `Fila ${displayId}`;
       const queuePayload = {
         queue: queueName,
-        company: '/people/' + currentCompany.id,
+        company: `/people/${currentCompany.id}`,
       };
       if (statusIn?.['@id']) queuePayload.status_in = statusIn['@id'];
       if (statusWorking?.['@id']) queuePayload.status_working = statusWorking['@id'];
       if (statusOut?.['@id']) queuePayload.status_out = statusOut['@id'];
 
       const createdQueue = await queuesStore.actions.save(queuePayload);
-
       const queueId = getId(createdQueue);
-      if (!queueId) throw new Error('Não foi possível criar a fila padrão do display');
+      if (!queueId) {
+        throw new Error('Nao foi possivel criar a fila padrao do display');
+      }
 
       await displayQueuesStore.actions.save({
         display: `/displays/${displayId}`,
@@ -88,7 +116,7 @@ export default function DisplayForm() {
       displayValue,
       queuesStore.actions,
       statusStore.actions,
-    ]
+    ],
   );
 
   const saveDisplay = useCallback(async () => {
@@ -97,7 +125,7 @@ export default function DisplayForm() {
       return;
     }
     if (!currentCompany?.id) {
-      setFormError('Empresa não encontrada.');
+      setFormError('Empresa nao encontrada.');
       return;
     }
 
@@ -108,24 +136,24 @@ export default function DisplayForm() {
         id: display?.id,
         display: displayValue.trim(),
         displayType: type,
-        company: '/people/' + currentCompany.id,
+        company: `/people/${currentCompany.id}`,
       });
 
       if (!display?.id && type === 'products') {
         try {
           await ensureProductQueueLink(savedDisplay);
         } catch (linkErr) {
-          Alert.alert(
-            'Atenção',
-            'Display criado, mas a fila não foi vinculada automaticamente. Tente novamente.'
+          showWarningToast(
+            'Display criado, mas a fila nao foi vinculada automaticamente. Tente novamente.',
           );
         }
       }
 
       navigation.goBack();
     } catch (err) {
-      setFormError(err?.message || 'Não foi possível salvar o display.');
-      Alert.alert('Erro', err.message || 'Não foi possível salvar o display');
+      const message = err?.message || 'Nao foi possivel salvar o display.';
+      setFormError(message);
+      showErrorToast(message);
     } finally {
       setSaving(false);
     }
@@ -136,6 +164,8 @@ export default function DisplayForm() {
     displaysStore.actions,
     ensureProductQueueLink,
     navigation,
+    showErrorToast,
+    showWarningToast,
     type,
   ]);
 
@@ -144,7 +174,7 @@ export default function DisplayForm() {
       <View style={styles.formCard}>
         <View style={styles.header}>
           <Text style={styles.title}>{display ? 'Editar Display' : 'Novo Display'}</Text>
-          <Text style={styles.subtitle}>Configure nome e tipo do painel de produção</Text>
+          <Text style={styles.subtitle}>Configure nome e tipo do painel de producao</Text>
         </View>
 
         <Text style={styles.label}>Display</Text>
@@ -192,7 +222,7 @@ export default function DisplayForm() {
         {type === 'products' && (
           <View style={styles.hintBox}>
             <Text style={styles.hintText}>
-              Dica: displays de produtos dependem de fila/status vinculados para liberar o botão de adicionar produtos.
+              Dica: displays de produtos dependem de fila/status vinculados para liberar o botao de adicionar produtos.
             </Text>
           </View>
         )}

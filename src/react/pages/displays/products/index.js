@@ -7,7 +7,7 @@ import { api } from '@controleonline/ui-common/src/api';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import InOut from './Status/InOut';
 import Working from './Status/Working';
-import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
+import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import { withOpacity } from '@controleonline/../../src/styles/branding';
 
 const DisplayProducts = ({ display = {} }) => {
@@ -22,7 +22,7 @@ const DisplayProducts = ({ display = {} }) => {
 
     const peopleStore = useStore('people');
     const displayQueueStore = useStore('display_queues');
-    const { ppcColors } = usePpcTheme();
+    const { ppcColors } = useDisplayTheme();
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
     const { currentCompany } = peopleStore.getters;
@@ -127,6 +127,8 @@ const DisplayProducts = ({ display = {} }) => {
       display?.displayType === 'orders' ? ppcColors.accentInfo : ppcColors.accent;
     const displayTypeLabel = String(display?.displayType || 'products').toUpperCase();
     const displayName = String(display?.display || 'Display');
+    const hasLoadedAnyStage = Object.keys(loaded).length > 0;
+    const showSkeleton = !hasLoadedAnyStage;
 
     return (
         <SafeAreaView style={styles.container}>
@@ -169,6 +171,21 @@ const DisplayProducts = ({ display = {} }) => {
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
+                {showSkeleton && (
+                    <View style={styles.skeletonWrap}>
+                        {[1, 2, 3].map((key) => (
+                            <View key={`products-skeleton-${key}`} style={styles.skeletonCard}>
+                                <View style={styles.skeletonHeader}>
+                                    <View style={[styles.skeletonLine, styles.skeletonTitle]} />
+                                    <View style={styles.skeletonBadge} />
+                                </View>
+                                <View style={[styles.skeletonLine, styles.skeletonRow]} />
+                                <View style={[styles.skeletonLine, styles.skeletonRow]} />
+                                <View style={[styles.skeletonLine, styles.skeletonButton]} />
+                            </View>
+                        ))}
+                    </View>
+                )}
                 {loaded.status_in && (
                     <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
                         {orders.status_in.length > 0 ? (
@@ -179,6 +196,7 @@ const DisplayProducts = ({ display = {} }) => {
                                         total={totals.status_in}
                                         status_in={statusIn}
                                         status_working={statusWorking}
+                                        ppcColorsOverride={ppcColors}
                                         onReload={onRequest}
                                     />
                                 </View>
@@ -190,6 +208,7 @@ const DisplayProducts = ({ display = {} }) => {
                                     total={totals.status_in}
                                     status_in={statusIn}
                                     status_working={statusWorking}
+                                    ppcColorsOverride={ppcColors}
                                     onReload={onRequest}
                                 />
                             </View>
@@ -207,6 +226,7 @@ const DisplayProducts = ({ display = {} }) => {
                                         total={totals.status_working}
                                         status_working={statusWorking}
                                         status_out={statusOut}
+                                        ppcColorsOverride={ppcColors}
                                         onReload={onRequest}
                                     />
                                 </View>
@@ -218,6 +238,7 @@ const DisplayProducts = ({ display = {} }) => {
                                     total={totals.status_working}
                                     status_working={statusWorking}
                                     status_out={statusOut}
+                                    ppcColorsOverride={ppcColors}
                                     onReload={onRequest}
                                 />
                             </View>
@@ -234,6 +255,7 @@ const DisplayProducts = ({ display = {} }) => {
                                         orders={[order]}
                                         total={totals.status_out}
                                         status_in={statusOut}
+                                        ppcColorsOverride={ppcColors}
                                         onReload={onRequest}
                                     />
                                 </View>
@@ -244,6 +266,7 @@ const DisplayProducts = ({ display = {} }) => {
                                     orders={[]}
                                     total={totals.status_out}
                                     status_in={statusOut}
+                                    ppcColorsOverride={ppcColors}
                                     onReload={onRequest}
                                 />
                             </View>
@@ -350,6 +373,50 @@ const createStyles = (ppcColors) =>
             paddingBottom: 8,
             backgroundColor: ppcColors.appBg,
             minHeight: '100%',
+        },
+        skeletonWrap: {
+            gap: 10,
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+        },
+        skeletonCard: {
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: ppcColors.border,
+            backgroundColor: ppcColors.cardBg,
+            padding: 12,
+            gap: 10,
+        },
+        skeletonHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+        },
+        skeletonLine: {
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: ppcColors.border,
+            backgroundColor: ppcColors.cardBgSoft,
+            height: 11,
+        },
+        skeletonTitle: {
+            width: '52%',
+            height: 14,
+        },
+        skeletonBadge: {
+            width: 46,
+            height: 24,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: ppcColors.border,
+            backgroundColor: ppcColors.cardBgSoft,
+        },
+        skeletonRow: {
+            width: '100%',
+        },
+        skeletonButton: {
+            width: '44%',
+            height: 28,
         },
     });
 

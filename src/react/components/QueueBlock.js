@@ -1,11 +1,13 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, Pressable, Modal, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Text, Button, RadioButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import { env } from '@env';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
+import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
+import { withOpacity } from '@controleonline/../../src/styles/branding';
 
 export default function QueueBlock({
   queue,
@@ -123,12 +125,26 @@ export default function QueueBlock({
         {renderStatus(queue.status_out, 'out')}
       </View>
 
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+      <AnimatedModal
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+        style={{ justifyContent: 'flex-end' }}
+      >
+        <View style={styles.editSheetRoot}>
+          <Pressable style={styles.editSheetBackdrop} onPress={() => setModalVisible(false)} />
+          <View style={styles.editSheetWrap}>
+            <View style={styles.editSheetHandle} />
+            <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Selecione o status</Text>
-              <Text style={styles.modalSubtitle}>Atualize a etapa desta fila</Text>
+              <View style={styles.modalHeaderRow}>
+                <View style={styles.modalHeaderTextWrap}>
+                  <Text style={styles.modalTitle}>Selecione o status</Text>
+                  <Text style={styles.modalSubtitle}>Atualize a etapa desta fila</Text>
+                </View>
+                <Pressable onPress={() => setModalVisible(false)} style={styles.modalCloseButton}>
+                  <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
+                </Pressable>
+              </View>
             </View>
 
             <ScrollView style={styles.statusList}>
@@ -191,7 +207,8 @@ export default function QueueBlock({
             </Button>
           </View>
         </View>
-      </Modal>
+      </View>
+      </AnimatedModal>
     </View>
   );
 }
@@ -269,34 +286,69 @@ const createStyles = (ppcColors) =>
       backgroundColor: ppcColors.border,
     },
     addIcon: { fontSize: 14, color: ppcColors.textDark, fontWeight: '900', lineHeight: 14 },
-    modalOverlay: {
+    editSheetRoot: {
       flex: 1,
-      backgroundColor: ppcColors.overlay,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 14,
+      justifyContent: 'flex-end',
+    },
+    editSheetBackdrop: {
+      flex: 1,
+      backgroundColor: withOpacity(ppcColors.overlay || '#0F172A', 0.55),
+    },
+    editSheetWrap: {
+      paddingHorizontal: 0,
+      paddingBottom: 10,
+    },
+    editSheetHandle: {
+      alignSelf: 'center',
+      width: 54,
+      height: 5,
+      borderRadius: 999,
+      backgroundColor: withOpacity(ppcColors.textSecondary, 0.24),
+      marginBottom: 6,
     },
     modalContent: {
       width: '100%',
-      maxWidth: 460,
-      backgroundColor: ppcColors.cardBg,
-      borderRadius: 18,
-      padding: 16,
-      borderWidth: 1,
+      maxHeight: '88%',
+      backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 18,
+      paddingTop: 16,
+      paddingBottom: 20,
+      borderTopWidth: 1,
       borderColor: ppcColors.border,
       shadowColor: '#000',
-      shadowOpacity: 0.3,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: -3 },
       elevation: 8,
     },
     modalHeader: {
       paddingBottom: 10,
-      marginBottom: 10,
+      marginBottom: 12,
       borderBottomWidth: 1,
       borderBottomColor: ppcColors.border,
     },
-    modalTitle: { fontSize: 18, fontWeight: '900', color: ppcColors.textPrimary },
+    modalHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    modalHeaderTextWrap: {
+      flex: 1,
+    },
+    modalCloseButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      backgroundColor: ppcColors.cardBgSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalTitle: { fontSize: 20, fontWeight: '800', color: ppcColors.textPrimary },
     modalSubtitle: {
       marginTop: 3,
       fontSize: 12,

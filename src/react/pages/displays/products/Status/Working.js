@@ -5,10 +5,18 @@ import { useStore } from '@store';
 import OrderProductComponents from './../../OrderProductComponents';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 
-const Working = ({ orders = [], total = 0, status_working, status_out, onReload }) => {
+const Working = ({
+    orders = [],
+    total = 0,
+    status_working,
+    status_out,
+    onReload,
+    ppcColorsOverride = null,
+}) => {
     const store = useStore('order_products_queue');
     const { actions } = store;
-    const { ppcColors } = usePpcTheme();
+    const { ppcColors: defaultPpcColors } = usePpcTheme();
+    const ppcColors = ppcColorsOverride || defaultPpcColors;
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
     const finalize = async order => {
