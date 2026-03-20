@@ -625,32 +625,34 @@ export default function DisplayCard({
           <View style={[styles.typeAccent, { backgroundColor: accentSoft }]} />
           <View style={styles.cardGlow} />
           <Card.Content style={styles.cardContent}>
-            <View style={styles.iconWrap}>
-              <MaterialCommunityIcons
-                name={iconByType[item.displayType] || 'monitor'}
-                size={28}
-                color={accent}
-              />
-            </View>
-            <View style={styles.titleRow}>
-              <PaperText style={[styles.displayTitle, titleSizing]}>{item.display}</PaperText>
-              {env.APP_TYPE === 'MANAGER' && (
-                <View style={styles.cardActions}>
-                  <TouchableOpacity
-                    onPress={(event) => {
-                      event?.stopPropagation?.();
-                      setModalVisible(true);
-                    }}
-                    style={styles.editIcon}
-                  >
-                    <MaterialCommunityIcons
-                      name="pencil"
-                      size={12}
-                      color={ppcColors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                </View>
-              )}
+            <View style={styles.headerRow}>
+              <View style={styles.iconWrap}>
+                <MaterialCommunityIcons
+                  name={iconByType[item.displayType] || 'monitor'}
+                  size={22}
+                  color={accent}
+                />
+              </View>
+              <View style={styles.titleRow}>
+                <PaperText style={[styles.displayTitle, titleSizing]}>{item.display}</PaperText>
+                {env.APP_TYPE === 'MANAGER' && (
+                  <View style={styles.cardActions}>
+                    <TouchableOpacity
+                      onPress={(event) => {
+                        event?.stopPropagation?.();
+                        setModalVisible(true);
+                      }}
+                      style={styles.editIcon}
+                    >
+                      <MaterialCommunityIcons
+                        name="pencil"
+                        size={12}
+                        color={ppcColors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             </View>
             <View style={styles.queuesWrap}>
               <QueuesList
@@ -928,28 +930,34 @@ const createStyles = (ppcColors) =>
     opacity: 0.18,
   },
   cardContent: {
-    alignItems: 'center',
+    alignItems: 'stretch',
     paddingTop: 12,
     paddingBottom: 12,
     paddingHorizontal: 14,
     minHeight: 222,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
   iconWrap: {
-    width: 52,
-    height: 52,
+    width: 42,
+    height: 42,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: ppcColors.border,
     backgroundColor: ppcColors.cardBgSoft,
+    marginRight: 10,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    maxWidth: '94%',
+    justifyContent: 'flex-start',
+    maxWidth: '78%',
   },
   cardActions: {
     marginLeft: 6,
@@ -969,7 +977,7 @@ const createStyles = (ppcColors) =>
   displayTitle: {
     fontWeight: '900',
     color: ppcColors.textPrimary,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   typePill: {
     backgroundColor: ppcColors.panelBg,

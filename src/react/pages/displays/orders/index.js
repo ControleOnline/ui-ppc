@@ -13,10 +13,11 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import { useStore } from '@store'
 import OrderProducts from '@controleonline/ui-ppc/src/react/components/OrderProducts'
 import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader'
-import AppearanceToggle from '@controleonline/ui-ppc/src/react/components/AppearanceToggle'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme'
+import { withOpacity } from '@controleonline/../../src/styles/branding'
 
-const Orders = () => {
+const Orders = ({ display = {} }) => {
     const route = useRoute()
     const navigation = useNavigation()
     const { width } = useWindowDimensions()
@@ -24,10 +25,10 @@ const Orders = () => {
     const queuesStore = useStore('queues')
     const { getters, actions } = queuesStore
     const { items, totalItems, isLoading } = getters
-    const display = decodeURIComponent(route.params?.id || '')
+    const displayId = decodeURIComponent(route.params?.id || '')
     const [orders, setOrders] = useState([])
     const { currentCompany } = peopleStore.getters;
-    const { ppcColors, isDark, toggleAppearanceMode } = usePpcTheme()
+    const { ppcColors } = usePpcTheme()
 
     const columns = useMemo(() => {
         if (width >= 2200) return 5
@@ -47,14 +48,14 @@ const Orders = () => {
     const styles = useMemo(() => createStyles(scale, ppcColors), [scale, ppcColors])
 
     const fetchOrders = useCallback(() => {
-        if (!display || !currentCompany) return
+        if (!displayId || !currentCompany) return
         actions.ordersQueue({
             status: { realStatus: ['open'] },
             provider: currentCompany?.id
         }).then((data) => {
             setOrders(data);
         })
-    }, [display])
+    }, [displayId])
 
     useFocusEffect(
         useCallback(() => {
@@ -81,25 +82,48 @@ const Orders = () => {
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Pedidos na fila</Text>
+            <View style={styles.summaryCard}>
+                <View style={styles.summaryHeader}>
+                    <View style={styles.summaryIdentity}>
+                        <View style={styles.summaryIconWrap}>
+                            <MaterialCommunityIcons
+                                name={display?.displayType === 'products' ? 'silverware-fork-knife' : 'receipt-text'}
+                                size={18}
+                                color={display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo}
+                            />
+                        </View>
+                        <View style={styles.summaryTitleWrap}>
+                            <Text numberOfLines={1} style={styles.summaryTitle}>
+                                {String(display?.display || 'Display')}
+                            </Text>
+                            <Text style={styles.summarySubtitle}>Pedidos na fila</Text>
+                        </View>
+                    </View>
 
-                <View style={styles.headerRight}>
-                    <AppearanceToggle
-                        isDark={isDark}
-                        onToggle={toggleAppearanceMode}
-                        ppcColors={ppcColors}
-                        compact
-                    />
                     {isLoading ? (
                         <ActivityIndicator
                             size="small"
                             color={ppcColors.accent}
                             style={styles.loader}
                         />
-                    ) : <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{totalItems || 0}</Text>
-                    </View>}
+                    ) : (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{totalItems || 0}</Text>
+                        </View>
+                    )}
+                </View>
+
+                <View style={styles.summaryFooter}>
+                    <View style={styles.summaryTypePill}>
+                        <Text
+                            style={[
+                                styles.summaryTypeText,
+                                { color: display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo },
+                            ]}
+                        >
+                            {String(display?.displayType || 'orders').toUpperCase()}
+                        </Text>
+                    </View>
                 </View>
             </View>
 
@@ -145,10 +169,73 @@ const createStyles = (scale, ppcColors) =>
             borderBottomWidth: 1,
             borderBottomColor: ppcColors.border,
         },
-        headerTitle: {
+        summaryCard: {
+            marginHorizontal: 12 * scale,
+            marginTop: 10 * scale,
+            marginBottom: 10 * scale,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: ppcColors.borderSoft,
+            backgroundColor: ppcColors.cardBg,
+            paddingHorizontal: 12 * scale,
+            paddingTop: 10 * scale,
+            paddingBottom: 10 * scale,
+        },
+        summaryHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+        },
+        summaryIdentity: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+        },
+        summaryIconWrap: {
+            width: 36 * scale,
+            height: 36 * scale,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: ppcColors.border,
+            backgroundColor: ppcColors.cardBgSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 10 * scale,
+        },
+        summaryTitleWrap: {
+            flex: 1,
+        },
+        summaryTitle: {
             color: ppcColors.textPrimary,
-            fontSize: 22 * scale,
+            fontSize: 24 * scale,
+            lineHeight: 28 * scale,
             fontWeight: '900',
+        },
+        summarySubtitle: {
+            color: ppcColors.textSecondary,
+            fontSize: 12 * scale,
+            fontWeight: '600',
+            marginTop: 2 * scale,
+        },
+        summaryFooter: {
+            marginTop: 8 * scale,
+            borderTopWidth: 1,
+            borderTopColor: withOpacity(ppcColors.border, 0.7),
+            paddingTop: 8 * scale,
+        },
+        summaryTypePill: {
+            alignSelf: 'flex-start',
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: ppcColors.border,
+            backgroundColor: ppcColors.panelBg,
+            paddingHorizontal: 10 * scale,
+            paddingVertical: 3 * scale,
+        },
+        summaryTypeText: {
+            fontSize: 10 * scale,
+            letterSpacing: 0.8 * scale,
+            fontWeight: '800',
         },
         headerRight: {
             flexDirection: 'row',
