@@ -6,13 +6,18 @@ import { useStore } from '@store';
 import { env } from '@env';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 
-export default function QueueBlock({ queue, onQueueUpdate }) {
+export default function QueueBlock({
+  queue,
+  onQueueUpdate,
+  ppcColorsOverride = null,
+}) {
   const navigation = useNavigation();
   const statusStore = useStore('status');
   const queueStore = useStore('queues');
   const { actions: actionsQueue } = queueStore;
   const { actions } = statusStore;
-  const { ppcColors } = usePpcTheme();
+  const { ppcColors: defaultPpcColors } = usePpcTheme();
+  const ppcColors = ppcColorsOverride || defaultPpcColors;
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(null);

@@ -11,14 +11,58 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/Feather';
 import { useStore } from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
 import DisplayCard from '@controleonline/ui-ppc/src/react/components/DisplayCard';
-import AppearanceToggle from '@controleonline/ui-ppc/src/react/components/AppearanceToggle';
 import { env } from '@env';
-import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
+import { colors as fallbackColors } from '@controleonline/../../src/styles/colors';
+import {
+  resolveThemePalette,
+  withOpacity,
+} from '@controleonline/../../src/styles/branding';
 
 const BRAND_LOGO = require('@assets/ppc/logo 512x512 r.png');
+
+const buildDisplayTheme = (palette = {}, themeColors = {}) => {
+  const accent = themeColors['ppc-accent'] || palette.primary || '#FACC15';
+  const secondaryAccent =
+    themeColors['ppc-accent-info'] || palette.secondary || '#38BDF8';
+
+  return {
+    appBg: palette.background || '#F8FAFC',
+    panelBg: themeColors['ppc-panel-bg-light'] || '#FFFFFF',
+    cardBg: themeColors['ppc-card-bg-light'] || '#FFFFFF',
+    cardBgSoft:
+      themeColors['ppc-card-bg-soft-light'] || withOpacity(accent, 0.07),
+    modalBg: themeColors['ppc-modal-bg'] || '#FFFFFF',
+    textPrimary:
+      themeColors['ppc-text-primary-light'] || palette.text || '#0F172A',
+    textSecondary:
+      themeColors['ppc-text-secondary-light'] ||
+      palette.textSecondary ||
+      '#475569',
+    textDark: themeColors['ppc-text-dark'] || palette.text || '#0F172A',
+    border:
+      themeColors['ppc-border-light'] ||
+      withOpacity(palette.primary || accent, 0.16),
+    borderSoft:
+      themeColors['ppc-border-soft-light'] ||
+      withOpacity(palette.primary || accent, 0.3),
+    overlay: themeColors['ppc-overlay-light'] || 'rgba(15,23,42,0.32)',
+    accent,
+    accentInfo: secondaryAccent,
+    danger: themeColors['ppc-danger'] || '#EF4444',
+    dangerBg: themeColors['ppc-danger-bg-light'] || '#FFF1F2',
+    dangerText: themeColors['ppc-danger-text'] || '#DC2626',
+    pillTextDark: themeColors['ppc-pill-text-dark-light'] || '#0F172A',
+    primary: palette.primary || accent,
+    mode: 'light',
+    isLight: true,
+    isDark: false,
+  };
+};
+
 const parseEntityId = (value) => {
   if (!value) return null;
   if (typeof value === 'number') return value;
@@ -40,14 +84,40 @@ const DisplaysPage = () => {
   const displaysStore = useStore('displays');
   const displayQueuesStore = useStore('display_queues');
   const peopleStore = useStore('people');
+  const themeStore = useStore('theme');
   const navigation = useNavigation();
 
   const { actions, items, isLoading, error } = displaysStore;
   const { actions: displayQueuesActions } = displayQueuesStore;
   const { currentCompany } = peopleStore.getters;
+  const themeColors = themeStore?.getters?.colors || {};
   const [displayQueuesRows, setDisplayQueuesRows] = useState([]);
-  const { ppcColors, isDark, toggleAppearanceMode } = usePpcTheme();
-  const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
+
+  const brandColors = useMemo(
+    () =>
+      resolveThemePalette(
+        {
+          ...themeColors,
+          ...(currentCompany?.theme?.colors || {}),
+        },
+        fallbackColors,
+      ),
+    [currentCompany?.id, currentCompany?.theme?.colors, themeColors],
+  );
+
+  const ppcColors = useMemo(
+    () =>
+      buildDisplayTheme(brandColors, {
+        ...themeColors,
+        ...(currentCompany?.theme?.colors || {}),
+      }),
+    [brandColors, currentCompany?.id, currentCompany?.theme?.colors, themeColors],
+  );
+
+  const styles = useMemo(
+    () => createStyles(ppcColors, brandColors),
+    [brandColors, ppcColors],
+  );
 
   const numColumns = useMemo(() => {
     if (width >= 1700) return 4;
@@ -75,7 +145,9 @@ const DisplaysPage = () => {
     });
     const linkedRows = Array.isArray(linked) ? linked : [];
     const filtered = linkedRows.filter((row) => {
-      const displayId = parseEntityId(row?.display?.id || row?.display?.['@id'] || row?.display);
+      const displayId = parseEntityId(
+        row?.display?.id || row?.display?.['@id'] || row?.display,
+      );
       return displayId && displayIds.includes(displayId);
     });
     setDisplayQueuesRows(filtered);
@@ -84,13 +156,15 @@ const DisplaysPage = () => {
   useFocusEffect(
     useCallback(() => {
       refreshDisplays();
-    }, [refreshDisplays])
+    }, [refreshDisplays]),
   );
 
   const prefetchedByDisplay = useMemo(() => {
     const grouped = {};
     (Array.isArray(displayQueuesRows) ? displayQueuesRows : []).forEach((row) => {
-      const displayId = parseEntityId(row?.display?.id || row?.display?.['@id'] || row?.display);
+      const displayId = parseEntityId(
+        row?.display?.id || row?.display?.['@id'] || row?.display,
+      );
       if (!displayId) return;
       if (!grouped[displayId]) grouped[displayId] = [];
       grouped[displayId].push(row);
@@ -102,7 +176,7 @@ const DisplaysPage = () => {
     (item) => {
       navigation.navigate('DisplayDetails', { id: item.id });
     },
-    [navigation]
+    [navigation],
   );
 
   const addDisplay = useCallback(() => {
@@ -118,17 +192,18 @@ const DisplaysPage = () => {
         <DisplayCard
           item={item}
           prefetchedDisplayQueues={prefetchedByDisplay[item.id] || []}
+          ppcColorsOverride={ppcColors}
           onPress={() => openDisplay(item)}
           onLinked={refreshDisplays}
           editable={env.APP_TYPE === 'MANAGER'}
         />
       </View>
     ),
-    [openDisplay, prefetchedByDisplay, refreshDisplays]
+    [openDisplay, ppcColors, prefetchedByDisplay, refreshDisplays, styles.itemWrapper],
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <StateStore store="displays" />
 
       <View style={styles.hero}>
@@ -138,22 +213,23 @@ const DisplaysPage = () => {
             <View style={styles.heroLogoWrap}>
               <Image source={BRAND_LOGO} style={styles.heroLogo} resizeMode="contain" />
             </View>
-            <View>
+            <View style={styles.heroContent}>
               <Text style={styles.heroTitle}>Painel PPC</Text>
-              <Text style={styles.heroSubtitle}>
-                {currentCompany?.alias || currentCompany?.person || 'Empresa'} · Displays ativos
-              </Text>
+              <Text style={styles.heroSubtitle}>Gestao de displays para operacao mobile.</Text>
             </View>
           </View>
+
           <View style={[styles.heroActions, isCompact && styles.heroActionsCompact]}>
-            <AppearanceToggle isDark={isDark} onToggle={toggleAppearanceMode} ppcColors={ppcColors} />
             <View style={styles.countPill}>
-              <Text style={styles.countNumber}>{items?.length || 0}</Text>
-              <Text style={styles.countLabel}>displays</Text>
+              <Text style={styles.countNumber}>{items?.length || 0} ativos</Text>
+              <Text style={styles.countLabel}>
+                {currentCompany?.alias || currentCompany?.person || 'Empresa atual'}
+              </Text>
             </View>
+
             {env.APP_TYPE === 'MANAGER' && (
               <Pressable style={styles.addButton} onPress={addDisplay}>
-                <Text style={styles.addButtonText}>+ Adicionar Display</Text>
+                <Icon name="plus" size={24} color={ppcColors.pillTextDark} />
               </Pressable>
             )}
           </View>
@@ -180,142 +256,149 @@ const DisplaysPage = () => {
   );
 };
 
-const createStyles = (ppcColors) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: ppcColors.appBg,
-  },
-  hero: {
-    marginHorizontal: 14,
-    marginTop: 8,
-    marginBottom: 12,
-    borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: ppcColors.panelBg,
-    borderWidth: 1,
-    borderColor: ppcColors.border,
-    borderTopWidth: 2,
-    borderTopColor: ppcColors.accent,
-    position: 'relative',
-  },
-  heroGlow: {
-    position: 'absolute',
-    top: -90,
-    right: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 999,
-    backgroundColor: ppcColors.border,
-    opacity: 0.5,
-  },
-  heroTopRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 14,
-  },
-  heroTopRowCompact: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-  },
-  heroIdentity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  heroLogoWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: ppcColors.borderSoft,
-    backgroundColor: ppcColors.pillTextDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroLogo: {
-    width: 28,
-    height: 28,
-  },
-  heroTitle: {
-    color: ppcColors.textPrimary,
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-  },
-  heroSubtitle: {
-    marginTop: 2,
-    color: ppcColors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  heroActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-  },
-  heroActionsCompact: {
-    width: '100%',
-    justifyContent: 'space-between',
-  },
-  countPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: ppcColors.accent,
-    backgroundColor: ppcColors.panelBg,
-    alignItems: 'center',
-    minWidth: 76,
-  },
-  countNumber: {
-    color: ppcColors.accent,
-    fontSize: 18,
-    fontWeight: '900',
-    lineHeight: 20,
-  },
-  countLabel: {
-    color: ppcColors.textSecondary,
-    fontSize: 10,
-    textTransform: 'uppercase',
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  list: {
-    paddingHorizontal: 14,
-    paddingBottom: 28,
-    paddingTop: 2,
-    gap: 12,
-  },
-  columnWrapper: {
-    gap: 12,
-  },
-  itemWrapper: {
-    flex: 1,
-  },
-  addButton: {
-    backgroundColor: ppcColors.panelBg,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: ppcColors.border,
-  },
-  addButtonText: {
-    color: ppcColors.accent,
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  loaderWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
+const createStyles = (ppcColors, brandColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: ppcColors.appBg,
+    },
+    hero: {
+      marginHorizontal: 14,
+      marginTop: 12,
+      marginBottom: 14,
+      borderRadius: 24,
+      overflow: 'hidden',
+      backgroundColor: ppcColors.panelBg,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      shadowColor: brandColors.primary,
+      shadowOpacity: 0.12,
+      shadowOffset: { width: 0, height: 12 },
+      shadowRadius: 22,
+      elevation: 5,
+      position: 'relative',
+    },
+    heroGlow: {
+      position: 'absolute',
+      top: -74,
+      left: 52,
+      width: 180,
+      height: 180,
+      borderRadius: 999,
+      backgroundColor: withOpacity(ppcColors.accent, 0.16),
+    },
+    heroTopRow: {
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 14,
+    },
+    heroTopRowCompact: {
+      flexDirection: 'column',
+      alignItems: 'stretch',
+    },
+    heroIdentity: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flex: 1,
+    },
+    heroContent: {
+      flex: 1,
+    },
+    heroLogoWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: withOpacity(ppcColors.accent, 0.28),
+      backgroundColor: withOpacity(ppcColors.accent, 0.06),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    heroLogo: {
+      width: 30,
+      height: 30,
+    },
+    heroTitle: {
+      color: ppcColors.textPrimary,
+      fontSize: 18,
+      fontWeight: '900',
+    },
+    heroSubtitle: {
+      marginTop: 3,
+      color: ppcColors.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    heroActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+    },
+    heroActionsCompact: {
+      width: '100%',
+      justifyContent: 'space-between',
+    },
+    countPill: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: withOpacity(ppcColors.accent, 0.22),
+      backgroundColor: withOpacity(ppcColors.accent, 0.1),
+      alignItems: 'center',
+      minWidth: 108,
+    },
+    countNumber: {
+      color: ppcColors.accent,
+      fontSize: 13,
+      fontWeight: '900',
+      lineHeight: 16,
+      textTransform: 'uppercase',
+    },
+    countLabel: {
+      color: ppcColors.textSecondary,
+      fontSize: 10,
+      fontWeight: '700',
+      marginTop: 2,
+    },
+    list: {
+      paddingHorizontal: 14,
+      paddingBottom: 28,
+      paddingTop: 2,
+      gap: 12,
+    },
+    columnWrapper: {
+      gap: 12,
+    },
+    itemWrapper: {
+      flex: 1,
+    },
+    addButton: {
+      width: 52,
+      height: 52,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: withOpacity(ppcColors.accent, 0.32),
+      backgroundColor: ppcColors.accent,
+      shadowColor: ppcColors.accent,
+      shadowOpacity: 0.28,
+      shadowOffset: { width: 0, height: 10 },
+      shadowRadius: 16,
+      elevation: 5,
+    },
+    loaderWrap: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+  });
 
 export default DisplaysPage;

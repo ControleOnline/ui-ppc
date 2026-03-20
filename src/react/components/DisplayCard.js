@@ -8,6 +8,8 @@ import QueuesList from './QueuesList';
 import { useStore } from '@store';
 import { env } from '@env';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
+import { withOpacity } from '@controleonline/../../src/styles/branding';
+import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 
 const iconByType = {
   products: 'silverware-fork-knife',
@@ -21,9 +23,9 @@ const typeAccentByType = {
 
 const getTitleStyleByName = (name) => {
   const size = String(name || '').trim().length;
-  if (size > 18) return { fontSize: 30, lineHeight: 34 };
-  if (size > 12) return { fontSize: 34, lineHeight: 38 };
-  return { fontSize: 38, lineHeight: 42 };
+  if (size > 18) return { fontSize: 24, lineHeight: 28 };
+  if (size > 12) return { fontSize: 28, lineHeight: 32 };
+  return { fontSize: 30, lineHeight: 34 };
 };
 
 const normalizeDisplayQueues = (value) => {
@@ -79,7 +81,13 @@ const writeLocalLinks = (links) => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPress, onLinked }) {
+export default function DisplayCard({
+  item,
+  prefetchedDisplayQueues = [],
+  onPress,
+  onLinked,
+  ppcColorsOverride = null,
+}) {
   const navigation = useNavigation();
   const displaysStore = useStore('displays');
   const queuesStore = useStore('queues');
@@ -89,7 +97,12 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
   const { actions } = displaysStore;
   const displaysItems = displaysStore.items || [];
   const { currentCompany } = peopleStore.getters;
-  const { ppcColors, isDark } = usePpcTheme();
+  const { ppcColors: defaultPpcColors, isDark: defaultIsDark } = usePpcTheme();
+  const ppcColors = ppcColorsOverride || defaultPpcColors;
+  const isDark =
+    typeof ppcColorsOverride?.isDark === 'boolean'
+      ? ppcColorsOverride.isDark
+      : defaultIsDark;
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
   const [queues, setQueues] = useState(
@@ -597,8 +610,10 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
     (item.displayType === 'orders' ? ppcColors.accentInfo : ppcColors.accent) ||
     typeAccentByType[item.displayType] ||
     '#FACC15';
-  const accentSoft = isDark ? `${accent}C0` : `${accent}8A`;
+  const accentSoft = isDark ? withOpacity(accent, 0.75) : withOpacity(accent, 0.54);
   const titleSizing = getTitleStyleByName(item.display);
+  const canManageQueue = env.APP_TYPE === 'MANAGER' && item.displayType === 'products';
+  const hasLinkedQueue = Array.isArray(queues) && queues.length > 0;
 
   return (
     <>
@@ -613,60 +628,88 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
             <View style={styles.iconWrap}>
               <MaterialCommunityIcons
                 name={iconByType[item.displayType] || 'monitor'}
-                size={34}
-                color="#FACC15"
+                size={28}
+                color={accent}
               />
             </View>
             <View style={styles.titleRow}>
               <PaperText style={[styles.displayTitle, titleSizing]}>{item.display}</PaperText>
               {env.APP_TYPE === 'MANAGER' && (
                 <View style={styles.cardActions}>
-                  <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.editIcon}>
-                    <Text style={styles.editIconText}>✎</Text>
+                  <TouchableOpacity
+                    onPress={(event) => {
+                      event?.stopPropagation?.();
+                      setModalVisible(true);
+                    }}
+                    style={styles.editIcon}
+                  >
+                    <MaterialCommunityIcons
+                      name="pencil"
+                      size={12}
+                      color={ppcColors.textSecondary}
+                    />
                   </TouchableOpacity>
                 </View>
               )}
             </View>
-            <View style={styles.typePill}>
-              <PaperText style={[styles.displayType, { color: accent }]}>
-                {String(item.displayType || '').toUpperCase()}
-              </PaperText>
-            </View>
             <View style={styles.queuesWrap}>
-              <QueuesList queues={queues} onQueueUpdate={handleQueueUpdate} />
-              {env.APP_TYPE === 'MANAGER' &&
-                item.displayType === 'products' &&
-                (!queues || queues.length === 0) && (
-                  <Pressable
-                    style={[styles.linkQueueButton, linkingQueue && styles.linkQueueButtonDisabled]}
-                    onPress={(event) => {
-                      event?.stopPropagation?.();
-                      openLinkQueueModal();
-                    }}
-                    disabled={linkingQueue}
-                  >
-                    <Text style={styles.linkQueueButtonText}>
-                      {linkingQueue ? 'Carregando...' : 'Vincular fila'}
-                    </Text>
-                  </Pressable>
-                )}
-              {env.APP_TYPE === 'MANAGER' &&
-                item.displayType === 'products' &&
-                queues &&
-                queues.length > 0 && (
-                  <Pressable
-                    style={[styles.unlinkQueueButton, unlinkingQueue && styles.linkQueueButtonDisabled]}
-                    onPress={(event) => {
-                      event?.stopPropagation?.();
+              <QueuesList
+                queues={queues}
+                onQueueUpdate={handleQueueUpdate}
+                ppcColorsOverride={ppcColorsOverride}
+              />
+            </View>
+            <View
+              style={[
+                styles.footerRow,
+                !canManageQueue && styles.footerRowCentered,
+              ]}
+            >
+              <View style={styles.typePill}>
+                <PaperText style={[styles.displayType, { color: accent }]}>
+                  {String(item.displayType || '').toUpperCase()}
+                </PaperText>
+              </View>
+
+              {canManageQueue && (
+                <Pressable
+                  style={[
+                    hasLinkedQueue ? styles.unlinkQueueButton : styles.linkQueueButton,
+                    (linkingQueue || unlinkingQueue) && styles.linkQueueButtonDisabled,
+                  ]}
+                  onPress={(event) => {
+                    event?.stopPropagation?.();
+                    if (hasLinkedQueue) {
                       unlinkQueue();
-                    }}
-                    disabled={unlinkingQueue}
+                    } else {
+                      openLinkQueueModal();
+                    }
+                  }}
+                  disabled={linkingQueue || unlinkingQueue}
+                >
+                  <MaterialCommunityIcons
+                    name={hasLinkedQueue ? 'link-off' : 'plus'}
+                    size={12}
+                    color={hasLinkedQueue ? ppcColors.dangerText : ppcColors.accent}
+                    style={styles.footerActionIcon}
+                  />
+                  <Text
+                    style={[
+                      hasLinkedQueue ? styles.unlinkQueueButtonText : styles.linkQueueButtonText,
+                    ]}
                   >
-                    <Text style={styles.unlinkQueueButtonText}>
-                      {unlinkingQueue ? 'Desvinculando...' : 'Desvincular fila'}
-                    </Text>
-                  </Pressable>
-                )}
+                    {hasLinkedQueue
+                      ? unlinkingQueue
+                        ? 'Desvinculando...'
+                        : 'Desvincular fila'
+                      : linkingQueue
+                        ? 'Carregando...'
+                        : 'Vincular fila'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+            <View style={styles.feedbackWrap}>
               {!!linkError && (
                 <Text style={styles.linkQueueErrorText}>
                   {linkError}
@@ -769,85 +812,89 @@ export default function DisplayCard({ item, prefetchedDisplayQueues = [], onPres
       </Modal>
 
       {env.APP_TYPE === 'MANAGER' && (
-        <Modal visible={modalVisible} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={styles.editModalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Editar Display</Text>
-                <Text style={styles.modalSubtitle}>Atualize nome e tipo do painel</Text>
+        <AnimatedModal visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
+          <View style={styles.editSheetRoot}>
+            <Pressable style={styles.editSheetBackdrop} onPress={() => setModalVisible(false)} />
+            <View style={styles.editSheetWrap}>
+              <View style={styles.editSheetHandle} />
+              <View style={styles.editModalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Editar display</Text>
+                  <Text style={styles.modalSubtitle}>Nome e tipo do painel</Text>
+                </View>
+
+                <Text style={styles.modalLabel}>Nome do display</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={editDisplay}
+                  onChangeText={setEditDisplay}
+                  placeholder="Nome do display"
+                  placeholderTextColor={ppcColors.textSecondary}
+                />
+
+                <Text style={styles.modalLabel}>Tipo do display</Text>
+                <RadioButton.Group onValueChange={setEditType} value={editType}>
+                  <View
+                    style={[
+                      styles.radioItemWrap,
+                      editType === 'orders' && styles.radioItemWrapSelected,
+                    ]}
+                  >
+                    <RadioButton.Item
+                      label="Orders"
+                      value="orders"
+                      color={ppcColors.accentInfo}
+                      uncheckedColor={ppcColors.borderSoft}
+                      labelStyle={styles.radioLabel}
+                      style={styles.radioItem}
+                    />
+                  </View>
+                  <View
+                    style={[
+                      styles.radioItemWrap,
+                      editType === 'products' && styles.radioItemWrapSelected,
+                    ]}
+                  >
+                    <RadioButton.Item
+                      label="Products"
+                      value="products"
+                      color={ppcColors.accent}
+                      uncheckedColor={ppcColors.borderSoft}
+                      labelStyle={styles.radioLabel}
+                      style={styles.radioItem}
+                    />
+                  </View>
+                </RadioButton.Group>
+
+                <Button
+                  mode="contained"
+                  onPress={saveDisplay}
+                  style={styles.editModalSaveButton}
+                  buttonColor={ppcColors.accent}
+                  textColor={ppcColors.pillTextDark}
+                >
+                  Salvar alteracoes
+                </Button>
+                <Button
+                  mode="outlined"
+                  onPress={confirmDeleteDisplay}
+                  style={styles.editModalDeleteButton}
+                  textColor={ppcColors.dangerText}
+                  disabled={deletingDisplay}
+                >
+                  {deletingDisplay ? 'Excluindo...' : 'Excluir display'}
+                </Button>
+                <Button
+                  onPress={() => setModalVisible(false)}
+                  style={styles.editModalCancelButton}
+                  textColor={ppcColors.textSecondary}
+                >
+                  Fechar
+                </Button>
               </View>
-
-              <Text style={styles.modalLabel}>Nome do Display</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={editDisplay}
-                onChangeText={setEditDisplay}
-                placeholder="Nome do display"
-                placeholderTextColor={ppcColors.textSecondary}
-              />
-
-              <Text style={styles.modalLabel}>Tipo do Display</Text>
-              <RadioButton.Group onValueChange={setEditType} value={editType}>
-                <View
-                  style={[
-                    styles.radioItemWrap,
-                    editType === 'orders' && styles.radioItemWrapSelected,
-                  ]}
-                >
-                  <RadioButton.Item
-                    label="Orders"
-                    value="orders"
-                    color={ppcColors.accentInfo}
-                    uncheckedColor={ppcColors.borderSoft}
-                    labelStyle={styles.radioLabel}
-                    style={styles.radioItem}
-                  />
-                </View>
-                <View
-                  style={[
-                    styles.radioItemWrap,
-                    editType === 'products' && styles.radioItemWrapSelected,
-                  ]}
-                >
-                  <RadioButton.Item
-                    label="Products"
-                    value="products"
-                    color={ppcColors.accent}
-                    uncheckedColor={ppcColors.borderSoft}
-                    labelStyle={styles.radioLabel}
-                    style={styles.radioItem}
-                  />
-                </View>
-              </RadioButton.Group>
-
-              <Button
-                mode="contained"
-                onPress={saveDisplay}
-                style={styles.editModalSaveButton}
-                buttonColor={ppcColors.accent}
-                textColor={ppcColors.pillTextDark}
-              >
-                Salvar
-              </Button>
-              <Button
-                mode="outlined"
-                onPress={confirmDeleteDisplay}
-                style={styles.editModalDeleteButton}
-                textColor={ppcColors.dangerText}
-                disabled={deletingDisplay}
-              >
-                {deletingDisplay ? 'Excluindo...' : 'Excluir display'}
-              </Button>
-              <Button
-                onPress={() => setModalVisible(false)}
-                style={styles.editModalCancelButton}
-                textColor={ppcColors.textSecondary}
-              >
-                Cancelar
-              </Button>
             </View>
           </View>
-        </Modal>
+        </AnimatedModal>
       )}
     </>
   );
@@ -859,8 +906,8 @@ const createStyles = (ppcColors) =>
   cardPressed: { opacity: 0.96, transform: [{ scale: 0.992 }] },
   displayCard: {
     flex: 1,
-    minHeight: 260,
-    borderRadius: 18,
+    minHeight: 224,
+    borderRadius: 22,
     backgroundColor: ppcColors.cardBg,
     borderWidth: 1,
     borderColor: ppcColors.borderSoft,
@@ -872,24 +919,24 @@ const createStyles = (ppcColors) =>
   },
   cardGlow: {
     position: 'absolute',
-    width: 200,
-    height: 200,
+    width: 156,
+    height: 156,
     borderRadius: 999,
-    top: -80,
-    right: -70,
+    top: -54,
+    right: -44,
     backgroundColor: ppcColors.border,
-    opacity: 0.24,
+    opacity: 0.18,
   },
   cardContent: {
     alignItems: 'center',
-    paddingTop: 14,
-    paddingBottom: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
     paddingHorizontal: 14,
-    minHeight: 258,
+    minHeight: 222,
   },
   iconWrap: {
-    width: 56,
-    height: 56,
+    width: 52,
+    height: 52,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
@@ -900,28 +947,24 @@ const createStyles = (ppcColors) =>
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
-    maxWidth: '92%',
+    justifyContent: 'center',
+    marginTop: 8,
+    maxWidth: '94%',
   },
   cardActions: {
-    marginLeft: 8,
+    marginLeft: 6,
     flexDirection: 'row',
     alignItems: 'center',
   },
   editIcon: {
-    backgroundColor: ppcColors.pillTextDark,
+    backgroundColor: ppcColors.cardBgSoft,
     borderWidth: 1,
     borderColor: ppcColors.borderSoft,
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  editIconText: {
-    color: ppcColors.textSecondary,
-    fontSize: 14,
-    lineHeight: 16,
   },
   displayTitle: {
     fontWeight: '900',
@@ -929,31 +972,41 @@ const createStyles = (ppcColors) =>
     textAlign: 'center',
   },
   typePill: {
-    marginTop: 6,
-    marginBottom: 12,
     backgroundColor: ppcColors.panelBg,
     borderWidth: 1,
     borderColor: ppcColors.border,
     borderRadius: 999,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 3,
   },
-  displayType: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
+  displayType: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   queuesWrap: {
-    marginTop: 2,
+    marginTop: 8,
     width: '100%',
-    flex: 1,
     justifyContent: 'flex-start',
   },
-  linkQueueButton: {
-    alignSelf: 'center',
+  footerRow: {
     marginTop: 10,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  footerRowCentered: {
+    justifyContent: 'center',
+  },
+  feedbackWrap: {
+    width: '100%',
+  },
+  linkQueueButton: {
     borderRadius: 999,
     borderWidth: 1,
     borderColor: ppcColors.accent,
     backgroundColor: ppcColors.panelBg,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   linkQueueButtonDisabled: {
     opacity: 0.7,
@@ -966,21 +1019,23 @@ const createStyles = (ppcColors) =>
     letterSpacing: 0.4,
   },
   unlinkQueueButton: {
-    alignSelf: 'center',
-    marginTop: 10,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: ppcColors.danger,
     backgroundColor: ppcColors.dangerBg,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  footerActionIcon: {
+    marginRight: 6,
   },
   unlinkQueueButtonText: {
     color: ppcColors.dangerText,
     fontWeight: '800',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    fontSize: 11,
+    letterSpacing: 0.2,
   },
   linkQueueErrorText: {
     marginTop: 8,
@@ -1096,17 +1151,38 @@ const createStyles = (ppcColors) =>
   },
   editModalContent: {
     width: '100%',
-    maxWidth: 460,
+    maxWidth: 520,
     backgroundColor: ppcColors.cardBg,
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 18,
     borderWidth: 1,
     borderColor: ppcColors.border,
     shadowColor: '#000',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  editSheetRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  editSheetBackdrop: {
+    flex: 1,
+  },
+  editSheetWrap: {
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+  editSheetHandle: {
+    alignSelf: 'center',
+    width: 54,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: withOpacity(ppcColors.textSecondary, 0.25),
+    marginBottom: 8,
   },
   radioItemWrap: {
     marginTop: 8,

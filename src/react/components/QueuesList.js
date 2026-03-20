@@ -2,7 +2,11 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import QueueBlock from './QueueBlock';
 
-export default function QueuesList({ queues, onQueueUpdate }) {
+export default function QueuesList({
+  queues,
+  onQueueUpdate,
+  ppcColorsOverride = null,
+}) {
   const [queueState, setQueueState] = useState([...queues]);
 
   useEffect(() => {
@@ -32,6 +36,7 @@ export default function QueuesList({ queues, onQueueUpdate }) {
           key={dq.queue.id}
           queue={dq.queue}
           onQueueUpdate={handleQueueUpdate}
+          ppcColorsOverride={ppcColorsOverride}
         />
       ))}
     </View>
