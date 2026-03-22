@@ -115,7 +115,7 @@ const Orders = ({ display = {} }) => {
   const peopleStore = useStore('people')
   const queuesStore = useStore('queues')
   const { getters, actions } = queuesStore
-  const { items, totalItems, isLoading } = getters
+  const { items, totalItems, isLoading, messages } = getters
   const { currentCompany } = peopleStore.getters
   const { ppcColors } = useDisplayTheme()
 
@@ -151,12 +151,18 @@ const Orders = ({ display = {} }) => {
     }, [items]),
   )
 
+  useEffect(() => {
+    if (!Array.isArray(messages) || messages.length === 0) return
+    const last = messages[messages.length - 1]
+    if (last?.action === 'refresh') fetchOrders()
+  }, [messages, fetchOrders])
+
   useFocusEffect(
     useCallback(() => {
       fetchOrders()
       const interval = setInterval(() => {
         fetchOrders()
-      }, 15000)
+      }, 60000)
 
       return () => clearInterval(interval)
     }, [fetchOrders]),
