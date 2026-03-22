@@ -8,6 +8,7 @@ import QueuesList from './QueuesList';
 import { useStore } from '@store';
 import { env } from '@env';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
+import { withOpacity } from '@controleonline/../../src/styles/branding';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
 
