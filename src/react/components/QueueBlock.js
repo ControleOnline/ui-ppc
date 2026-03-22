@@ -1,13 +1,12 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { Text, Button, RadioButton } from 'react-native-paper';
+import { View, StyleSheet, Pressable, ScrollView, TouchableOpacity } from 'react-native';
+import { Text, RadioButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import { env } from '@env';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
-import { withOpacity } from '@controleonline/../../src/styles/branding';
 
 export default function QueueBlock({
   queue,
@@ -130,84 +129,65 @@ export default function QueueBlock({
         onRequestClose={() => setModalVisible(false)}
         style={{ justifyContent: 'flex-end' }}
       >
-        <View style={styles.editSheetRoot}>
-          <Pressable style={styles.editSheetBackdrop} onPress={() => setModalVisible(false)} />
-          <View style={styles.editSheetWrap}>
-            <View style={styles.editSheetHandle} />
-            <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderRow}>
-                <View style={styles.modalHeaderTextWrap}>
-                  <Text style={styles.modalTitle}>Selecione o status</Text>
-                  <Text style={styles.modalSubtitle}>Atualize a etapa desta fila</Text>
-                </View>
-                <Pressable onPress={() => setModalVisible(false)} style={styles.modalCloseButton}>
-                  <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
-                </Pressable>
-              </View>
-            </View>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Selecione o status</Text>
+            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.headerCloseButton}>
+              <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
-            <ScrollView style={styles.statusList}>
-              {loadingStatuses ? (
-                <Text style={styles.loadingText}>Carregando status...</Text>
-              ) : statusList.length === 0 ? (
-                <Text style={styles.loadingText}>Nenhum status disponivel.</Text>
-              ) : (
-                <RadioButton.Group
-                  onValueChange={(value) => {
-                    const selected = statusList.find((s) => String(s.id) === String(value));
-                    setSelectedStatus(selected);
-                  }}
-                  value={selectedStatus?.id}
-                >
-                  {statusList.map((item) => (
+          <ScrollView style={styles.statusList}>
+            {loadingStatuses ? (
+              <Text style={styles.loadingText}>Carregando status...</Text>
+            ) : statusList.length === 0 ? (
+              <Text style={styles.loadingText}>Nenhum status disponivel.</Text>
+            ) : (
+              <RadioButton.Group
+                onValueChange={(value) => {
+                  const selected = statusList.find((s) => String(s.id) === String(value));
+                  setSelectedStatus(selected);
+                }}
+                value={selectedStatus?.id}
+              >
+                {statusList.map((item) => (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.radioItemWrap,
+                      String(selectedStatus?.id) === String(item.id) &&
+                        styles.radioItemWrapSelected,
+                    ]}
+                  >
                     <View
-                      key={item.id}
                       style={[
-                        styles.radioItemWrap,
-                        String(selectedStatus?.id) === String(item.id) &&
-                          styles.radioItemWrapSelected,
+                        styles.modalStatusDot,
+                        { backgroundColor: item.color || '#64748B' },
                       ]}
-                    >
-                      <View
-                        style={[
-                          styles.modalStatusDot,
-                          { backgroundColor: item.color || '#64748B' },
-                        ]}
-                      />
-                      <RadioButton.Item
-                        label={item.name}
-                        value={item.id}
-                        color={ppcColors.accent}
-                        uncheckedColor={ppcColors.borderSoft}
-                        labelStyle={styles.radioLabel}
-                        style={styles.radioItem}
-                      />
-                    </View>
-                  ))}
-                </RadioButton.Group>
-              )}
-            </ScrollView>
+                    />
+                    <RadioButton.Item
+                      label={item.name}
+                      value={item.id}
+                      color={ppcColors.accent}
+                      uncheckedColor={ppcColors.borderSoft}
+                      labelStyle={styles.radioLabel}
+                      style={styles.radioItem}
+                    />
+                  </View>
+                ))}
+              </RadioButton.Group>
+            )}
+          </ScrollView>
 
-            <Button
-              mode="contained"
-              onPress={saveStatus}
-              style={styles.modalSaveButton}
-              buttonColor={ppcColors.accent}
-              textColor={ppcColors.pillTextDark}
-            >
-              Salvar
-            </Button>
-            <Button
-              onPress={() => setModalVisible(false)}
-              style={styles.modalCancelButton}
-              textColor={ppcColors.textSecondary}
-            >
-              Cancelar
-            </Button>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveButton} onPress={saveStatus}>
+              <Text style={styles.saveButtonText}>Salvar</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </View>
       </AnimatedModal>
     </View>
   );
@@ -286,77 +266,40 @@ const createStyles = (ppcColors) =>
       backgroundColor: ppcColors.border,
     },
     addIcon: { fontSize: 14, color: ppcColors.textDark, fontWeight: '900', lineHeight: 14 },
-    editSheetRoot: {
-      flex: 1,
-      justifyContent: 'flex-end',
-    },
-    editSheetBackdrop: {
-      flex: 1,
-      backgroundColor: withOpacity(ppcColors.overlay || '#0F172A', 0.55),
-    },
-    editSheetWrap: {
-      paddingHorizontal: 0,
-      paddingBottom: 10,
-    },
-    editSheetHandle: {
-      alignSelf: 'center',
-      width: 54,
-      height: 5,
-      borderRadius: 999,
-      backgroundColor: withOpacity(ppcColors.textSecondary, 0.24),
-      marginBottom: 6,
-    },
-    modalContent: {
-      width: '100%',
-      maxHeight: '88%',
+    modalContainer: {
       backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      paddingHorizontal: 18,
-      paddingTop: 16,
-      paddingBottom: 20,
-      borderTopWidth: 1,
-      borderColor: ppcColors.border,
+      maxHeight: '90%',
+      width: '100%',
       shadowColor: '#000',
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: -3 },
-      elevation: 8,
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 10,
     },
     modalHeader: {
-      paddingBottom: 10,
-      marginBottom: 12,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 24,
+      paddingVertical: 20,
       borderBottomWidth: 1,
       borderBottomColor: ppcColors.border,
     },
-    modalHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 10,
-    },
-    modalHeaderTextWrap: {
-      flex: 1,
-    },
-    modalCloseButton: {
+    modalTitle: { fontSize: 20, fontWeight: '800', color: ppcColors.textPrimary },
+    headerCloseButton: {
       width: 32,
       height: 32,
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: ppcColors.border,
       backgroundColor: ppcColors.cardBgSoft,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    modalTitle: { fontSize: 20, fontWeight: '800', color: ppcColors.textPrimary },
-    modalSubtitle: {
-      marginTop: 3,
-      fontSize: 12,
-      color: ppcColors.textSecondary,
-      fontWeight: '600',
-    },
     statusList: {
       maxHeight: 320,
+      marginHorizontal: 24,
+      marginVertical: 12,
       borderRadius: 12,
       borderWidth: 1,
       borderColor: ppcColors.border,
@@ -400,12 +343,37 @@ const createStyles = (ppcColors) =>
       paddingHorizontal: 10,
       paddingVertical: 12,
     },
-    modalSaveButton: {
-      marginTop: 12,
-      borderRadius: 12,
+    modalFooter: {
+      flexDirection: 'row',
+      padding: 20,
+      gap: 12,
+      borderTopWidth: 1,
+      borderTopColor: ppcColors.border,
     },
-    modalCancelButton: {
-      marginTop: 4,
+    cancelButton: {
+      flex: 1,
+      paddingVertical: 14,
       borderRadius: 12,
+      borderWidth: 1,
+      borderColor: ppcColors.textSecondary,
+      alignItems: 'center',
+    },
+    cancelButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: ppcColors.textSecondary,
+    },
+    saveButton: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 12,
+      backgroundColor: ppcColors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    saveButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: ppcColors.pillTextDark,
     },
   });

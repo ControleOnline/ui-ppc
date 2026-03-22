@@ -1,14 +1,13 @@
 // DisplayCard.js
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, View, TextInput, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { Card, Text as PaperText, Button, RadioButton } from 'react-native-paper';
+import { Card, Text as PaperText, RadioButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import QueuesList from './QueuesList';
 import { useStore } from '@store';
 import { env } from '@env';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
-import { withOpacity } from '@controleonline/../../src/styles/branding';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
 
@@ -776,108 +775,98 @@ export default function DisplayCard({
         onRequestClose={() => setLinkModalVisible(false)}
         style={{ justifyContent: 'flex-end' }}
       >
-        <View style={styles.editSheetRoot}>
-          <Pressable style={styles.editSheetBackdrop} onPress={() => setLinkModalVisible(false)} />
-            <View style={styles.editSheetWrap}>
-              <View style={styles.editSheetHandle} />
-            <View style={styles.linkModalContent}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderRow}>
-                <View style={styles.modalHeaderTextWrap}>
-                  <Text style={styles.modalTitle}>Vincular fila</Text>
-                  <Text style={styles.modalSubtitle}>Conecte uma fila existente ou crie uma nova</Text>
-                </View>
-                <Pressable
-                  onPress={() => setLinkModalVisible(false)}
-                  style={styles.modalCloseButton}
-                >
-                  <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
-                </Pressable>
-              </View>
-            </View>
-            <Text style={styles.modalLabel}>Escolha uma fila existente</Text>
-
-            <ScrollView
-              style={styles.linkModalList}
-              contentContainerStyle={styles.linkModalListContent}
-              showsVerticalScrollIndicator
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Vincular fila</Text>
+            <TouchableOpacity
+              onPress={() => setLinkModalVisible(false)}
+              style={styles.headerCloseButton}
             >
-              {queueOptions.length > 0 ? (
-                <RadioButton.Group
-                  onValueChange={(value) => setSelectedQueueId(String(value))}
-                  value={selectedQueueId}
-                >
-                  {queueOptions.map((queue) => {
-                    const queueKey = queue.id || getId(queue) || queue?.['@id'];
-                    const queueValue = String(queue.id || getId(queue) || queue?.['@id']);
-                    return (
-                      <View
-                        key={queueKey}
-                        style={[
-                          styles.linkModalItemWrap,
-                          String(selectedQueueId) === queueValue && styles.linkModalItemWrapSelected,
-                        ]}
-                      >
-                        <RadioButton.Item
-                          label={queue.queue || `Fila #${queueValue}`}
-                          value={queueValue}
-                          color={ppcColors.accent}
-                          uncheckedColor={ppcColors.borderSoft}
-                          labelStyle={styles.linkModalRadioLabel}
-                          style={styles.linkModalRadioItem}
-                        />
-                      </View>
-                    );
-                  })}
-                </RadioButton.Group>
-              ) : (
-                <Text style={styles.linkModalHintText}>
-                  {linkingQueue ? 'Carregando filas...' : 'Nenhuma fila disponivel nesta empresa.'}
-                </Text>
-              )}
-            </ScrollView>
+              <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
-            <View style={styles.linkModalFooter}>
-              <View style={styles.createQueueDivider} />
-              <Text style={styles.modalLabel}>Ou crie uma nova fila</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newQueueName}
-                onChangeText={setNewQueueName}
-                placeholder="Nome da nova fila"
-                placeholderTextColor={ppcColors.textSecondary}
-              />
-              <Button
-                mode="outlined"
-                onPress={createQueueAndBind}
-                style={styles.createQueueButton}
-                textColor={ppcColors.accent}
-                disabled={creatingQueue || linkingQueue}
+          <ScrollView
+            style={styles.linkModalList}
+            contentContainerStyle={styles.linkModalListContent}
+            showsVerticalScrollIndicator
+          >
+            <Text style={styles.modalLabel}>Escolha uma fila existente</Text>
+            {queueOptions.length > 0 ? (
+              <RadioButton.Group
+                onValueChange={(value) => setSelectedQueueId(String(value))}
+                value={selectedQueueId}
               >
+                {queueOptions.map((queue) => {
+                  const queueKey = queue.id || getId(queue) || queue?.['@id'];
+                  const queueValue = String(queue.id || getId(queue) || queue?.['@id']);
+                  return (
+                    <View
+                      key={queueKey}
+                      style={[
+                        styles.linkModalItemWrap,
+                        String(selectedQueueId) === queueValue && styles.linkModalItemWrapSelected,
+                      ]}
+                    >
+                      <RadioButton.Item
+                        label={queue.queue || `Fila #${queueValue}`}
+                        value={queueValue}
+                        color={ppcColors.accent}
+                        uncheckedColor={ppcColors.borderSoft}
+                        labelStyle={styles.linkModalRadioLabel}
+                        style={styles.linkModalRadioItem}
+                      />
+                    </View>
+                  );
+                })}
+              </RadioButton.Group>
+            ) : (
+              <Text style={styles.linkModalHintText}>
+                {linkingQueue ? 'Carregando filas...' : 'Nenhuma fila disponivel nesta empresa.'}
+              </Text>
+            )}
+
+            <View style={styles.createQueueDivider} />
+            <Text style={styles.modalLabel}>Ou crie uma nova fila</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newQueueName}
+              onChangeText={setNewQueueName}
+              placeholder="Nome da nova fila"
+              placeholderTextColor={ppcColors.textSecondary}
+            />
+            <TouchableOpacity
+              style={[styles.outlineButton, (creatingQueue || linkingQueue) && styles.buttonDisabled]}
+              onPress={createQueueAndBind}
+              disabled={creatingQueue || linkingQueue}
+            >
+              <Text style={styles.outlineButtonText}>
                 {creatingQueue ? 'Criando...' : 'Criar e Vincular'}
-              </Button>
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
 
-              <Button
-                mode="contained"
-                onPress={bindSelectedQueue}
-                style={styles.linkModalBindButton}
-                buttonColor={ppcColors.accent}
-                textColor={ppcColors.pillTextDark}
-                disabled={!queueOptions.length || !selectedQueueId || linkingQueue || creatingQueue || unlinkingQueue}
-              >
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setLinkModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                (!queueOptions.length || !selectedQueueId || linkingQueue || creatingQueue || unlinkingQueue) && styles.buttonDisabled,
+              ]}
+              onPress={bindSelectedQueue}
+              disabled={!queueOptions.length || !selectedQueueId || linkingQueue || creatingQueue || unlinkingQueue}
+            >
+              <Text style={styles.saveButtonText}>
                 {linkingQueue ? 'Vinculando...' : 'Vincular'}
-              </Button>
-              <Button
-                onPress={() => setLinkModalVisible(false)}
-                style={styles.linkModalCancelButton}
-                textColor={ppcColors.textSecondary}
-              >
-                Cancelar
-              </Button>
-            </View>
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </View>
       </AnimatedModal>
 
       {env.APP_TYPE === 'MANAGER' && (
@@ -886,88 +875,82 @@ export default function DisplayCard({
           onRequestClose={() => setModalVisible(false)}
           style={{ justifyContent: 'flex-end' }}
         >
-          <View style={styles.editSheetRoot}>
-            <Pressable style={styles.editSheetBackdrop} onPress={() => setModalVisible(false)} />
-            <View style={styles.editSheetWrap}>
-              <View style={styles.editSheetHandle} />
-              <View style={styles.editModalContent}>
-                <View style={styles.modalHeader}>
-                  <View style={styles.modalHeaderRow}>
-                    <View style={styles.modalHeaderTextWrap}>
-                      <Text style={styles.modalTitle}>Editar display</Text>
-                      <Text style={styles.modalSubtitle}>Nome e tipo do painel</Text>
-                    </View>
-                    <Pressable
-                      onPress={() => setModalVisible(false)}
-                      style={styles.modalCloseButton}
-                    >
-                      <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
-                    </Pressable>
-                  </View>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Editar display</Text>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={styles.headerCloseButton}
+              >
+                <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.modalLabel}>Nome do display</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editDisplay}
+                onChangeText={setEditDisplay}
+                placeholder="Nome do display"
+                placeholderTextColor={ppcColors.textSecondary}
+              />
+
+              <Text style={styles.modalLabel}>Tipo do display</Text>
+              <RadioButton.Group onValueChange={setEditType} value={editType}>
+                <View
+                  style={[
+                    styles.radioItemWrap,
+                    editType === 'orders' && styles.radioItemWrapSelected,
+                  ]}
+                >
+                  <RadioButton.Item
+                    label="Orders"
+                    value="orders"
+                    color={ppcColors.accentInfo}
+                    uncheckedColor={ppcColors.borderSoft}
+                    labelStyle={styles.radioLabel}
+                    style={styles.radioItem}
+                  />
                 </View>
-
-                <Text style={styles.modalLabel}>Nome do display</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={editDisplay}
-                  onChangeText={setEditDisplay}
-                  placeholder="Nome do display"
-                  placeholderTextColor={ppcColors.textSecondary}
-                />
-
-                <Text style={styles.modalLabel}>Tipo do display</Text>
-                <RadioButton.Group onValueChange={setEditType} value={editType}>
-                  <View
-                    style={[
-                      styles.radioItemWrap,
-                      editType === 'orders' && styles.radioItemWrapSelected,
-                    ]}
-                  >
-                    <RadioButton.Item
-                      label="Orders"
-                      value="orders"
-                      color={ppcColors.accentInfo}
-                      uncheckedColor={ppcColors.borderSoft}
-                      labelStyle={styles.radioLabel}
-                      style={styles.radioItem}
-                    />
-                  </View>
-                  <View
-                    style={[
-                      styles.radioItemWrap,
-                      editType === 'products' && styles.radioItemWrapSelected,
-                    ]}
-                  >
-                    <RadioButton.Item
-                      label="Products"
-                      value="products"
-                      color={ppcColors.accent}
-                      uncheckedColor={ppcColors.borderSoft}
-                      labelStyle={styles.radioLabel}
-                      style={styles.radioItem}
-                    />
-                  </View>
-                </RadioButton.Group>
-
-                <Button
-                  mode="contained"
-                  onPress={saveDisplay}
-                  style={styles.editModalSaveButton}
-                  buttonColor={ppcColors.accent}
-                  textColor={ppcColors.pillTextDark}
+                <View
+                  style={[
+                    styles.radioItemWrap,
+                    editType === 'products' && styles.radioItemWrapSelected,
+                  ]}
                 >
-                  Salvar alteracoes
-                </Button>
-                <Button
-                  mode="outlined"
-                  onPress={confirmDeleteDisplay}
-                  style={styles.editModalDeleteButton}
-                  textColor={ppcColors.dangerText}
-                  disabled={deletingDisplay}
-                >
+                  <RadioButton.Item
+                    label="Products"
+                    value="products"
+                    color={ppcColors.accent}
+                    uncheckedColor={ppcColors.borderSoft}
+                    labelStyle={styles.radioLabel}
+                    style={styles.radioItem}
+                  />
+                </View>
+              </RadioButton.Group>
+
+              <TouchableOpacity
+                style={[styles.dangerOutlineButton, deletingDisplay && styles.buttonDisabled]}
+                onPress={confirmDeleteDisplay}
+                disabled={deletingDisplay}
+              >
+                <Text style={styles.dangerOutlineButtonText}>
                   {deletingDisplay ? 'Excluindo...' : 'Excluir display'}
-                </Button>
-              </View>
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveButton} onPress={saveDisplay}>
+                <Text style={styles.saveButtonText}>Salvar</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </AnimatedModal>
@@ -978,46 +961,37 @@ export default function DisplayCard({
         onRequestClose={() => setConfirmDeleteVisible(false)}
         style={{ justifyContent: 'flex-end' }}
       >
-        <View style={styles.editSheetRoot}>
-          <Pressable style={styles.editSheetBackdrop} onPress={() => setConfirmDeleteVisible(false)} />
-          <View style={styles.editSheetWrap}>
-            <View style={styles.editSheetHandle} />
-            <View style={styles.confirmModalContent}>
-              <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalTitle}>Excluir display</Text>
-                <Pressable
-                  onPress={() => setConfirmDeleteVisible(false)}
-                  style={styles.modalCloseButton}
-                  disabled={deletingDisplay}
-                >
-                  <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
-                </Pressable>
-              </View>
-              <Text style={styles.confirmModalMessage}>
-                Deseja excluir o display "{item.display}"?
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Excluir display</Text>
+            <TouchableOpacity
+              onPress={() => setConfirmDeleteVisible(false)}
+              style={styles.headerCloseButton}
+              disabled={deletingDisplay}
+            >
+              <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.confirmModalMessage}>
+            Deseja excluir o display "{item.display}"?
+          </Text>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.cancelButton, deletingDisplay && styles.buttonDisabled]}
+              onPress={() => setConfirmDeleteVisible(false)}
+              disabled={deletingDisplay}
+            >
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dangerButton, deletingDisplay && styles.buttonDisabled]}
+              onPress={deleteDisplay}
+              disabled={deletingDisplay}
+            >
+              <Text style={styles.dangerButtonText}>
+                {deletingDisplay ? 'Excluindo...' : 'Excluir'}
               </Text>
-              <View style={styles.confirmModalActions}>
-                <Button
-                  mode="outlined"
-                  onPress={() => setConfirmDeleteVisible(false)}
-                  style={styles.confirmCancelButton}
-                  textColor={ppcColors.textSecondary}
-                  disabled={deletingDisplay}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  mode="contained"
-                  onPress={deleteDisplay}
-                  style={styles.confirmDangerButton}
-                  buttonColor={ppcColors.danger}
-                  textColor="#FFFFFF"
-                  disabled={deletingDisplay}
-                >
-                  {deletingDisplay ? 'Excluindo...' : 'Excluir'}
-                </Button>
-              </View>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
       </AnimatedModal>
@@ -1027,46 +1001,37 @@ export default function DisplayCard({
         onRequestClose={() => setConfirmUnlinkVisible(false)}
         style={{ justifyContent: 'flex-end' }}
       >
-        <View style={styles.editSheetRoot}>
-          <Pressable style={styles.editSheetBackdrop} onPress={() => setConfirmUnlinkVisible(false)} />
-          <View style={styles.editSheetWrap}>
-            <View style={styles.editSheetHandle} />
-            <View style={styles.confirmModalContent}>
-              <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalTitle}>Desvincular fila</Text>
-                <Pressable
-                  onPress={() => setConfirmUnlinkVisible(false)}
-                  style={styles.modalCloseButton}
-                  disabled={unlinkingQueue}
-                >
-                  <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
-                </Pressable>
-              </View>
-              <Text style={styles.confirmModalMessage}>
-                Confirma o desvinculo desta fila do display?
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Desvincular fila</Text>
+            <TouchableOpacity
+              onPress={() => setConfirmUnlinkVisible(false)}
+              style={styles.headerCloseButton}
+              disabled={unlinkingQueue}
+            >
+              <MaterialCommunityIcons name="close" size={18} color={ppcColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.confirmModalMessage}>
+            Confirma o desvinculo desta fila do display?
+          </Text>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.cancelButton, unlinkingQueue && styles.buttonDisabled]}
+              onPress={() => setConfirmUnlinkVisible(false)}
+              disabled={unlinkingQueue}
+            >
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dangerButton, unlinkingQueue && styles.buttonDisabled]}
+              onPress={unlinkQueue}
+              disabled={unlinkingQueue}
+            >
+              <Text style={styles.dangerButtonText}>
+                {unlinkingQueue ? 'Desvinculando...' : 'Desvincular'}
               </Text>
-              <View style={styles.confirmModalActions}>
-                <Button
-                  mode="outlined"
-                  onPress={() => setConfirmUnlinkVisible(false)}
-                  style={styles.confirmCancelButton}
-                  textColor={ppcColors.textSecondary}
-                  disabled={unlinkingQueue}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  mode="contained"
-                  onPress={unlinkQueue}
-                  style={styles.confirmDangerButton}
-                  buttonColor={ppcColors.danger}
-                  textColor="#FFFFFF"
-                  disabled={unlinkingQueue}
-                >
-                  {unlinkingQueue ? 'Desvinculando...' : 'Desvincular'}
-                </Button>
-              </View>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
       </AnimatedModal>
@@ -1232,85 +1197,75 @@ const createStyles = (ppcColors) =>
     textAlign: 'center',
     paddingHorizontal: 8,
   },
-  linkModalContent: {
-    width: '100%',
-    maxHeight: '88%',
+  modalContainer: {
     backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderColor: ppcColors.border,
+    maxHeight: '90%',
+    width: '100%',
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: -3 },
-    elevation: 8,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 10,
   },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: ppcColors.textPrimary, marginBottom: 2 },
-  modalHeaderRow: {
+  modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: ppcColors.border,
   },
-  modalHeaderTextWrap: {
-    flex: 1,
-  },
-  modalCloseButton: {
+  modalTitle: { fontSize: 20, fontWeight: '800', color: ppcColors.textPrimary },
+  headerCloseButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: ppcColors.border,
     backgroundColor: ppcColors.cardBgSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modalHeader: {
-    paddingBottom: 10,
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: ppcColors.border,
-  },
-  modalSubtitle: {
-    marginTop: 2,
-    fontSize: 12,
-    fontWeight: '600',
-    color: ppcColors.textSecondary,
+  modalBody: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
   modalLabel: { fontSize: 14, fontWeight: '700', marginTop: 12, color: ppcColors.textSecondary },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: ppcColors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    color: ppcColors.textPrimary,
+    backgroundColor: ppcColors.cardBgSoft,
+  },
   createQueueDivider: {
     height: 1,
     backgroundColor: ppcColors.border,
-    marginTop: 10,
-    marginBottom: 2,
+    marginTop: 16,
+    marginBottom: 4,
   },
   linkModalList: {
     maxHeight: 300,
-    marginTop: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: ppcColors.border,
-    backgroundColor: ppcColors.cardBgSoft,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
+    paddingHorizontal: 24,
+    paddingTop: 12,
   },
   linkModalListContent: {
-    paddingBottom: 2,
+    paddingBottom: 8,
   },
   linkModalItemWrap: {
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'transparent',
-    backgroundColor: ppcColors.cardBg,
+    backgroundColor: ppcColors.cardBgSoft,
     marginBottom: 8,
   },
   linkModalItemWrapSelected: {
     borderColor: ppcColors.accent,
-    backgroundColor: ppcColors.cardBgSoft,
+    backgroundColor: ppcColors.cardBg,
   },
   linkModalRadioItem: {
     minHeight: 42,
@@ -1324,91 +1279,7 @@ const createStyles = (ppcColors) =>
     color: ppcColors.textSecondary,
     fontWeight: '600',
     fontSize: 13,
-    paddingHorizontal: 10,
     paddingVertical: 10,
-  },
-  linkModalFooter: {
-    marginTop: 2,
-    backgroundColor: ppcColors.cardBg,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: ppcColors.border,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginTop: 6,
-    color: ppcColors.textPrimary,
-    backgroundColor: ppcColors.cardBgSoft,
-  },
-  editModalContent: {
-    width: '100%',
-    maxHeight: '88%',
-    backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderColor: ppcColors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: -3 },
-    elevation: 6,
-  },
-  confirmModalContent: {
-    width: '100%',
-    backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderColor: ppcColors.border,
-  },
-  confirmModalMessage: {
-    marginTop: 8,
-    color: ppcColors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-  confirmModalActions: {
-    marginTop: 14,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  confirmCancelButton: {
-    flex: 1,
-    borderColor: ppcColors.borderSoft,
-    borderRadius: 12,
-  },
-  confirmDangerButton: {
-    flex: 1,
-    borderRadius: 12,
-  },
-  editSheetRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  editSheetBackdrop: {
-    flex: 1,
-    backgroundColor: withOpacity(ppcColors.overlay || '#0F172A', 0.55),
-  },
-  editSheetWrap: {
-    paddingHorizontal: 0,
-    paddingBottom: 10,
-  },
-  editSheetHandle: {
-    alignSelf: 'center',
-    width: 54,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: withOpacity(ppcColors.textSecondary, 0.24),
-    marginBottom: 6,
   },
   radioItemWrap: {
     marginTop: 8,
@@ -1429,27 +1300,88 @@ const createStyles = (ppcColors) =>
     fontWeight: '700',
     fontSize: 14,
   },
-  editModalSaveButton: {
-    marginTop: 14,
-    borderRadius: 12,
+  confirmModalMessage: {
+    marginHorizontal: 24,
+    marginTop: 16,
+    color: ppcColors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
   },
-  editModalDeleteButton: {
-    marginTop: 10,
-    borderColor: ppcColors.danger,
-    borderRadius: 12,
-    backgroundColor: ppcColors.dangerBg,
+  modalFooter: {
+    flexDirection: 'row',
+    padding: 20,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: ppcColors.border,
   },
-  createQueueButton: {
-    marginTop: 10,
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ppcColors.textSecondary,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: ppcColors.textSecondary,
+  },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: ppcColors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: ppcColors.pillTextDark,
+  },
+  dangerButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: ppcColors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  outlineButton: {
+    marginTop: 10,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
     borderColor: ppcColors.accent,
+    alignItems: 'center',
   },
-  linkModalBindButton: {
-    marginTop: 10,
-    borderRadius: 12,
+  outlineButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: ppcColors.accent,
   },
-  linkModalCancelButton: {
-    marginTop: 4,
+  dangerOutlineButton: {
+    marginTop: 16,
+    paddingVertical: 12,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ppcColors.danger,
+    backgroundColor: ppcColors.dangerBg,
+    alignItems: 'center',
+  },
+  dangerOutlineButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: ppcColors.dangerText,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
 });
