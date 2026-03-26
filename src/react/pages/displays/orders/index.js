@@ -297,7 +297,7 @@ const Orders = ({ display = {} }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {display?.displayType === 'tv' && env.APP_TYPE === 'PPC' && <Spotify />}
+      {display?.displayType === 'tv' && env.APP_TYPE === 'PPC' && 1 === 't' && <Spotify />}
       <View style={styles.summaryCard}>
         <View style={styles.summaryHeader}>
           <View style={styles.summaryIdentity}>
