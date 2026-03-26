@@ -13,6 +13,7 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useStore } from '@store'
 import Formatter from '@controleonline/ui-common/src/utils/formatter'
+import YouTube from '@controleonline/ui-common/src/react/components/YouTube';
 import {
   getOrderChannelLabel,
   getOrderChannelLogo,
@@ -321,6 +322,7 @@ const Orders = ({ display = {} }) => {
               <Text style={styles.countBubbleText}>{listCount}</Text>
             )}
           </View>
+          {display?.displayType === 'tv' && <YouTube />}
         </View>
 
         <View style={styles.summaryFooter}>

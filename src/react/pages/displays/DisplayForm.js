@@ -191,7 +191,7 @@ export default function DisplayForm() {
 
         <Text style={styles.label}>Tipo</Text>
         <View style={styles.typesWrapper}>
-          {['orders', 'products'].map((t) => (
+          {['orders', 'products', 'tv'].map((t) => (
             <Pressable
               key={t}
               style={[styles.typeButton, type === t && styles.typeButtonSelected]}
