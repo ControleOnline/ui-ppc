@@ -13,14 +13,12 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useStore } from '@store'
 import Formatter from '@controleonline/ui-common/src/utils/formatter'
-import Spotify from '@controleonline/ui-common/src/react/components/radio/Spotify';
 import {
   getOrderChannelLabel,
   getOrderChannelLogo,
 } from '@assets/ppc/channels'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
-import { env } from '@env';
 const normalizeText = value => String(value || '').trim()
 
 const extractExtraEntries = extraData => {
@@ -297,7 +295,6 @@ const Orders = ({ display = {} }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {display?.displayType === 'tv' && env.APP_TYPE === 'PPC' && 1 === 't' && <Spotify />}
       <View style={styles.summaryCard}>
         <View style={styles.summaryHeader}>
           <View style={styles.summaryIdentity}>
