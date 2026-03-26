@@ -5,14 +5,17 @@ import mutations from "@controleonline/ui-default/src/store/default/mutations";
 export default {
   namespaced: true,
   state: {
- item:{},
-items:[],
+    item: {},
+    items: [],
     resourceEndpoint: "display_queues",
     isLoading: false,
+    isSaving: false,
     error: "",
     violations: null,
     totalItems: 0,
-    columns: []
+    message: {},
+    messages: [],
+    columns: [],
   },
   actions,
   getters,

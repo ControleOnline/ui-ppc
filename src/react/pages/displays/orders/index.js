@@ -48,6 +48,15 @@ const getExternalOrderRef = order => {
   return normalizeText(preferred?.value || fallback?.value)
 }
 
+const truncateMiddle = (value, maxLength = 28, head = 12, tail = 8) => {
+  const normalized = normalizeText(value)
+  if (!normalized || normalized.length <= maxLength) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, head)}...${normalized.slice(-tail)}`
+}
+
 const getWaitingMinutes = orderDate => {
   if (!orderDate) return 0
   const diff = Date.now() - new Date(orderDate).getTime()
@@ -114,8 +123,10 @@ const Orders = ({ display = {} }) => {
 
   const peopleStore = useStore('people')
   const queuesStore = useStore('queues')
+  const ordersStore = useStore('orders')
   const { getters, actions } = queuesStore
-  const { items, totalItems, isLoading, messages } = getters
+  const { items, totalItems, isLoading, messages: queueMessages } = getters
+  const ordersMessages = ordersStore?.getters?.messages
   const { currentCompany } = peopleStore.getters
   const { ppcColors } = useDisplayTheme()
 
@@ -151,11 +162,20 @@ const Orders = ({ display = {} }) => {
     }, [items]),
   )
 
+  const queueMessageCount = Array.isArray(queueMessages) ? queueMessages.length : 0
+  const ordersMessageCount = Array.isArray(ordersMessages) ? ordersMessages.length : 0
+
   useEffect(() => {
-    if (!Array.isArray(messages) || messages.length === 0) return
-    const last = messages[messages.length - 1]
-    if (last?.action === 'refresh') fetchOrders()
-  }, [messages, fetchOrders])
+    if (queueMessageCount === 0 && ordersMessageCount === 0) {
+      return
+    }
+
+    const refreshTimeout = setTimeout(() => {
+      fetchOrders()
+    }, 220)
+
+    return () => clearTimeout(refreshTimeout)
+  }, [queueMessageCount, ordersMessageCount, fetchOrders])
 
   useFocusEffect(
     useCallback(() => {
@@ -174,7 +194,7 @@ const Orders = ({ display = {} }) => {
       const waitingMinutes = getWaitingMinutes(item?.orderDate)
       const channelLogo = getOrderChannelLogo(item)
       const channelLabel = String(getOrderChannelLabel(item) || 'SHOP').toUpperCase()
-      const externalRef = getExternalOrderRef(item)
+      const externalRef = truncateMiddle(getExternalOrderRef(item))
       const channelDisplay = externalRef ? `${channelLabel} (${externalRef})` : channelLabel
       const products = getOrderProductsPreview(item)
       const price = Number(item?.price || 0)

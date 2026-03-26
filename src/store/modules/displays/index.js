@@ -9,10 +9,13 @@ export default {
     items: [],
     resourceEndpoint: "displays",
     isLoading: false,
+    isSaving: false,
     error: "",
     violations: null,
     totalItems: 0,
     filters: {},
+    message: {},
+    messages: [],
     columns: [
       {
         editable: false,

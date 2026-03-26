@@ -11,9 +11,12 @@ export default {
     filters: {},
     resourceEndpoint: "queues",
     isLoading: false,
+    isSaving: false,
     error: "",
     violations: null,
     totalItems: 0,
+    message: {},
+    messages: [],
     columns: [
       {
         editable: false,
