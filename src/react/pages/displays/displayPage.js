@@ -148,16 +148,16 @@ const DisplaysPage = () => {
               <Image source={BRAND_LOGO} style={styles.heroLogo} resizeMode="contain" />
             </View>
             <View style={styles.heroContent}>
-              <Text style={styles.heroTitle}>Painel PPC</Text>
-              <Text style={styles.heroSubtitle}>Gestao de displays para operacao mobile.</Text>
+              <Text style={styles.heroTitle}>{global.t?.t('products','label','PPC')}</Text>
+              <Text style={styles.heroSubtitle}>{global.t?.t('products','label','displayManager')}</Text>
             </View>
           </View>
 
           <View style={[styles.heroActions, isCompact && styles.heroActionsCompact]}>
             <View style={styles.countPill}>
-              <Text style={styles.countNumber}>{items?.length || 0} ativos</Text>
+              <Text style={styles.countNumber}>{items?.length || 0} {global.t?.t('products','label','enabled')}</Text>
               <Text style={styles.countLabel}>
-                {currentCompany?.alias || currentCompany?.person || 'Empresa atual'}
+                {currentCompany?.alias || currentCompany?.name}
               </Text>
             </View>
 
