@@ -750,11 +750,11 @@ export default function DisplayCard({
                   >
                     {hasLinkedQueue
                       ? unlinkingQueue
-                        ? 'Desvinculando...'
-                        : 'Desvincular fila'
+                        ? global.t?.t('products','label','unlinkingQueue')
+                        : global.t?.t('products','label','unlinkQueue')
                       : linkingQueue
-                        ? 'Carregando...'
-                        : 'Vincular fila'}
+                        ? global.t?.t('products','label','loading')
+                        : global.t?.t('products','label','linkingQueue')}
                   </Text>
                 </Pressable>
               )}
@@ -778,7 +778,7 @@ export default function DisplayCard({
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Vincular fila</Text>
+            <Text style={styles.modalTitle}>{global.t?.t('products','label','linkQueue')}</Text>
             <TouchableOpacity
               onPress={() => setLinkModalVisible(false)}
               style={styles.headerCloseButton}
@@ -842,7 +842,7 @@ export default function DisplayCard({
               disabled={creatingQueue || linkingQueue}
             >
               <Text style={styles.outlineButtonText}>
-                {creatingQueue ? 'Criando...' : 'Criar e Vincular'}
+                {creatingQueue ? global.t?.t('products','label','creatingQueue') : global.t?.t('products','label','createAndLink')}
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -852,7 +852,7 @@ export default function DisplayCard({
               style={styles.cancelButton}
               onPress={() => setLinkModalVisible(false)}
             >
-              <Text style={styles.cancelButtonText}>Cancelar</Text>
+              <Text style={styles.cancelButtonText}>{global.t?.t('products','button','cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
@@ -863,7 +863,7 @@ export default function DisplayCard({
               disabled={!queueOptions.length || !selectedQueueId || linkingQueue || creatingQueue || unlinkingQueue}
             >
               <Text style={styles.saveButtonText}>
-                {linkingQueue ? 'Vinculando...' : 'Vincular'}
+                {linkingQueue ? global.t?.t('products','label','linkingQueue') : global.t?.t('products','label','linkQueue')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -878,7 +878,7 @@ export default function DisplayCard({
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Editar display</Text>
+              <Text style={styles.modalTitle}>{global.t?.t('products','label','editingDisplay')}</Text>
               <TouchableOpacity
                 onPress={() => setModalVisible(false)}
                 style={styles.headerCloseButton}
@@ -888,16 +888,16 @@ export default function DisplayCard({
             </View>
 
             <View style={styles.modalBody}>
-              <Text style={styles.modalLabel}>Nome do display</Text>
+              <Text style={styles.modalLabel}>{global.t?.t('products','label','displayName')}</Text>
               <TextInput
                 style={styles.modalInput}
                 value={editDisplay}
                 onChangeText={setEditDisplay}
-                placeholder="Nome do display"
+                placeholder={global.t?.t('products','placeholder','displayName')}
                 placeholderTextColor={ppcColors.textSecondary}
               />
 
-              <Text style={styles.modalLabel}>Tipo do display</Text>
+              <Text style={styles.modalLabel}>{global.t?.t('products','label','displayType')}</Text>
               <RadioButton.Group onValueChange={setEditType} value={editType}>
                 <View
                   style={[
@@ -982,7 +982,7 @@ export default function DisplayCard({
               onPress={() => setConfirmDeleteVisible(false)}
               disabled={deletingDisplay}
             >
-              <Text style={styles.cancelButtonText}>Cancelar</Text>
+              <Text style={styles.cancelButtonText}>{global.t?.t('products','button','cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.dangerButton, deletingDisplay && styles.buttonDisabled]}
@@ -990,7 +990,7 @@ export default function DisplayCard({
               disabled={deletingDisplay}
             >
               <Text style={styles.dangerButtonText}>
-                {deletingDisplay ? 'Excluindo...' : 'Excluir'}
+                {deletingDisplay ? global.t?.t('products','button','deleting') : global.t?.t('products','button','delete')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1014,7 +1014,7 @@ export default function DisplayCard({
             </TouchableOpacity>
           </View>
           <Text style={styles.confirmModalMessage}>
-            Confirma o desvinculo desta fila do display?
+            {global.t?.t('products','message','confirmUnlinkQueue')}
           </Text>
           <View style={styles.modalFooter}>
             <TouchableOpacity
@@ -1022,7 +1022,7 @@ export default function DisplayCard({
               onPress={() => setConfirmUnlinkVisible(false)}
               disabled={unlinkingQueue}
             >
-              <Text style={styles.cancelButtonText}>Cancelar</Text>
+              <Text style={styles.cancelButtonText}>{global.t?.t('products','button','cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.dangerButton, unlinkingQueue && styles.buttonDisabled]}
@@ -1030,7 +1030,7 @@ export default function DisplayCard({
               disabled={unlinkingQueue}
             >
               <Text style={styles.dangerButtonText}>
-                {unlinkingQueue ? 'Desvinculando...' : 'Desvincular'}
+                {unlinkingQueue ? global.t?.t('products','button','unlinking') : global.t?.t('products','button','unlink')}
               </Text>
             </TouchableOpacity>
           </View>
