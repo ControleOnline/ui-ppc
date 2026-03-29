@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import InOut from './Status/InOut';
 import Working from './Status/Working';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
+import { queue } from '../../../../../../ui-common/src/api/queue';
 
 const DisplayProducts = ({ display = {} }) => {
     const route = useRoute();
@@ -90,7 +91,7 @@ const DisplayProducts = ({ display = {} }) => {
         autoStart();
     }, [orders]);
 
-    const getMyOrders = async (key, statusIds, rows) => {
+    const getMyOrders = async (key, statusIds, rows, queueIds) => {
         if (!statusIds.length) {
             setTotals(prev => ({ ...prev, [key]: 0 }));
             setOrders(prev => ({ ...prev, [key]: [] }));
@@ -104,6 +105,8 @@ const DisplayProducts = ({ display = {} }) => {
                     status: [...new Set(statusIds)],
                     itemsPerPage: rows,
                     'order_product.order.provider': currentCompany?.id,
+                    queue: queueIds
+
                 },
             });
 
@@ -132,8 +135,10 @@ const DisplayProducts = ({ display = {} }) => {
         const inIds = [];
         const workingIds = [];
         const outIds = [];
+        const queueIds = [];
 
         (Array.isArray(result) ? result : []).forEach(item => {
+            queueIds.push(item.queue.id);
             if (item.queue.status_in) {
                 inIds.push(item.queue.status_in.id);
                 setStatusIn(item.queue.status_in);
@@ -149,9 +154,9 @@ const DisplayProducts = ({ display = {} }) => {
         });
 
         await Promise.all([
-            getMyOrders('status_in', inIds, rows),
-            getMyOrders('status_working', workingIds, rows),
-            getMyOrders('status_out', outIds, rows),
+            getMyOrders('status_in', inIds, rows, queueIds),
+            getMyOrders('status_working', workingIds, rows, queueIds),
+            getMyOrders('status_out', outIds, rows, queueIds),
         ]);
     };
 
