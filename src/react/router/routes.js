@@ -8,7 +8,7 @@ const shopRoutes = [
     options: {
       headerShown: true,
       headerBackVisible: true,
-      title: 'PCP',
+      title: global.t?.t('configs','title','ppc'),
       showBottomToolBar: true,
     },
   },
