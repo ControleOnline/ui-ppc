@@ -80,8 +80,6 @@ const DisplayProducts = ({ display = {} }) => {
                 await actions.save({
                     id: order.id,
                     status: statusWorking['@id'],
-                }).then(() => {
-                    totals.status_in = 0;
                 });
             }
 
