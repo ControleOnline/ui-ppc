@@ -130,6 +130,7 @@ const Orders = ({ display = {} }) => {
   const { ppcColors } = useDisplayTheme()
 
   const [orders, setOrders] = useState([])
+  const [visibleCount, setVisibleCount] = useState(50)
 
   const columns = useMemo(() => {
     if (width >= 1150) return 2
@@ -143,10 +144,12 @@ const Orders = ({ display = {} }) => {
   const fetchOrders = useCallback(() => {
     if (!displayId || !currentCompany?.id) return
 
+    setVisibleCount(50)
     actions
       .ordersQueue({
         status: { realStatus: ['open'] },
         provider: currentCompany.id,
+        itemsPerPage: 50,
       })
       .then(data => {
         setOrders(Array.isArray(data) ? data : [])
@@ -369,13 +372,17 @@ const Orders = ({ display = {} }) => {
         </View>
       ) : (
         <FlatList
-          data={orders}
+          data={orders.slice(0, visibleCount)}
           key={`orders-cols-${columns}`}
           numColumns={columns}
           keyExtractor={item => String(item.id)}
           renderItem={renderOrderCard}
           columnWrapperStyle={columns > 1 ? styles.columnWrapper : null}
           contentContainerStyle={styles.list}
+          onEndReached={() => {
+            if (visibleCount < orders.length) setVisibleCount(v => v + 50)
+          }}
+          onEndReachedThreshold={0.3}
         />
       )}
     </SafeAreaView>

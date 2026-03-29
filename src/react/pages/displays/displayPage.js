@@ -46,6 +46,7 @@ const DisplaysPage = () => {
   const { actions, items, isLoading, error } = displaysStore;
   const { actions: displayQueuesActions } = displayQueuesStore;
   const [displayQueuesRows, setDisplayQueuesRows] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(50);
 
   const styles = useMemo(
     () => createStyles(ppcColors, brandColors),
@@ -63,7 +64,8 @@ const DisplaysPage = () => {
 
   const refreshDisplays = useCallback(async () => {
     if (!currentCompany?.id) return;
-    const displays = await actions.getItems({ company: currentCompany.id });
+    setVisibleCount(50);
+    const displays = await actions.getItems({ company: currentCompany.id, itemsPerPage: 50 });
     const displayIds = (Array.isArray(displays) ? displays : [])
       .map((row) => parseEntityId(row?.id || row?.['@id'] || row))
       .filter(Boolean);
@@ -173,12 +175,16 @@ const DisplaysPage = () => {
       {!isLoading && !error && (
         <FlatList
           key={`cols-${numColumns}`}
-          data={items}
+          data={(Array.isArray(items) ? items : []).slice(0, visibleCount)}
           renderItem={renderItem}
           keyExtractor={(item) => String(item.id)}
           numColumns={numColumns}
           columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : null}
           contentContainerStyle={styles.list}
+          onEndReached={() => {
+            if (visibleCount < (items?.length || 0)) setVisibleCount(v => v + 50);
+          }}
+          onEndReachedThreshold={0.3}
         />
       )}
       {isLoading && (
