@@ -1,5 +1,13 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, useWindowDimensions, ScrollView, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import {
+    View,
+    Text,
+    useWindowDimensions,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    Modal,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useFocusEffect } from '@react-navigation/native';
 import { useStore } from '@store';
@@ -8,11 +16,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import InOut from './Status/InOut';
 import Working from './Status/Working';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
-import { withOpacity } from '@controleonline/../../src/styles/branding';
 
 const DisplayProducts = ({ display = {} }) => {
     const route = useRoute();
     const { width } = useWindowDimensions();
+
     const displayId = decodeURIComponent(
         route.params?.id ||
         (typeof window !== 'undefined'
@@ -32,6 +40,10 @@ const DisplayProducts = ({ display = {} }) => {
     const [statusIn, setStatusIn] = useState(null);
     const [statusWorking, setStatusWorking] = useState(null);
     const [statusOut, setStatusOut] = useState(null);
+    const store = useStore('order_products_queue');
+    const { actions, getters } = store;
+    const { isSaving } = getters;
+    const [modalType, setModalType] = useState(null); // 'in' | 'out' | null
 
     const [orders, setOrders] = useState({
         status_in: [],
@@ -50,6 +62,35 @@ const DisplayProducts = ({ display = {} }) => {
         if (width > 480) return 4;
         return 1;
     };
+
+
+    useEffect(() => {
+        const autoStart = async () => {
+
+            if (isSaving) return;
+            if (!loaded.status_working) return;
+            if (!loaded.status_in) return;
+            if (!orders.status_in.length) return;
+            if (totals.status_working >= 5) return;
+            if (totals.status_in == 0) return;
+
+            const needed = 5 - totals.status_working;
+            const ordersToStart = orders.status_in.slice(0, needed);
+            for (const order of ordersToStart) {
+                await actions.save({
+                    id: order.id,
+                    status: statusWorking['@id'],
+                }).then(() => {
+                    totals.status_in = 0;
+                });
+            }
+
+            if (ordersToStart.length > 0) {
+                await onRequest();
+            }
+        };
+        autoStart();
+    }, [orders]);
 
     const getMyOrders = async (key, statusIds, rows) => {
         if (!statusIds.length) {
@@ -123,157 +164,77 @@ const DisplayProducts = ({ display = {} }) => {
         }, [currentCompany])
     );
 
-    const displayAccent =
-      display?.displayType === 'orders' ? ppcColors.accentInfo : ppcColors.accent;
-    const displayTypeLabel = String(display?.displayType || 'products').toUpperCase();
-    const displayName = String(display?.display || 'Display');
-    const hasLoadedAnyStage = Object.keys(loaded).length > 0;
-    const showSkeleton = !hasLoadedAnyStage;
-
     return (
         <SafeAreaView style={styles.container}>
+            {/* HEADER */}
             <View style={styles.summaryCard}>
-                <View style={styles.summaryHeader}>
-                    <View style={styles.summaryIconWrap}>
-                        <MaterialCommunityIcons
-                            name={display?.displayType === 'orders' ? 'receipt-text' : 'silverware-fork-knife'}
-                            size={18}
-                            color={displayAccent}
-                        />
-                    </View>
-                    <View style={styles.summaryTitleWrap}>
-                        <Text numberOfLines={1} style={styles.summaryTitle}>{displayName}</Text>
-                    </View>
-                </View>
-
                 <View style={styles.summaryStatsRow}>
-                    <View style={styles.summaryStatPill}>
+                    <TouchableOpacity
+                        style={styles.summaryStatPill}
+                        onPress={() => setModalType('in')}
+                    >
                         <Text style={styles.summaryStatLabel}>Fila</Text>
                         <Text style={styles.summaryStatValue}>{totals.status_in}</Text>
-                    </View>
+                    </TouchableOpacity>
+
                     <View style={styles.summaryStatPill}>
                         <Text style={styles.summaryStatLabel}>Prep</Text>
                         <Text style={styles.summaryStatValue}>{totals.status_working}</Text>
                     </View>
-                    <View style={styles.summaryStatPill}>
+
+                    <TouchableOpacity
+                        style={styles.summaryStatPill}
+                        onPress={() => setModalType('out')}
+                    >
                         <Text style={styles.summaryStatLabel}>Pronto</Text>
                         <Text style={styles.summaryStatValue}>{totals.status_out}</Text>
-                    </View>
-                </View>
-
-                <View style={styles.summaryFooter}>
-                    <View style={styles.summaryTypePill}>
-                        <Text style={[styles.summaryTypeText, { color: displayAccent }]}>
-                            {displayTypeLabel}
-                        </Text>
-                    </View>
+                    </TouchableOpacity>
                 </View>
             </View>
 
+            {/* 🔥 SOMENTE WORKING */}
             <ScrollView contentContainerStyle={styles.content}>
-                {showSkeleton && (
-                    <View style={styles.skeletonWrap}>
-                        {[1, 2, 3].map((key) => (
-                            <View key={`products-skeleton-${key}`} style={styles.skeletonCard}>
-                                <View style={styles.skeletonHeader}>
-                                    <View style={[styles.skeletonLine, styles.skeletonTitle]} />
-                                    <View style={styles.skeletonBadge} />
-                                </View>
-                                <View style={[styles.skeletonLine, styles.skeletonRow]} />
-                                <View style={[styles.skeletonLine, styles.skeletonRow]} />
-                                <View style={[styles.skeletonLine, styles.skeletonButton]} />
-                            </View>
-                        ))}
-                    </View>
-                )}
-                {loaded.status_in && (
-                    <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-                        {orders.status_in.length > 0 ? (
-                            orders.status_in.map((order, index) => (
-                                <View key={index} style={{ width }}>
-                                    <InOut
-                                        orders={[order]}
-                                        total={totals.status_in}
-                                        status_in={statusIn}
-                                        status_working={statusWorking}
-                                        ppcColorsOverride={ppcColors}
-                                        onReload={onRequest}
-                                    />
-                                </View>
-                            ))
-                        ) : (
-                            <View style={{ width }}>
-                                <InOut
-                                    orders={[]}
-                                    total={totals.status_in}
-                                    status_in={statusIn}
-                                    status_working={statusWorking}
-                                    ppcColorsOverride={ppcColors}
-                                    onReload={onRequest}
-                                />
-                            </View>
-                        )}
-                    </ScrollView>
-                )}
-
                 {loaded.status_working && (
-                    <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-                        {orders.status_working.length > 0 ? (
-                            orders.status_working.map((order, index) => (
-                                <View key={index} style={{ width }}>
-                                    <Working
-                                        orders={[order]}
-                                        total={totals.status_working}
-                                        status_working={statusWorking}
-                                        status_out={statusOut}
-                                        ppcColorsOverride={ppcColors}
-                                        onReload={onRequest}
-                                    />
-                                </View>
-                            ))
-                        ) : (
-                            <View style={{ width }}>
-                                <Working
-                                    orders={[]}
-                                    total={totals.status_working}
-                                    status_working={statusWorking}
-                                    status_out={statusOut}
-                                    ppcColorsOverride={ppcColors}
-                                    onReload={onRequest}
-                                />
-                            </View>
-                        )}
-                    </ScrollView>
-                )}
-
-                {loaded.status_out && (
-                    <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-                        {orders.status_out.length > 0 ? (
-                            orders.status_out.map((order, index) => (
-                                <View key={index} style={{ width }}>
-                                    <InOut
-                                        orders={[order]}
-                                        total={totals.status_out}
-                                        status_in={statusOut}
-                                        ppcColorsOverride={ppcColors}
-                                        onReload={onRequest}
-                                    />
-                                </View>
-                            ))
-                        ) : (
-                            <View style={{ width }}>
-                                <InOut
-                                    orders={[]}
-                                    total={totals.status_out}
-                                    status_in={statusOut}
-                                    ppcColorsOverride={ppcColors}
-                                    onReload={onRequest}
-                                />
-                            </View>
-                        )}
-                    </ScrollView>
+                    <Working
+                        orders={orders.status_working}
+                        total={totals.status_working}
+                        status_working={statusWorking}
+                        status_out={statusOut}
+                        ppcColorsOverride={ppcColors}
+                        onReload={onRequest}
+                    />
                 )}
             </ScrollView>
+
+            {/* 🔥 MODAL (IN / OUT) */}
+            <Modal visible={!!modalType} animationType="slide">
+                <SafeAreaView style={styles.modalContainer}>
+                    <TouchableOpacity onPress={() => setModalType(null)}>
+                        <Text style={styles.closeButton}>Fechar</Text>
+                    </TouchableOpacity>
+
+                    {modalType === 'in' && (
+                        <InOut
+                            orders={orders.status_in}
+                            total={totals.status_in}
+                            status_in={statusIn}
+                            status_working={statusWorking}
+                            ppcColorsOverride={ppcColors}
+                            onReload={onRequest}
+                        />
+                    )}
+
+                    {modalType === 'out' && (
+                        <InOut
+                            orders={orders.status_out}
+                            total={totals.status_out}
+                            status_in={statusOut}
+                            ppcColorsOverride={ppcColors}
+                            onReload={onRequest}
+                        />
+                    )}
+                </SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -285,43 +246,14 @@ const createStyles = (ppcColors) =>
             backgroundColor: ppcColors.appBg,
         },
         summaryCard: {
-            marginHorizontal: 12,
-            marginTop: 8,
-            marginBottom: 8,
-            paddingHorizontal: 12,
-            paddingTop: 10,
-            paddingBottom: 10,
+            margin: 12,
+            padding: 10,
             borderRadius: 18,
             borderWidth: 1,
             borderColor: ppcColors.borderSoft,
             backgroundColor: ppcColors.cardBg,
         },
-        summaryHeader: {
-            flexDirection: 'row',
-            alignItems: 'center',
-        },
-        summaryIconWrap: {
-            width: 36,
-            height: 36,
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: ppcColors.border,
-            backgroundColor: ppcColors.cardBgSoft,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 10,
-        },
-        summaryTitleWrap: {
-            flex: 1,
-        },
-        summaryTitle: {
-            color: ppcColors.textPrimary,
-            fontSize: 30,
-            lineHeight: 34,
-            fontWeight: '900',
-        },
         summaryStatsRow: {
-            marginTop: 10,
             flexDirection: 'row',
             justifyContent: 'space-between',
         },
@@ -332,91 +264,29 @@ const createStyles = (ppcColors) =>
             borderWidth: 1,
             borderColor: ppcColors.border,
             backgroundColor: ppcColors.cardBgSoft,
-            paddingVertical: 5,
+            paddingVertical: 10,
             alignItems: 'center',
         },
         summaryStatLabel: {
-            color: ppcColors.textSecondary,
             fontSize: 11,
             fontWeight: '700',
         },
         summaryStatValue: {
-            color: ppcColors.textPrimary,
-            fontSize: 21,
-            lineHeight: 24,
+            fontSize: 22,
             fontWeight: '900',
-            marginTop: 2,
-        },
-        summaryFooter: {
-            marginTop: 10,
-            flexDirection: 'row',
-            justifyContent: 'flex-start',
-            borderTopWidth: 1,
-            borderTopColor: withOpacity(ppcColors.border, 0.7),
-            paddingTop: 8,
-        },
-        summaryTypePill: {
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: ppcColors.border,
-            backgroundColor: ppcColors.panelBg,
-            paddingHorizontal: 10,
-            paddingVertical: 3,
-        },
-        summaryTypeText: {
-            fontSize: 10,
-            letterSpacing: 0.8,
-            fontWeight: '800',
         },
         content: {
-            paddingTop: 4,
-            paddingBottom: 8,
+            padding: 10,
+        },
+        modalContainer: {
+            flex: 1,
+            padding: 10,
             backgroundColor: ppcColors.appBg,
-            minHeight: '100%',
         },
-        skeletonWrap: {
-            gap: 10,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-        },
-        skeletonCard: {
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: ppcColors.border,
-            backgroundColor: ppcColors.cardBg,
-            padding: 12,
-            gap: 10,
-        },
-        skeletonHeader: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-        },
-        skeletonLine: {
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: ppcColors.border,
-            backgroundColor: ppcColors.cardBgSoft,
-            height: 11,
-        },
-        skeletonTitle: {
-            width: '52%',
-            height: 14,
-        },
-        skeletonBadge: {
-            width: 46,
-            height: 24,
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: ppcColors.border,
-            backgroundColor: ppcColors.cardBgSoft,
-        },
-        skeletonRow: {
-            width: '100%',
-        },
-        skeletonButton: {
-            width: '44%',
-            height: 28,
+        closeButton: {
+            fontSize: 18,
+            fontWeight: 'bold',
+            marginBottom: 10,
         },
     });
 
