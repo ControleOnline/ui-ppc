@@ -58,23 +58,23 @@ const DisplayProducts = ({ display = {} }) => {
     });
 
     const getResponsiveItemsPerPage = () => {
-        if (width > 1024) return 6;
-        if (width > 480) return 4;
-        return 1;
+        return 6;
     };
 
 
     useEffect(() => {
         const autoStart = async () => {
 
+            const itensPerPage = getResponsiveItemsPerPage();
+
             if (isSaving) return;
             if (!loaded.status_working) return;
             if (!loaded.status_in) return;
             if (!orders.status_in.length) return;
-            if (totals.status_working >= 5) return;
+            if (totals.status_working >= itensPerPage) return;
             if (totals.status_in == 0) return;
 
-            const needed = 5 - totals.status_working;
+            const needed = itensPerPage - totals.status_working;
             const ordersToStart = orders.status_in.slice(0, needed);
             for (const order of ordersToStart) {
                 await actions.save({
