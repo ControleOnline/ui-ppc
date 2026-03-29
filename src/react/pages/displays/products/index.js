@@ -16,7 +16,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import InOut from './Status/InOut';
 import Working from './Status/Working';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
-import { queue } from '../../../../../../ui-common/src/api/queue';
 
 const DisplayProducts = ({ display = {} }) => {
     const route = useRoute();
@@ -41,10 +40,12 @@ const DisplayProducts = ({ display = {} }) => {
     const [statusIn, setStatusIn] = useState(null);
     const [statusWorking, setStatusWorking] = useState(null);
     const [statusOut, setStatusOut] = useState(null);
+
     const store = useStore('order_products_queue');
     const { actions, getters } = store;
     const { isSaving } = getters;
-    const [modalType, setModalType] = useState(null); // 'in' | 'out' | null
+
+    const [modalType, setModalType] = useState(null);
 
     const [orders, setOrders] = useState({
         status_in: [],
@@ -58,14 +59,11 @@ const DisplayProducts = ({ display = {} }) => {
         status_out: 0,
     });
 
-    const getResponsiveItemsPerPage = () => {
-        return 6;
-    };
+    const getResponsiveItemsPerPage = () => 6;
 
-
+    // 🔥 AUTO START (mantido)
     useEffect(() => {
         const autoStart = async () => {
-
             const itensPerPage = getResponsiveItemsPerPage();
 
             if (isSaving) return;
@@ -73,10 +71,11 @@ const DisplayProducts = ({ display = {} }) => {
             if (!loaded.status_in) return;
             if (!orders.status_in.length) return;
             if (totals.status_working >= itensPerPage) return;
-            if (totals.status_in == 0) return;
+            if (totals.status_in === 0) return;
 
             const needed = itensPerPage - totals.status_working;
             const ordersToStart = orders.status_in.slice(0, needed);
+
             for (const order of ordersToStart) {
                 await actions.save({
                     id: order.id,
@@ -88,48 +87,14 @@ const DisplayProducts = ({ display = {} }) => {
                 await onRequest();
             }
         };
+
         autoStart();
     }, [orders]);
 
-    const getMyOrders = async (key, statusIds, rows, queueIds) => {
-        if (!statusIds.length) {
-            setTotals(prev => ({ ...prev, [key]: 0 }));
-            setOrders(prev => ({ ...prev, [key]: [] }));
-            setLoaded(prev => ({ ...prev, [key]: true }));
-            return;
-        }
-
-        try {
-            const response = await api.fetch('order_product_queues', {
-                params: {
-                    status: [...new Set(statusIds)],
-                    itemsPerPage: rows,
-                    'order_product.order.provider': currentCompany?.id,
-                    queue: queueIds
-
-                },
-            });
-
-            setTotals(prev => ({
-                ...prev,
-                [key]: Number(response?.totalItems) || 0,
-            }));
-
-            setOrders(prev => ({
-                ...prev,
-                [key]: Array.isArray(response?.member) ? response.member : [],
-            }));
-        } finally {
-            setLoaded(prev => ({ ...prev, [key]: true }));
-        }
-    };
-
+    // 🔥 REQUEST SEM FLICKER
     const onRequest = async () => {
-        setOrders({ status_in: [], status_working: [], status_out: [] });
-        setTotals({ status_in: 0, status_working: 0, status_out: 0 });
-        setLoaded({});
-
         const rows = getResponsiveItemsPerPage();
+
         const result = await displayQueueActions.getItems({ display: displayId });
 
         const inIds = [];
@@ -137,35 +102,96 @@ const DisplayProducts = ({ display = {} }) => {
         const outIds = [];
         const queueIds = [];
 
+        let _statusIn = null;
+        let _statusWorking = null;
+        let _statusOut = null;
+
         (Array.isArray(result) ? result : []).forEach(item => {
             queueIds.push(item.queue.id);
+
             if (item.queue.status_in) {
                 inIds.push(item.queue.status_in.id);
-                setStatusIn(item.queue.status_in);
+                _statusIn = item.queue.status_in;
             }
             if (item.queue.status_working) {
                 workingIds.push(item.queue.status_working.id);
-                setStatusWorking(item.queue.status_working);
+                _statusWorking = item.queue.status_working;
             }
             if (item.queue.status_out) {
                 outIds.push(item.queue.status_out.id);
-                setStatusOut(item.queue.status_out);
+                _statusOut = item.queue.status_out;
             }
         });
 
-        await Promise.all([
-            getMyOrders('status_in', inIds, rows, queueIds),
-            getMyOrders('status_working', workingIds, rows, queueIds),
-            getMyOrders('status_out', outIds, rows, queueIds),
+        const [inData, workingData, outData] = await Promise.all([
+            api.fetch('order_product_queues', {
+                params: {
+                    status: [...new Set(inIds)],
+                    itemsPerPage: rows,
+                    'order_product.order.provider': currentCompany?.id,
+                    queue: queueIds,
+                },
+            }),
+            api.fetch('order_product_queues', {
+                params: {
+                    status: [...new Set(workingIds)],
+                    itemsPerPage: rows,
+                    'order_product.order.provider': currentCompany?.id,
+                    queue: queueIds,
+                },
+            }),
+            api.fetch('order_product_queues', {
+                params: {
+                    status: [...new Set(outIds)],
+                    itemsPerPage: rows,
+                    'order_product.order.provider': currentCompany?.id,
+                    queue: queueIds,
+                },
+            }),
         ]);
+
+        // 🔥 UPDATE ATÔMICO (sem piscar)
+        setOrders({
+            status_in: inData?.member || [],
+            status_working: workingData?.member || [],
+            status_out: outData?.member || [],
+        });
+
+        setTotals({
+            status_in: Number(inData?.totalItems) || 0,
+            status_working: Number(workingData?.totalItems) || 0,
+            status_out: Number(outData?.totalItems) || 0,
+        });
+
+        setLoaded({
+            status_in: true,
+            status_working: true,
+            status_out: true,
+        });
+
+        setStatusIn(_statusIn);
+        setStatusWorking(_statusWorking);
+        setStatusOut(_statusOut);
     };
 
+    // 🔥 PRIMEIRA CARGA
     useFocusEffect(
         useCallback(() => {
             if (!currentCompany?.id) return;
             onRequest();
         }, [currentCompany])
     );
+
+    // 🔥 AUTO REFRESH SUAVE
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (!isSaving) {
+                onRequest();
+            }
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [isSaving, currentCompany]);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -195,7 +221,7 @@ const DisplayProducts = ({ display = {} }) => {
                 </View>
             </View>
 
-            {/* 🔥 SOMENTE WORKING */}
+            {/* WORKING */}
             <ScrollView contentContainerStyle={styles.content}>
                 {loaded.status_working && (
                     <Working
@@ -209,7 +235,7 @@ const DisplayProducts = ({ display = {} }) => {
                 )}
             </ScrollView>
 
-            {/* 🔥 MODAL (IN / OUT) */}
+            {/* MODAL */}
             <Modal visible={!!modalType} animationType="slide">
                 <SafeAreaView style={styles.modalContainer}>
                     <TouchableOpacity onPress={() => setModalType(null)}>
