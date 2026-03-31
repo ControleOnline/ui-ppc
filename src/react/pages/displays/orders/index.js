@@ -98,20 +98,49 @@ const getStatusVisual = (order, ppcColors) => {
 }
 
 const getOrderProductsPreview = order => {
-  const allProducts = Array.isArray(order?.orderProducts) ? order.orderProducts : []
-  const positiveProducts = allProducts.filter(item => Number(item?.quantity || 0) > 0)
+  const items = Array.isArray(order?.orderProducts) ? order.orderProducts : []
 
-  const nonComponents = positiveProducts.filter(
-    item => String(item?.product?.type || '').toLowerCase() !== 'component',
-  )
+  const map = new Map()
 
-  const source = nonComponents.length > 0 ? nonComponents : positiveProducts
+  items.forEach(item => {
+    const product = item?.product || {}
+    const parentId =
+      item?.productGroup?.parentProduct?.id || product?.id
 
-  return source.slice(0, 5).map((item, index) => ({
-    id: item?.id || `${order?.id || 'order'}-${index}`,
-    quantity: Number(item?.quantity || 1),
-    name: normalizeText(item?.product?.product || item?.product?.description || 'Item'),
-  }))
+    if (!map.has(parentId)) {
+      map.set(parentId, {
+        id: parentId,
+        name: normalizeText(product?.product),
+        description: normalizeText(product?.description),
+        quantity: 0,
+        groups: {},
+      })
+    }
+
+    const parent = map.get(parentId)
+
+    // soma quantidade do principal
+    if (!item?.productGroup) {
+      parent.quantity += Number(item?.quantity || 1)
+    }
+
+    // se tiver grupo → organizar
+    if (item?.productGroup) {
+      const groupName = normalizeText(item?.productGroup?.productGroup || 'Outros')
+
+      if (!parent.groups[groupName]) {
+        parent.groups[groupName] = []
+      }
+
+      parent.groups[groupName].push({
+        id: item?.id,
+        name: normalizeText(product?.product),
+        quantity: Number(item?.quantity || 1),
+      })
+    }
+  })
+
+  return Array.from(map.values()).slice(0, 5)
 }
 
 const Orders = ({ display = {} }) => {
@@ -276,16 +305,43 @@ const Orders = ({ display = {} }) => {
                 <View
                   key={String(product.id)}
                   style={[
-                    styles.productRow,
+                    styles.productBlock,
                     index < products.length - 1 && styles.productRowDivider,
                   ]}
                 >
-                  <View style={styles.qtyPill}>
-                    <Text style={styles.qtyPillText}>{product.quantity}x</Text>
+                  {/* Produto principal */}
+                  <View style={styles.productRow}>
+                    <View style={styles.qtyPill}>
+                      <Text style={styles.qtyPillText}>{product.quantity}x</Text>
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.productName} numberOfLines={1}>
+                        {product.name}
+                      </Text>
+
+                      {!!product.description && (
+                        <Text style={styles.productDescription} numberOfLines={1}>
+                          {product.description}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                  <Text style={styles.productName} numberOfLines={1}>
-                    {product.name}
-                  </Text>
+
+                  {/* Grupos */}
+                  {Object.entries(product.groups || {}).map(([groupName, items]) => (
+                    <View key={groupName} style={styles.groupWrap}>
+                      <Text style={styles.groupTitle}>{groupName}</Text>
+
+                      {items.map(child => (
+                        <View key={child.id} style={[styles.groupItem, { marginLeft: 12 }]}>
+                          <Text style={styles.groupItemText}>
+                            {child.quantity}x {child.name}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ))}
                 </View>
               ))}
             </View>
@@ -759,6 +815,39 @@ const createStyles = ppcColors =>
     skeletonAmount: {
       width: '100%',
       height: 16,
+    },
+    productBlock: {
+      paddingVertical: 6,
+    },
+
+    productDescription: {
+      marginTop: 2,
+      color: withOpacity(ppcColors.textSecondary, 0.7),
+      fontSize: 12,
+      fontWeight: '500',
+    },
+
+    groupWrap: {
+      marginTop: 6,
+      paddingLeft: 34,
+    },
+
+    groupTitle: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: withOpacity(ppcColors.textSecondary, 0.8),
+      marginBottom: 2,
+      textTransform: 'uppercase',
+    },
+
+    groupItem: {
+      paddingVertical: 2,
+    },
+
+    groupItemText: {
+      fontSize: 12,
+      color: ppcColors.textPrimary,
+      fontWeight: '600',
     },
   })
 
