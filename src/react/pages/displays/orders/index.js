@@ -162,7 +162,9 @@ const Orders = ({ display = {} }) => {
   const [visibleCount, setVisibleCount] = useState(50)
 
   const columns = useMemo(() => {
-    if (width >= 1150) return 2
+    if (width >= 1600) return 4
+    if (width >= 1200) return 3
+    if (width >= 800) return 2
     return 1
   }, [width])
 
@@ -573,16 +575,18 @@ const createStyles = ppcColors =>
       gap: 10,
     },
     columnWrapper: {
-      gap: 10,
+      gap: 8,
+      justifyContent: 'space-between',
     },
     orderCard: {
       flex: 1,
-      borderRadius: 16,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: ppcColors.borderSoft,
       backgroundColor: ppcColors.cardBg,
-      padding: 12,
-      marginBottom: 10,
+      padding: 8,           // ↓ menor
+      marginBottom: 8,      // ↓ menor
+      maxWidth: '100%',
     },
     orderTopRow: {
       flexDirection: 'row',
@@ -597,8 +601,8 @@ const createStyles = ppcColors =>
       minWidth: 0,
     },
     orderIconWrap: {
-      width: 32,
-      height: 32,
+      width: 26,
+      height: 26,
       borderRadius: 999,
       borderWidth: 1,
       borderColor: ppcColors.border,
@@ -608,8 +612,8 @@ const createStyles = ppcColors =>
       marginRight: 10,
     },
     orderChannelLogo: {
-      width: 20,
-      height: 20,
+      width: 16,
+      height: 16,
       borderRadius: 999,
     },
     orderTitleWrap: {
@@ -618,14 +622,14 @@ const createStyles = ppcColors =>
     },
     orderTitle: {
       color: ppcColors.textPrimary,
-      fontSize: 17,
+      fontSize: 14, // antes 17
       lineHeight: 21,
       fontWeight: '900',
     },
     orderDate: {
       marginTop: 1,
       color: ppcColors.textSecondary,
-      fontSize: 12,
+      fontSize: 10, // antes 12
       fontWeight: '600',
     },
     orderStatusBadge: {
@@ -643,7 +647,7 @@ const createStyles = ppcColors =>
       marginRight: 6,
     },
     orderStatusText: {
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: '800',
       textTransform: 'uppercase',
       letterSpacing: 0.3,
@@ -677,7 +681,7 @@ const createStyles = ppcColors =>
     },
     channelMetaText: {
       color: withOpacity(ppcColors.textSecondary, 0.85),
-      fontSize: 13,
+      fontSize: 11,
       fontWeight: '700',
       textTransform: 'uppercase',
       textAlign: 'right',
@@ -685,7 +689,7 @@ const createStyles = ppcColors =>
     amountText: {
       marginTop: 1,
       color: ppcColors.accentInfo,
-      fontSize: 17,
+      fontSize: 14,
       lineHeight: 21,
       fontWeight: '900',
     },
@@ -700,8 +704,8 @@ const createStyles = ppcColors =>
     productRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 9,
-      paddingVertical: 8,
+      paddingHorizontal: 6,
+      paddingVertical: 5, // antes 8
       gap: 8,
     },
     productRowDivider: {
@@ -727,7 +731,7 @@ const createStyles = ppcColors =>
     productName: {
       flex: 1,
       color: ppcColors.textPrimary,
-      fontSize: 14,
+      fontSize: 12,
       lineHeight: 16,
       fontWeight: '700',
     },
@@ -823,7 +827,7 @@ const createStyles = ppcColors =>
     productDescription: {
       marginTop: 2,
       color: withOpacity(ppcColors.textSecondary, 0.7),
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: '500',
     },
 
@@ -833,7 +837,7 @@ const createStyles = ppcColors =>
     },
 
     groupTitle: {
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: '800',
       color: withOpacity(ppcColors.textSecondary, 0.8),
       marginBottom: 2,
@@ -845,7 +849,7 @@ const createStyles = ppcColors =>
     },
 
     groupItemText: {
-      fontSize: 12,
+      fontSize: 11,
       color: ppcColors.textPrimary,
       fontWeight: '600',
     },
