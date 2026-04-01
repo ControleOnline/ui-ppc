@@ -150,7 +150,7 @@ const DisplaysPage = () => {
               <Image source={BRAND_LOGO} style={styles.heroLogo} resizeMode="contain" />
             </View>
             <View style={styles.heroContent}>
-              <Text style={styles.heroTitle}>{global.t?.t('products','label','PPC')}</Text>
+              <Text style={styles.heroTitle}>{global.t?.t('products','label','ppc')}</Text>
               <Text style={styles.heroSubtitle}>{global.t?.t('products','label','displayManager')}</Text>
             </View>
           </View>
