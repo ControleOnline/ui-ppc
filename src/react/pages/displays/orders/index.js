@@ -162,9 +162,11 @@ const Orders = ({ display = {} }) => {
   const [visibleCount, setVisibleCount] = useState(50)
 
   const columns = useMemo(() => {
-    if (width >= 1600) return 4
-    if (width >= 1200) return 3
-    if (width >= 800) return 2
+    if (width >= 1920) return 6
+    if (width >= 1600) return 5
+    if (width >= 1200) return 4
+    if (width >= 800) return 3
+    if (width >= 600) return 2
     return 1
   }, [width])
 
@@ -237,6 +239,8 @@ const Orders = ({ display = {} }) => {
           style={styles.orderCard}
           onPress={() => navigation.navigate('OrderDetails', { order: item, kds: true })}
         >
+          <View style={[styles.orderAccentBar, { backgroundColor: statusVisual.textColor }]} />
+          <View style={styles.orderCardInner}>
           <View style={styles.orderTopRow}>
             <View style={styles.orderIdentity}>
               <View style={styles.orderIconWrap}>
@@ -333,7 +337,9 @@ const Orders = ({ display = {} }) => {
                   {/* Grupos */}
                   {Object.entries(product.groups || {}).map(([groupName, items]) => (
                     <View key={groupName} style={styles.groupWrap}>
-                      <Text style={styles.groupTitle}>{groupName}</Text>
+                      <View style={styles.groupTitlePill}>
+                        <Text style={styles.groupTitle}>{groupName}</Text>
+                      </View>
 
                       {items.map(child => (
                         <View key={child.id} style={[styles.groupItem, { marginLeft: 12 }]}>
@@ -348,6 +354,7 @@ const Orders = ({ display = {} }) => {
               ))}
             </View>
           )}
+          </View>
         </Pressable>
       )
     },
@@ -580,13 +587,19 @@ const createStyles = ppcColors =>
     },
     orderCard: {
       flex: 1,
-      borderRadius: 12,
+      borderRadius: 14,
       borderWidth: 1,
       borderColor: ppcColors.borderSoft,
       backgroundColor: ppcColors.cardBg,
-      padding: 8,           // ↓ menor
-      marginBottom: 8,      // ↓ menor
+      marginBottom: 8,
       maxWidth: '100%',
+      overflow: 'hidden',
+    },
+    orderAccentBar: {
+      height: 3,
+    },
+    orderCardInner: {
+      padding: 10,
     },
     orderTopRow: {
       flexDirection: 'row',
@@ -622,14 +635,14 @@ const createStyles = ppcColors =>
     },
     orderTitle: {
       color: ppcColors.textPrimary,
-      fontSize: 14, // antes 17
-      lineHeight: 21,
+      fontSize: 15,
+      lineHeight: 20,
       fontWeight: '900',
     },
     orderDate: {
       marginTop: 1,
       color: ppcColors.textSecondary,
-      fontSize: 10, // antes 12
+      fontSize: 11,
       fontWeight: '600',
     },
     orderStatusBadge: {
@@ -689,8 +702,8 @@ const createStyles = ppcColors =>
     amountText: {
       marginTop: 1,
       color: ppcColors.accentInfo,
-      fontSize: 14,
-      lineHeight: 21,
+      fontSize: 16,
+      lineHeight: 20,
       fontWeight: '900',
     },
     productsWrap: {
@@ -833,23 +846,35 @@ const createStyles = ppcColors =>
 
     groupWrap: {
       marginTop: 6,
-      paddingLeft: 34,
+      paddingLeft: 10,
+    },
+
+    groupTitlePill: {
+      alignSelf: 'flex-start',
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: withOpacity(ppcColors.border, 0.9),
+      backgroundColor: withOpacity(ppcColors.accentInfo, 0.08),
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      marginBottom: 4,
     },
 
     groupTitle: {
-      fontSize: 10,
-      fontWeight: '800',
-      color: withOpacity(ppcColors.textSecondary, 0.8),
-      marginBottom: 2,
+      fontSize: 9,
+      fontWeight: '900',
+      color: ppcColors.accentInfo,
       textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
 
     groupItem: {
       paddingVertical: 2,
+      paddingLeft: 4,
     },
 
     groupItemText: {
-      fontSize: 11,
+      fontSize: 12,
       color: ppcColors.textPrimary,
       fontWeight: '600',
     },
