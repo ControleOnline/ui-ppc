@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  Dimensions,
   FlatList,
   Image,
   Pressable,
@@ -46,6 +47,9 @@ const getExternalOrderRef = order => {
   const fallback = entries[0]
   return normalizeText(preferred?.value || fallback?.value)
 }
+
+const resolveOrderDateValue = order =>
+  normalizeText(order?.alterDate || order?.alter_date || order?.orderDate)
 
 const truncateMiddle = (value, maxLength = 28, head = 12, tail = 8) => {
   const normalized = normalizeText(value)
@@ -160,15 +164,31 @@ const Orders = ({ display = {} }) => {
 
   const [orders, setOrders] = useState([])
   const [visibleCount, setVisibleCount] = useState(50)
+  const isTvDisplay = String(display?.displayType || '').toLowerCase() === 'tv'
+
+  const effectiveWidth = useMemo(() => {
+    const screenWidth = Number(Dimensions.get('screen')?.width || 0)
+    const windowWidth = Number(width || 0)
+    return Math.max(windowWidth, screenWidth)
+  }, [width])
 
   const columns = useMemo(() => {
-    if (width >= 1920) return 6
-    if (width >= 1600) return 5
-    if (width >= 1200) return 4
-    if (width >= 800) return 3
-    if (width >= 600) return 2
+    if (isTvDisplay) {
+      if (effectiveWidth >= 2500) return 6
+      if (effectiveWidth >= 2100) return 5
+      if (effectiveWidth >= 880) return 4
+      if (effectiveWidth >= 760) return 3
+      if (effectiveWidth >= 560) return 2
+      return 1
+    }
+
+    if (effectiveWidth >= 1920) return 6
+    if (effectiveWidth >= 1600) return 5
+    if (effectiveWidth >= 1200) return 4
+    if (effectiveWidth >= 800) return 3
+    if (effectiveWidth >= 600) return 2
     return 1
-  }, [width])
+  }, [effectiveWidth, isTvDisplay])
 
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
   const showSkeleton = isLoading && (!Array.isArray(orders) || orders.length === 0)
@@ -225,8 +245,9 @@ const Orders = ({ display = {} }) => {
 
   const renderOrderCard = useCallback(
     ({ item }) => {
+      const orderDateValue = resolveOrderDateValue(item)
       const statusVisual = getStatusVisual(item, ppcColors)
-      const waitingMinutes = getWaitingMinutes(item?.orderDate)
+      const waitingMinutes = getWaitingMinutes(orderDateValue)
       const channelLogo = getOrderChannelLogo(item)
       const channelLabel = String(getOrderChannelLabel(item) || 'SHOP').toUpperCase()
       const externalRef = truncateMiddle(getExternalOrderRef(item))
@@ -237,7 +258,14 @@ const Orders = ({ display = {} }) => {
       return (
         <Pressable
           style={styles.orderCard}
-          onPress={() => navigation.navigate('OrderDetails', { order: item, kds: true })}
+          onPress={() =>
+            navigation.navigate('OrderDetails', {
+              order: item,
+              kds: true,
+              displayType: display?.displayType,
+              hideBottomToolBar: isTvDisplay,
+            })
+          }
         >
           <View style={[styles.orderAccentBar, { backgroundColor: statusVisual.textColor }]} />
           <View style={styles.orderCardInner}>
@@ -257,7 +285,7 @@ const Orders = ({ display = {} }) => {
 
               <View style={styles.orderTitleWrap}>
                 <Text style={styles.orderTitle}>Pedido #{item?.id}</Text>
-                <Text style={styles.orderDate}>{formatOrderDate(item?.orderDate)}</Text>
+                <Text style={styles.orderDate}>{formatOrderDate(orderDateValue)}</Text>
               </View>
             </View>
 
@@ -358,7 +386,7 @@ const Orders = ({ display = {} }) => {
         </Pressable>
       )
     },
-    [navigation, ppcColors, styles],
+    [display?.displayType, isTvDisplay, navigation, ppcColors, styles],
   )
 
   return (
