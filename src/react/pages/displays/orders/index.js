@@ -101,7 +101,7 @@ const getStatusVisual = (order, ppcColors) => {
   }
 }
 
-const getOrderProductsPreview = order => {
+const getOrderProductsPreview = (order, maxItems = 5) => {
   const items = Array.isArray(order?.orderProducts) ? order.orderProducts : []
 
   const map = new Map()
@@ -144,10 +144,10 @@ const getOrderProductsPreview = order => {
     }
   })
 
-  return Array.from(map.values()).slice(0, 5)
+  return Array.from(map.values()).slice(0, maxItems)
 }
 
-const Orders = ({ display = {} }) => {
+const Orders = ({ display = {}, isTvDisplay = false }) => {
   const route = useRoute()
   const navigation = useNavigation()
   const { width } = useWindowDimensions()
@@ -164,7 +164,8 @@ const Orders = ({ display = {} }) => {
 
   const [orders, setOrders] = useState([])
   const [visibleCount, setVisibleCount] = useState(50)
-  const isTvDisplay = String(display?.displayType || '').toLowerCase() === 'tv'
+  const tvMode =
+    Boolean(isTvDisplay) || String(display?.displayType || '').toLowerCase() === 'tv'
 
   const effectiveWidth = useMemo(() => {
     const screenWidth = Number(Dimensions.get('screen')?.width || 0)
@@ -173,10 +174,11 @@ const Orders = ({ display = {} }) => {
   }, [width])
 
   const columns = useMemo(() => {
-    if (isTvDisplay) {
+    if (tvMode) {
       if (effectiveWidth >= 2500) return 6
-      if (effectiveWidth >= 2100) return 5
-      if (effectiveWidth >= 880) return 4
+      if (effectiveWidth >= 1920) return 5
+      if (effectiveWidth >= 1400) return 4
+      if (effectiveWidth >= 1100) return 3
       if (effectiveWidth >= 760) return 3
       if (effectiveWidth >= 560) return 2
       return 1
@@ -188,7 +190,7 @@ const Orders = ({ display = {} }) => {
     if (effectiveWidth >= 800) return 3
     if (effectiveWidth >= 600) return 2
     return 1
-  }, [effectiveWidth, isTvDisplay])
+  }, [effectiveWidth, tvMode])
 
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
   const showSkeleton = isLoading && (!Array.isArray(orders) || orders.length === 0)
@@ -216,6 +218,18 @@ const Orders = ({ display = {} }) => {
       }
     }, [items]),
   )
+
+  const sortedOrders = useMemo(() => {
+    if (!Array.isArray(orders)) return []
+
+    return [...orders].sort((a, b) => {
+      const aTime = new Date(resolveOrderDateValue(a)).getTime()
+      const bTime = new Date(resolveOrderDateValue(b)).getTime()
+      const safeATime = Number.isFinite(aTime) ? aTime : 0
+      const safeBTime = Number.isFinite(bTime) ? bTime : 0
+      return safeATime - safeBTime
+    })
+  }, [orders])
 
   const queueMessageCount = Array.isArray(queueMessages) ? queueMessages.length : 0
   const ordersMessageCount = Array.isArray(ordersMessages) ? ordersMessages.length : 0
@@ -252,7 +266,7 @@ const Orders = ({ display = {} }) => {
       const channelLabel = String(getOrderChannelLabel(item) || 'SHOP').toUpperCase()
       const externalRef = truncateMiddle(getExternalOrderRef(item))
       const channelDisplay = externalRef ? `${channelLabel} (${externalRef})` : channelLabel
-      const products = getOrderProductsPreview(item)
+      const products = getOrderProductsPreview(item, tvMode ? 3 : 5)
       const price = Number(item?.price || 0)
 
       return (
@@ -263,15 +277,15 @@ const Orders = ({ display = {} }) => {
               order: item,
               kds: true,
               displayType: display?.displayType,
-              hideBottomToolBar: isTvDisplay,
+              hideBottomToolBar: tvMode,
             })
           }
         >
           <View style={[styles.orderAccentBar, { backgroundColor: statusVisual.textColor }]} />
-          <View style={styles.orderCardInner}>
-          <View style={styles.orderTopRow}>
+          <View style={[styles.orderCardInner, tvMode && styles.tvOrderCardInner]}>
+          <View style={[styles.orderTopRow, tvMode && styles.tvOrderTopRow]}>
             <View style={styles.orderIdentity}>
-              <View style={styles.orderIconWrap}>
+              <View style={[styles.orderIconWrap, tvMode && styles.tvOrderIconWrap]}>
                 {channelLogo ? (
                   <Image source={channelLogo} style={styles.orderChannelLogo} resizeMode="contain" />
                 ) : (
@@ -284,14 +298,15 @@ const Orders = ({ display = {} }) => {
               </View>
 
               <View style={styles.orderTitleWrap}>
-                <Text style={styles.orderTitle}>Pedido #{item?.id}</Text>
-                <Text style={styles.orderDate}>{formatOrderDate(orderDateValue)}</Text>
+                <Text style={[styles.orderTitle, tvMode && styles.tvOrderTitle]}>Pedido #{item?.id}</Text>
+                <Text style={[styles.orderDate, tvMode && styles.tvOrderDate]}>{formatOrderDate(orderDateValue)}</Text>
               </View>
             </View>
 
             <View
               style={[
                 styles.orderStatusBadge,
+                tvMode && styles.tvOrderStatusBadge,
                 {
                   borderColor: statusVisual.borderColor,
                   backgroundColor: statusVisual.bgColor,
@@ -307,6 +322,7 @@ const Orders = ({ display = {} }) => {
               <Text
                 style={[
                   styles.orderStatusText,
+                  tvMode && styles.tvOrderStatusText,
                   { color: statusVisual.textColor },
                 ]}
               >
@@ -315,26 +331,26 @@ const Orders = ({ display = {} }) => {
             </View>
           </View>
 
-          <View style={styles.orderMetaRow}>
-            <View style={styles.waitingChip}>
+          <View style={[styles.orderMetaRow, tvMode && styles.tvOrderMetaRow]}>
+            <View style={[styles.waitingChip, tvMode && styles.tvWaitingChip]}>
               <MaterialCommunityIcons
                 name="clock-time-four-outline"
-                size={12}
+                size={tvMode ? 10 : 12}
                 color={ppcColors.danger}
               />
-              <Text style={styles.waitingText}>{waitingMinutes} min</Text>
+              <Text style={[styles.waitingText, tvMode && styles.tvWaitingText]}>{waitingMinutes} min</Text>
             </View>
 
             <View style={styles.amountWrap}>
-              <Text style={styles.channelMetaText} numberOfLines={1}>
+              <Text style={[styles.channelMetaText, tvMode && styles.tvChannelMetaText]} numberOfLines={1}>
                 {channelDisplay}
               </Text>
-              <Text style={styles.amountText}>{Formatter.formatMoney(price)}</Text>
+              <Text style={[styles.amountText, tvMode && styles.tvAmountText]}>{Formatter.formatMoney(price)}</Text>
             </View>
           </View>
 
           {products.length > 0 && (
-            <View style={styles.productsWrap}>
+            <View style={[styles.productsWrap, tvMode && styles.tvProductsWrap]}>
               {products.map((product, index) => (
                 <View
                   key={String(product.id)}
@@ -345,17 +361,17 @@ const Orders = ({ display = {} }) => {
                 >
                   {/* Produto principal */}
                   <View style={styles.productRow}>
-                    <View style={styles.qtyPill}>
-                      <Text style={styles.qtyPillText}>{product.quantity}x</Text>
+                    <View style={[styles.qtyPill, tvMode && styles.tvQtyPill]}>
+                      <Text style={[styles.qtyPillText, tvMode && styles.tvQtyPillText]}>{product.quantity}x</Text>
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.productName} numberOfLines={1}>
+                      <Text style={[styles.productName, tvMode && styles.tvProductName]} numberOfLines={1}>
                         {product.name}
                       </Text>
 
                       {!!product.description && (
-                        <Text style={styles.productDescription} numberOfLines={1}>
+                        <Text style={[styles.productDescription, tvMode && styles.tvProductDescription]} numberOfLines={1}>
                           {product.description}
                         </Text>
                       )}
@@ -365,13 +381,13 @@ const Orders = ({ display = {} }) => {
                   {/* Grupos */}
                   {Object.entries(product.groups || {}).map(([groupName, items]) => (
                     <View key={groupName} style={styles.groupWrap}>
-                      <View style={styles.groupTitlePill}>
-                        <Text style={styles.groupTitle}>{groupName}</Text>
+                      <View style={[styles.groupTitlePill, tvMode && styles.tvGroupTitlePill]}>
+                        <Text style={[styles.groupTitle, tvMode && styles.tvGroupTitle]}>{groupName}</Text>
                       </View>
 
                       {items.map(child => (
                         <View key={child.id} style={[styles.groupItem, { marginLeft: 12 }]}>
-                          <Text style={styles.groupItemText}>
+                          <Text style={[styles.groupItemText, tvMode && styles.tvGroupItemText]}>
                             {child.quantity}x {child.name}
                           </Text>
                         </View>
@@ -386,7 +402,7 @@ const Orders = ({ display = {} }) => {
         </Pressable>
       )
     },
-    [display?.displayType, isTvDisplay, navigation, ppcColors, styles],
+    [display?.displayType, navigation, ppcColors, styles, tvMode],
   )
 
   return (
@@ -465,7 +481,7 @@ const Orders = ({ display = {} }) => {
         </View>
       ) : (
         <FlatList
-          data={orders.slice(0, visibleCount)}
+          data={sortedOrders.slice(0, visibleCount)}
           key={`orders-cols-${columns}`}
           numColumns={columns}
           keyExtractor={item => String(item.id)}
@@ -473,7 +489,7 @@ const Orders = ({ display = {} }) => {
           columnWrapperStyle={columns > 1 ? styles.columnWrapper : null}
           contentContainerStyle={styles.list}
           onEndReached={() => {
-            if (visibleCount < orders.length) setVisibleCount(v => v + 50)
+            if (visibleCount < sortedOrders.length) setVisibleCount(v => v + 50)
           }}
           onEndReachedThreshold={0.3}
         />
@@ -629,11 +645,17 @@ const createStyles = ppcColors =>
     orderCardInner: {
       padding: 10,
     },
+    tvOrderCardInner: {
+      padding: 8,
+    },
     orderTopRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
       gap: 8,
+    },
+    tvOrderTopRow: {
+      gap: 6,
     },
     orderIdentity: {
       flexDirection: 'row',
@@ -652,6 +674,11 @@ const createStyles = ppcColors =>
       justifyContent: 'center',
       marginRight: 10,
     },
+    tvOrderIconWrap: {
+      width: 22,
+      height: 22,
+      marginRight: 8,
+    },
     orderChannelLogo: {
       width: 16,
       height: 16,
@@ -667,11 +694,18 @@ const createStyles = ppcColors =>
       lineHeight: 20,
       fontWeight: '900',
     },
+    tvOrderTitle: {
+      fontSize: 13,
+      lineHeight: 16,
+    },
     orderDate: {
       marginTop: 1,
       color: ppcColors.textSecondary,
       fontSize: 11,
       fontWeight: '600',
+    },
+    tvOrderDate: {
+      fontSize: 10,
     },
     orderStatusBadge: {
       flexDirection: 'row',
@@ -680,6 +714,10 @@ const createStyles = ppcColors =>
       borderRadius: 999,
       paddingHorizontal: 10,
       paddingVertical: 4,
+    },
+    tvOrderStatusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
     },
     orderStatusDot: {
       width: 7,
@@ -693,12 +731,19 @@ const createStyles = ppcColors =>
       textTransform: 'uppercase',
       letterSpacing: 0.3,
     },
+    tvOrderStatusText: {
+      fontSize: 9,
+    },
     orderMetaRow: {
       marginTop: 10,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-end',
       gap: 10,
+    },
+    tvOrderMetaRow: {
+      marginTop: 8,
+      gap: 8,
     },
     waitingChip: {
       flexDirection: 'row',
@@ -711,10 +756,18 @@ const createStyles = ppcColors =>
       paddingVertical: 6,
       gap: 5,
     },
+    tvWaitingChip: {
+      paddingHorizontal: 6,
+      paddingVertical: 4,
+      gap: 4,
+    },
     waitingText: {
       color: ppcColors.dangerText,
       fontSize: 13,
       fontWeight: '800',
+    },
+    tvWaitingText: {
+      fontSize: 11,
     },
     amountWrap: {
       alignItems: 'flex-end',
@@ -727,12 +780,19 @@ const createStyles = ppcColors =>
       textTransform: 'uppercase',
       textAlign: 'right',
     },
+    tvChannelMetaText: {
+      fontSize: 10,
+    },
     amountText: {
       marginTop: 1,
       color: ppcColors.accentInfo,
       fontSize: 16,
       lineHeight: 20,
       fontWeight: '900',
+    },
+    tvAmountText: {
+      fontSize: 14,
+      lineHeight: 17,
     },
     productsWrap: {
       marginTop: 10,
@@ -741,6 +801,9 @@ const createStyles = ppcColors =>
       borderColor: ppcColors.border,
       overflow: 'hidden',
       backgroundColor: ppcColors.cardBgSoft,
+    },
+    tvProductsWrap: {
+      marginTop: 8,
     },
     productRow: {
       flexDirection: 'row',
@@ -764,10 +827,18 @@ const createStyles = ppcColors =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    tvQtyPill: {
+      minWidth: 24,
+      paddingHorizontal: 5,
+      paddingVertical: 1,
+    },
     qtyPillText: {
       color: ppcColors.accentInfo,
       fontSize: 12,
       fontWeight: '800',
+    },
+    tvQtyPillText: {
+      fontSize: 10,
     },
     productName: {
       flex: 1,
@@ -775,6 +846,10 @@ const createStyles = ppcColors =>
       fontSize: 12,
       lineHeight: 16,
       fontWeight: '700',
+    },
+    tvProductName: {
+      fontSize: 11,
+      lineHeight: 14,
     },
     skeletonWrap: {
       paddingHorizontal: 12,
@@ -871,6 +946,10 @@ const createStyles = ppcColors =>
       fontSize: 10,
       fontWeight: '500',
     },
+    tvProductDescription: {
+      fontSize: 9,
+      marginTop: 1,
+    },
 
     groupWrap: {
       marginTop: 6,
@@ -887,6 +966,11 @@ const createStyles = ppcColors =>
       paddingVertical: 2,
       marginBottom: 4,
     },
+    tvGroupTitlePill: {
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      marginBottom: 3,
+    },
 
     groupTitle: {
       fontSize: 9,
@@ -894,6 +978,9 @@ const createStyles = ppcColors =>
       color: ppcColors.accentInfo,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
+    },
+    tvGroupTitle: {
+      fontSize: 8,
     },
 
     groupItem: {
@@ -905,6 +992,9 @@ const createStyles = ppcColors =>
       fontSize: 12,
       color: ppcColors.textPrimary,
       fontWeight: '600',
+    },
+    tvGroupItemText: {
+      fontSize: 10,
     },
   })
 

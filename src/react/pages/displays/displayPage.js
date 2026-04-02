@@ -110,7 +110,10 @@ const DisplaysPage = () => {
 
   const openDisplay = useCallback(
     (item) => {
-      navigation.navigate('DisplayDetails', { id: item.id });
+      navigation.navigate('DisplayDetails', {
+        id: item.id,
+        displayType: item?.displayType,
+      });
     },
     [navigation],
   );

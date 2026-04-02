@@ -1,31 +1,45 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import ProductsDisplay from './products';
 import OrdersDisplay from './orders';
 import { useStore } from '@store';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 
 const DisplayDetails = () => {
+    const navigation = useNavigation();
     const route = useRoute();
     const displayId = decodeURIComponent(route.params?.id || '');
+    const routeDisplayType = String(route.params?.displayType || '').toLowerCase();
     const { ppcColors } = useDisplayTheme();
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
     const displayQueueStore = useStore('displays');
     const { actions, getters } = displayQueueStore;
     const { item: display } = getters;
+    const effectiveDisplayType = String(display?.displayType || routeDisplayType || '').toLowerCase();
+    const isTvDisplay = effectiveDisplayType === 'tv';
+
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerShown: !isTvDisplay,
+        });
+
+        if (route.params?.hideBottomToolBar !== isTvDisplay) {
+            navigation.setParams({ hideBottomToolBar: isTvDisplay });
+        }
+    }, [navigation, isTvDisplay, route.params?.hideBottomToolBar]);
 
     useEffect(() => {
         if (displayId) actions.get(displayId);
     }, [actions, displayId]);
 
-    if (display.displayType === 'products') {
+    if (effectiveDisplayType === 'products') {
         return <ProductsDisplay display={display} />;
     }
 
-    if (display.displayType === 'orders' || display.displayType === 'tv') {
-        return <OrdersDisplay display={display} />;
+    if (effectiveDisplayType === 'orders' || effectiveDisplayType === 'tv') {
+        return <OrdersDisplay display={display} isTvDisplay={isTvDisplay} />;
     }
 
     if (!display?.id || !display?.displayType) {

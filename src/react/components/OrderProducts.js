@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react'
+﻿import React, { useMemo } from 'react'
 import { View, Text } from 'react-native'
+import Formatter from '@controleonline/ui-common/src/utils/formatter'
 
-const OrderProducts = ({ order, scale, styles, indentStep = 16 }) => {
+const OrderProducts = ({ order, scale, styles, indentStep = 16, showDetails = false }) => {
 
     const getItemColor = (order, product) => {
         const queue = product.orderProductQueues?.[0]
@@ -63,6 +64,18 @@ const OrderProducts = ({ order, scale, styles, indentStep = 16 }) => {
     const renderNode = (node, level = 0) => {
         const isZero = Number(node.quantity) === 0
         const isPositive = Number(node.quantity) > 0
+        const itemColor = getItemColor(order, node)
+        const description = String(node?.product?.description || node?.description || '').trim()
+        const observation = String(
+            node?.comments ||
+            node?.observation ||
+            node?.note ||
+            node?.remark ||
+            node?.product?.comments ||
+            '',
+        ).trim()
+        const unitPrice = Number(node?.value || node?.price || 0)
+        const totalPrice = unitPrice > 0 ? unitPrice * Number(node?.quantity || 0) : 0
 
         return (
             <View key={node.id}>
@@ -72,14 +85,14 @@ const OrderProducts = ({ order, scale, styles, indentStep = 16 }) => {
                         {
                             marginLeft: level * indentStep * scale,
                             borderLeftWidth: 3,
-                            borderLeftColor: isZero ? 'red' : getItemColor(order, node),
+                            borderLeftColor: isZero ? 'red' : itemColor,
                             opacity: level === 0 ? 1 : 0.96,
                         },
                     ]}
                 >
                     {isPositive && (
                         <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
-                            <Text style={[styles.statusMarker, { color: getItemColor(order, node) }]}>● </Text>
+                            <Text style={[styles.statusMarker, { color: itemColor }]}>* </Text>
                             {(node.quantity > 1) && <Text style={styles.qtyText}>{node.quantity}x </Text>}
                             {node.product.product}
                         </Text>
@@ -87,10 +100,29 @@ const OrderProducts = ({ order, scale, styles, indentStep = 16 }) => {
 
                     {isZero && (
                         <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
-                            <Text style={[styles.statusMarker, { color: 'red' }]}>● </Text>
+                            <Text style={[styles.statusMarker, { color: 'red' }]}>* </Text>
                             <Text style={{ color: 'red', fontWeight: 'bold' }}>REMOVER </Text>
                             {node.product.product}
                         </Text>
+                    )}
+
+                    {showDetails && !!description && (
+                        <Text style={styles.subText} numberOfLines={2}>
+                            {description}
+                        </Text>
+                    )}
+
+                    {showDetails && !!observation && (
+                        <Text style={styles.subText} numberOfLines={2}>
+                            Obs: {observation}
+                        </Text>
+                    )}
+
+                    {showDetails && unitPrice > 0 && (
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                            <Text style={styles.subText}>{Formatter.formatMoney(unitPrice)} / un</Text>
+                            <Text style={styles.subText}>{Formatter.formatMoney(totalPrice)}</Text>
+                        </View>
                     )}
                 </View>
 
@@ -124,3 +156,4 @@ const OrderProducts = ({ order, scale, styles, indentStep = 16 }) => {
 }
 
 export default OrderProducts
+
