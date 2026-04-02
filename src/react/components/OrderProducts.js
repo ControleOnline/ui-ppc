@@ -69,9 +69,11 @@ const OrderProducts = ({ order, scale, styles, indentStep = 16, showDetails = fa
         const observation = String(
             node?.comments ||
             node?.observation ||
+            node?.observations ||
             node?.note ||
             node?.remark ||
             node?.product?.comments ||
+            node?.product?.observations ||
             '',
         ).trim()
         const unitPrice = Number(node?.value || node?.price || 0)
