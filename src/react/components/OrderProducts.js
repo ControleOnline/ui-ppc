@@ -92,21 +92,21 @@ const OrderProducts = ({ order, scale, styles, indentStep = 16, showDetails = fa
                         },
                     ]}
                 >
-                    {isPositive && (
-                        <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
-                            <Text style={[styles.statusMarker, { color: itemColor }]}>* </Text>
-                            {(node.quantity > 1) && <Text style={styles.qtyText}>{node.quantity}x </Text>}
-                            {node.product.product}
-                        </Text>
-                    )}
+                      {isPositive && (
+                          <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
+                              <Text style={[styles.statusMarker, { color: itemColor }]}>* </Text>
+                              {(node.quantity > 1) && <Text style={styles.qtyText}>{node.quantity}x </Text>}
+                              {node?.product?.name || node?.product?.product || node?.name || node?.product?.description || ''}
+                          </Text>
+                      )}
 
-                    {isZero && (
-                        <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
-                            <Text style={[styles.statusMarker, { color: 'red' }]}>* </Text>
-                            <Text style={{ color: 'red', fontWeight: 'bold' }}>REMOVER </Text>
-                            {node.product.product}
-                        </Text>
-                    )}
+                      {isZero && (
+                          <Text style={level === 0 ? styles.text : styles.subText} numberOfLines={2}>
+                              <Text style={[styles.statusMarker, { color: 'red' }]}>* </Text>
+                              <Text style={{ color: 'red', fontWeight: 'bold' }}>REMOVER </Text>
+                              {node?.product?.name || node?.product?.product || node?.name || node?.product?.description || ''}
+                          </Text>
+                      )}
 
                     {showDetails && !!description && (
                         <Text style={styles.subText} numberOfLines={2}>
