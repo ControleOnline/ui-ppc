@@ -147,6 +147,11 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
   return Array.from(map.values()).slice(0, maxItems)
 }
 
+const EXCLUDED_REAL_STATUSES = new Set([
+  'cancelled', 'canceled', 'closed', 'concluded',
+  'cancelado', 'concluido', 'finalizado',
+])
+
 const Orders = ({ display = {}, isTvDisplay = false }) => {
   const route = useRoute()
   const navigation = useNavigation()
@@ -157,7 +162,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const queuesStore = useStore('queues')
   const ordersStore = useStore('orders')
   const { getters, actions } = queuesStore
-  const { items, totalItems, isLoading, messages: queueMessages } = getters
+  const { totalItems, isLoading, messages: queueMessages } = getters
   const ordersMessages = ordersStore?.getters?.messages
   const { currentCompany } = peopleStore.getters
   const { ppcColors } = useDisplayTheme()
@@ -211,24 +216,21 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       })
   }, [actions, currentCompany?.id, displayId])
 
-  useFocusEffect(
-    useCallback(() => {
-      if (Array.isArray(items)) {
-        setOrders(items)
-      }
-    }, [items]),
-  )
-
   const sortedOrders = useMemo(() => {
     if (!Array.isArray(orders)) return []
 
-    return [...orders].sort((a, b) => {
-      const aTime = new Date(resolveOrderDateValue(a)).getTime()
-      const bTime = new Date(resolveOrderDateValue(b)).getTime()
-      const safeATime = Number.isFinite(aTime) ? aTime : 0
-      const safeBTime = Number.isFinite(bTime) ? bTime : 0
-      return safeATime - safeBTime
-    })
+    return [...orders]
+      .filter(order => {
+        const realStatus = normalizeText(order?.status?.realStatus).toLowerCase()
+        return !EXCLUDED_REAL_STATUSES.has(realStatus)
+      })
+      .sort((a, b) => {
+        const aTime = new Date(resolveOrderDateValue(a)).getTime()
+        const bTime = new Date(resolveOrderDateValue(b)).getTime()
+        const safeATime = Number.isFinite(aTime) ? aTime : 0
+        const safeBTime = Number.isFinite(bTime) ? bTime : 0
+        return safeATime - safeBTime
+      })
   }, [orders])
 
   const queueMessageCount = Array.isArray(queueMessages) ? queueMessages.length : 0
