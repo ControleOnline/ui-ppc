@@ -80,11 +80,8 @@ const formatOrderDate = dateValue => {
 
 const getStatusVisual = (order, ppcColors) => {
   const statusName = order?.status?.status || ''
-  const realStatusName = order?.status?.realStatus || 'open'
-  // Status financeiro (ex: "paid") não representa o ciclo do pedido — usa realStatus no chip
-  const isFinanceStatus = /paid|pago|payment|pagamento/i.test(statusName)
-  const statusLabelRaw = normalizeText(isFinanceStatus ? realStatusName : (statusName || realStatusName))
-  const statusLabel = statusLabelRaw ? statusLabelRaw.toUpperCase() : 'OPEN'
+  const statusLabelRaw = normalizeText(statusName) || normalizeText(order?.status?.realStatus) || 'open'
+  const statusLabel = statusLabelRaw.toUpperCase()
   const baseColor = normalizeText(order?.status?.color) || ppcColors.textSecondary
 
   return {
