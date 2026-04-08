@@ -79,19 +79,13 @@ const formatOrderDate = dateValue => {
 }
 
 const getStatusVisual = (order, ppcColors) => {
-  const statusLabelRaw = normalizeText(order?.status?.status || order?.status?.realStatus || 'open')
+  const statusName = order?.status?.status || ''
+  const realStatusName = order?.status?.realStatus || 'open'
+  // Status financeiro (ex: "paid") não representa o ciclo do pedido — usa realStatus no chip
+  const isFinanceStatus = /paid|pago|payment|pagamento/i.test(statusName)
+  const statusLabelRaw = normalizeText(isFinanceStatus ? realStatusName : (statusName || realStatusName))
   const statusLabel = statusLabelRaw ? statusLabelRaw.toUpperCase() : 'OPEN'
-  const lower = statusLabelRaw.toLowerCase()
-  const isPaid = lower.includes('paid') || lower.includes('pago')
-  const isCanceled = lower.includes('cancel')
-
-  const fallbackColor = isPaid
-    ? '#22C55E'
-    : isCanceled
-      ? '#EF4444'
-      : ppcColors.textSecondary
-
-  const baseColor = normalizeText(order?.status?.color) || fallbackColor
+  const baseColor = normalizeText(order?.status?.color) || ppcColors.textSecondary
 
   return {
     label: statusLabel,
@@ -147,10 +141,8 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
   return Array.from(map.values()).slice(0, maxItems)
 }
 
-const EXCLUDED_REAL_STATUSES = new Set([
-  'cancelled', 'canceled', 'closed', 'concluded',
-  'cancelado', 'concluido', 'finalizado',
-])
+// Display exibe apenas pedidos ativos (realStatus === 'open')
+
 
 const Orders = ({ display = {}, isTvDisplay = false }) => {
   const route = useRoute()
@@ -220,10 +212,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     if (!Array.isArray(orders)) return []
 
     return [...orders]
-      .filter(order => {
-        const realStatus = normalizeText(order?.status?.realStatus).toLowerCase()
-        return !EXCLUDED_REAL_STATUSES.has(realStatus)
-      })
+      .filter(order => normalizeText(order?.status?.realStatus).toLowerCase() === 'open')
       .sort((a, b) => {
         const aTime = new Date(resolveOrderDateValue(a)).getTime()
         const bTime = new Date(resolveOrderDateValue(b)).getTime()
