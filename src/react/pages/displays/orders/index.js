@@ -21,6 +21,39 @@ import {
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
 const normalizeText = value => String(value || '').trim()
+const parseEntityId = value => {
+  if (!value) return null
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (/^\d+$/.test(trimmed)) return Number(trimmed)
+    const iriMatch = trimmed.match(/\/(\d+)(?:\/)?$/)
+    if (iriMatch?.[1]) return Number(iriMatch[1])
+    return null
+  }
+  if (typeof value?.id === 'number') return value.id
+  if (typeof value?.id === 'string') return parseEntityId(value.id)
+  if (value?.['@id']) return parseEntityId(String(value['@id']))
+  return null
+}
+
+const isMessageForCompany = (message, companyId) => {
+  if (!message) return false
+
+  const expectedCompanyId = parseEntityId(companyId)
+  const messageCompanyId = parseEntityId(message.company)
+
+  if (!expectedCompanyId || !messageCompanyId) {
+    return true
+  }
+
+  return expectedCompanyId === messageCompanyId
+}
+
+const removeConsumedMessages = (messages, companyId) =>
+  (Array.isArray(messages) ? messages : []).filter(
+    message => !isMessageForCompany(message, companyId),
+  )
 
 const extractExtraEntries = extraData => {
   if (!Array.isArray(extraData)) return []
@@ -150,9 +183,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const peopleStore = useStore('people')
   const queuesStore = useStore('queues')
   const ordersStore = useStore('orders')
+  const websocketStore = useStore('websocket')
   const { getters, actions } = queuesStore
   const { totalItems, isLoading, messages: queueMessages } = getters
+  const ordersActions = ordersStore.actions
   const ordersMessages = ordersStore?.getters?.messages
+  const websocketStatus = websocketStore?.getters?.summary || {}
+  const websocketConnected = Boolean(websocketStatus?.connected)
   const { currentCompany } = peopleStore.getters
   const { ppcColors } = useDisplayTheme()
 
@@ -219,30 +256,60 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       })
   }, [orders])
 
-  const queueMessageCount = Array.isArray(queueMessages) ? queueMessages.length : 0
-  const ordersMessageCount = Array.isArray(ordersMessages) ? ordersMessages.length : 0
+  const hasQueueRefreshMessage = useMemo(
+    () =>
+      (Array.isArray(queueMessages) ? queueMessages : []).some(message =>
+        isMessageForCompany(message, currentCompany?.id),
+      ),
+    [currentCompany?.id, queueMessages],
+  )
+
+  const hasOrderRefreshMessage = useMemo(
+    () =>
+      (Array.isArray(ordersMessages) ? ordersMessages : []).some(message =>
+        isMessageForCompany(message, currentCompany?.id),
+      ),
+    [currentCompany?.id, ordersMessages],
+  )
 
   useEffect(() => {
-    if (queueMessageCount === 0 && ordersMessageCount === 0) {
+    if (!hasQueueRefreshMessage && !hasOrderRefreshMessage) {
       return
     }
+
+    actions.setMessages(removeConsumedMessages(queueMessages, currentCompany?.id))
+    ordersActions.setMessages(removeConsumedMessages(ordersMessages, currentCompany?.id))
 
     const refreshTimeout = setTimeout(() => {
       fetchOrders()
     }, 220)
 
     return () => clearTimeout(refreshTimeout)
-  }, [queueMessageCount, ordersMessageCount, fetchOrders])
+  }, [
+    actions,
+    currentCompany?.id,
+    fetchOrders,
+    hasOrderRefreshMessage,
+    hasQueueRefreshMessage,
+    ordersActions,
+    ordersMessages,
+    queueMessages,
+  ])
 
   useFocusEffect(
     useCallback(() => {
       fetchOrders()
+
+      if (websocketConnected) {
+        return undefined
+      }
+
       const interval = setInterval(() => {
         fetchOrders()
-      }, 60000)
+      }, 20000)
 
       return () => clearInterval(interval)
-    }, [fetchOrders]),
+    }, [fetchOrders, websocketConnected]),
   )
 
   const renderOrderCard = useCallback(

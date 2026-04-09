@@ -17,6 +17,40 @@ import InOut from './Status/InOut';
 import Working from './Status/Working';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 
+const parseEntityId = value => {
+    if (!value) return null;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (/^\d+$/.test(trimmed)) return Number(trimmed);
+        const iriMatch = trimmed.match(/\/(\d+)(?:\/)?$/);
+        if (iriMatch?.[1]) return Number(iriMatch[1]);
+        return null;
+    }
+    if (typeof value?.id === 'number') return value.id;
+    if (typeof value?.id === 'string') return parseEntityId(value.id);
+    if (value?.['@id']) return parseEntityId(String(value['@id']));
+    return null;
+};
+
+const isMessageForCompany = (message, companyId) => {
+    if (!message) return false;
+
+    const expectedCompanyId = parseEntityId(companyId);
+    const messageCompanyId = parseEntityId(message.company);
+
+    if (!expectedCompanyId || !messageCompanyId) {
+        return true;
+    }
+
+    return expectedCompanyId === messageCompanyId;
+};
+
+const removeConsumedMessages = (messages, companyId) =>
+    (Array.isArray(messages) ? messages : []).filter(
+        message => !isMessageForCompany(message, companyId)
+    );
+
 const DisplayProducts = ({ display = {} }) => {
     const route = useRoute();
     const { width } = useWindowDimensions();
@@ -30,11 +64,15 @@ const DisplayProducts = ({ display = {} }) => {
 
     const peopleStore = useStore('people');
     const displayQueueStore = useStore('display_queues');
+    const websocketStore = useStore('websocket');
     const { ppcColors } = useDisplayTheme();
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
     const { currentCompany } = peopleStore.getters;
-    const { actions: displayQueueActions } = displayQueueStore;
+    const { actions: displayQueueActions, getters: displayQueueGetters } = displayQueueStore;
+    const displayQueueMessages = displayQueueGetters?.messages;
+    const websocketStatus = websocketStore?.getters?.summary || {};
+    const websocketConnected = Boolean(websocketStatus?.connected);
 
     const [loaded, setLoaded] = useState({});
     const [statusIn, setStatusIn] = useState(null);
@@ -43,7 +81,7 @@ const DisplayProducts = ({ display = {} }) => {
 
     const store = useStore('order_products_queue');
     const { actions, getters } = store;
-    const { isSaving } = getters;
+    const { isSaving, messages: orderProductQueueMessages } = getters;
 
     const [modalType, setModalType] = useState(null);
 
@@ -174,24 +212,66 @@ const DisplayProducts = ({ display = {} }) => {
         setStatusOut(_statusOut);
     };
 
+    const hasDisplayQueueRefreshMessage = useMemo(
+        () =>
+            (Array.isArray(displayQueueMessages) ? displayQueueMessages : []).some(message =>
+                isMessageForCompany(message, currentCompany?.id)
+            ),
+        [currentCompany?.id, displayQueueMessages]
+    );
+
+    const hasOrderProductQueueRefreshMessage = useMemo(
+        () =>
+            (Array.isArray(orderProductQueueMessages) ? orderProductQueueMessages : []).some(message =>
+                isMessageForCompany(message, currentCompany?.id)
+            ),
+        [currentCompany?.id, orderProductQueueMessages]
+    );
+
+    useEffect(() => {
+        if (isSaving || (!hasDisplayQueueRefreshMessage && !hasOrderProductQueueRefreshMessage)) {
+            return;
+        }
+
+        displayQueueActions.setMessages(removeConsumedMessages(displayQueueMessages, currentCompany?.id));
+        actions.setMessages(removeConsumedMessages(orderProductQueueMessages, currentCompany?.id));
+
+        const refreshTimeout = setTimeout(() => {
+            onRequest();
+        }, 220);
+
+        return () => clearTimeout(refreshTimeout);
+    }, [
+        actions,
+        currentCompany?.id,
+        displayQueueActions,
+        displayQueueMessages,
+        hasDisplayQueueRefreshMessage,
+        hasOrderProductQueueRefreshMessage,
+        isSaving,
+        onRequest,
+        orderProductQueueMessages,
+    ]);
+
     // 🔥 PRIMEIRA CARGA
     useFocusEffect(
         useCallback(() => {
-            if (!currentCompany?.id) return;
+            if (!currentCompany?.id) return undefined;
             onRequest();
-        }, [currentCompany])
-    );
 
-    // 🔥 AUTO REFRESH SUAVE
-    useEffect(() => {
-        const interval = setInterval(() => {
-            if (!isSaving) {
-                onRequest();
+            if (websocketConnected) {
+                return undefined;
             }
-        }, 5000);
 
-        return () => clearInterval(interval);
-    }, [isSaving, currentCompany]);
+            const interval = setInterval(() => {
+                if (!isSaving) {
+                    onRequest();
+                }
+            }, 20000);
+
+            return () => clearInterval(interval);
+        }, [currentCompany?.id, isSaving, onRequest, websocketConnected])
+    );
 
     return (
         <SafeAreaView style={styles.container}>
