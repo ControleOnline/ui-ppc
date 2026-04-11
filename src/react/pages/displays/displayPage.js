@@ -193,9 +193,6 @@ const DisplaysPage = () => {
           <View style={[styles.heroActions, isCompact && styles.heroActionsCompact]}>
             <View style={styles.countPill}>
               <Text style={styles.countNumber}>{items?.length || 0} {global.t?.t('products','label','enabled')}</Text>
-              <Text style={styles.countLabel}>
-                {currentCompany?.alias || currentCompany?.name}
-              </Text>
             </View>
 
             {env.APP_TYPE === 'MANAGER' && (
@@ -354,12 +351,6 @@ const createStyles = (ppcColors, brandColors) =>
       fontWeight: '900',
       lineHeight: 16,
       textTransform: 'uppercase',
-    },
-    countLabel: {
-      color: ppcColors.textSecondary,
-      fontSize: 10,
-      fontWeight: '700',
-      marginTop: 2,
     },
     list: {
       paddingHorizontal: 14,
