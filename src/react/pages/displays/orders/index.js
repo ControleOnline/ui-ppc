@@ -192,7 +192,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const websocketConnected = Boolean(websocketStatus?.connected)
   const { currentCompany } = peopleStore.getters
   const { ppcColors } = useDisplayTheme()
-  const { canPrint, printToAttachedPrinter } = useDisplayPrint()
+  const { canPrint, printToAttachedPrinter } = useDisplayPrint({ display })
 
   const [orders, setOrders] = useState([])
   const [visibleCount, setVisibleCount] = useState(50)
@@ -346,6 +346,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 order: item,
                 kds: true,
                 displayType: display?.displayType,
+                display: {
+                  id: parseEntityId(display?.id) || parseEntityId(displayId),
+                  displayType: display?.displayType || route.params?.displayType,
+                },
                 hideBottomToolBar: tvMode,
               })
             }

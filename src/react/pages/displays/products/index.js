@@ -74,7 +74,7 @@ const DisplayProducts = ({ display = {} }) => {
     const displayQueueMessages = displayQueueGetters?.messages;
     const websocketStatus = websocketStore?.getters?.summary || {};
     const websocketConnected = Boolean(websocketStatus?.connected);
-    const { canPrint, printToAttachedPrinter } = useDisplayPrint();
+    const { canPrint, printToAttachedPrinter } = useDisplayPrint({display});
 
     const [loaded, setLoaded] = useState({});
     const [statusIn, setStatusIn] = useState(null);

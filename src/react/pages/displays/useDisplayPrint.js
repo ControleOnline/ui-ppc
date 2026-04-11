@@ -1,19 +1,25 @@
 import {useCallback, useMemo} from 'react';
-import {Alert} from 'react-native';
+import {Alert, Platform} from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {useStore} from '@store';
 import {parseConfigsObject} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 import {printOnNetworkPrinter} from '@controleonline/ui-common/src/react/services/NetworkPrinterService';
 import {
   DEFAULT_NETWORK_PRINTER_PORT,
+  DISPLAY_DEVICE_TYPE,
   getPrinterHost,
   getPrinterOptions,
   isPrinterDeviceType,
   NETWORK_PRINTER_PORT_CONFIG_KEY,
   normalizePrinterPort,
 } from '@controleonline/ui-common/src/react/utils/printerDevices';
-import {normalizeDeviceId} from '@controleonline/ui-common/src/react/utils/paymentDevices';
+import {
+  filterDeviceConfigsByCompany,
+  normalizeDeviceId,
+  normalizeEntityId,
+} from '@controleonline/ui-common/src/react/utils/paymentDevices';
 
+const DISPLAY_DEVICE_LINK_CONFIG_KEY = 'display-id';
 const DISPLAY_DEVICE_PRINTER_CONFIG_KEY = 'printer';
 
 const normalizePrintIds = value =>
@@ -27,7 +33,56 @@ const resolveErrorMessage = error =>
   error?.message ||
   'Nao foi possivel concluir a impressao.';
 
-export const useDisplayPrint = () => {
+const resolveDisplayDeviceConfig = ({
+  deviceConfigs = [],
+  companyId,
+  currentDeviceId,
+  displayId,
+}) => {
+  const normalizedDisplayId = normalizeEntityId(displayId);
+  if (!normalizedDisplayId) {
+    return null;
+  }
+
+  const matchingConfigs = filterDeviceConfigsByCompany(deviceConfigs, companyId)
+    .filter(deviceConfig => {
+      const deviceType = String(deviceConfig?.device?.type || '')
+        .trim()
+        .toUpperCase();
+
+      if (deviceType !== DISPLAY_DEVICE_TYPE) {
+        return false;
+      }
+
+      const configs = parseConfigsObject(deviceConfig?.configs);
+      return (
+        normalizeEntityId(configs?.[DISPLAY_DEVICE_LINK_CONFIG_KEY]) ===
+        normalizedDisplayId
+      );
+    });
+
+  if (matchingConfigs.length === 0) {
+    return null;
+  }
+
+  return (
+    matchingConfigs.find(
+      deviceConfig =>
+        normalizeDeviceId(deviceConfig?.device?.device) ===
+        normalizeDeviceId(currentDeviceId),
+    ) ||
+    matchingConfigs.find(deviceConfig =>
+      normalizeDeviceId(
+        parseConfigsObject(deviceConfig?.configs)?.[
+          DISPLAY_DEVICE_PRINTER_CONFIG_KEY
+        ],
+      ),
+    ) ||
+    matchingConfigs[0]
+  );
+};
+
+export const useDisplayPrint = ({display = null} = {}) => {
   const peopleStore = useStore('people');
   const deviceStore = useStore('device');
   const deviceConfigStore = useStore('device_config');
@@ -43,6 +98,13 @@ export const useDisplayPrint = () => {
   const deviceConfigActions = deviceConfigStore.actions;
   const printerActions = printerStore.actions;
   const printActions = printStore.actions;
+  const currentDeviceId = normalizeDeviceId(
+    currentDevice?.id || currentDevice?.device,
+  );
+  const selectedDisplayId = useMemo(
+    () => normalizeEntityId(display?.id || display?.['@id'] || display),
+    [display],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -57,14 +119,25 @@ export const useDisplayPrint = () => {
     }, [currentCompany?.id, deviceConfigActions, printerActions]),
   );
 
+  const linkedDisplayDeviceConfig = useMemo(
+    () =>
+      resolveDisplayDeviceConfig({
+        deviceConfigs: companyDeviceConfigs,
+        companyId: currentCompany?.id,
+        currentDeviceId,
+        displayId: selectedDisplayId,
+      }),
+    [companyDeviceConfigs, currentCompany?.id, currentDeviceId, selectedDisplayId],
+  );
+
   const effectiveDeviceConfig = useMemo(() => {
+    if (selectedDisplayId) {
+      return linkedDisplayDeviceConfig;
+    }
+
     if (runtimeDeviceConfig?.configs) {
       return runtimeDeviceConfig;
     }
-
-    const currentDeviceId = normalizeDeviceId(
-      currentDevice?.id || currentDevice?.device,
-    );
 
     if (!currentDeviceId) {
       return null;
@@ -77,11 +150,16 @@ export const useDisplayPrint = () => {
       ) || null
     );
   }, [
+    currentDeviceId,
     companyDeviceConfigs,
-    currentDevice?.device,
-    currentDevice?.id,
+    linkedDisplayDeviceConfig,
     runtimeDeviceConfig,
+    selectedDisplayId,
   ]);
+  const managerDeviceId = useMemo(
+    () => normalizeDeviceId(effectiveDeviceConfig?.device?.device),
+    [effectiveDeviceConfig?.device?.device],
+  );
 
   const printerDeviceId = useMemo(
     () =>
@@ -111,24 +189,63 @@ export const useDisplayPrint = () => {
     [printerDeviceId, printerOptions],
   );
 
-  const canPrint = Boolean(printerDeviceId && attachedPrinter);
+  const canPrint = Boolean(managerDeviceId && printerDeviceId && attachedPrinter);
   const isNetworkPrinter = isPrinterDeviceType(attachedPrinter?.type);
+  const shouldDispatchSelectedDisplayThroughBackend = Boolean(
+    selectedDisplayId &&
+      managerDeviceId &&
+      (Platform.OS === 'web' ||
+        (currentDeviceId && managerDeviceId !== currentDeviceId)),
+  );
+  const shouldDispatchSocketPrinterThroughBackend = Boolean(
+    !isNetworkPrinter &&
+      managerDeviceId &&
+      printerDeviceId &&
+      currentDeviceId &&
+      printerDeviceId !== currentDeviceId,
+  );
+  const shouldDispatchThroughBackend =
+    shouldDispatchSelectedDisplayThroughBackend ||
+    shouldDispatchSocketPrinterThroughBackend;
 
   const printToAttachedPrinter = useCallback(
-    async ({orderId, orderProductQueueIds = []}) => {
+    async ({orderId, queueIds = [], orderProductQueueIds = []}) => {
       const normalizedOrderId = String(orderId || '').replace(/\D+/g, '').trim();
       if (!canPrint || !normalizedOrderId) {
         return false;
       }
 
+      const normalizedQueueIds = normalizePrintIds(queueIds);
       const normalizedOrderProductQueueIds =
         normalizePrintIds(orderProductQueueIds);
+
+      if (shouldDispatchThroughBackend) {
+        try {
+          await printActions.printOrder({
+            id: normalizedOrderId,
+            device: managerDeviceId,
+            ...(normalizedQueueIds.length > 0
+              ? {queueIds: normalizedQueueIds}
+              : {}),
+            ...(normalizedOrderProductQueueIds.length > 0
+              ? {orderProductQueueIds: normalizedOrderProductQueueIds}
+              : {}),
+          });
+          return true;
+        } catch (error) {
+          Alert.alert('Impressao', resolveErrorMessage(error));
+          return false;
+        }
+      }
 
       if (!isNetworkPrinter) {
         printActions.addToPrint({
           printType: 'order',
           id: normalizedOrderId,
           device: printerDeviceId,
+          ...(normalizedQueueIds.length > 0
+            ? {queueIds: normalizedQueueIds}
+            : {}),
           ...(normalizedOrderProductQueueIds.length > 0
             ? {orderProductQueueIds: normalizedOrderProductQueueIds}
             : {}),
@@ -154,6 +271,9 @@ export const useDisplayPrint = () => {
         const spoolData = await printActions.printOrder({
           id: normalizedOrderId,
           device: printerDeviceId,
+          ...(normalizedQueueIds.length > 0
+            ? {queueIds: normalizedQueueIds}
+            : {}),
           ...(normalizedOrderProductQueueIds.length > 0
             ? {orderProductQueueIds: normalizedOrderProductQueueIds}
             : {}),
@@ -180,7 +300,15 @@ export const useDisplayPrint = () => {
         return false;
       }
     },
-    [attachedPrinter, canPrint, isNetworkPrinter, printActions, printerDeviceId],
+    [
+      attachedPrinter,
+      canPrint,
+      isNetworkPrinter,
+      managerDeviceId,
+      printActions,
+      printerDeviceId,
+      shouldDispatchThroughBackend,
+    ],
   );
 
   return {
