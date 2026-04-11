@@ -18,6 +18,7 @@ import {
   getOrderChannelLabel,
   getOrderChannelLogo,
 } from '@assets/ppc/channels'
+import { resolveDisplayedOrderStatus } from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
 const normalizeText = value => String(value || '').trim()
@@ -112,16 +113,13 @@ const formatOrderDate = dateValue => {
 }
 
 const getStatusVisual = (order, ppcColors) => {
-  const statusName = order?.status?.status || ''
-  const statusLabelRaw = normalizeText(statusName) || normalizeText(order?.status?.realStatus) || 'open'
-  const statusLabel = statusLabelRaw.toUpperCase()
-  const baseColor = normalizeText(order?.status?.color) || ppcColors.textSecondary
+  const statusPresentation = resolveDisplayedOrderStatus(order, ppcColors.textSecondary)
 
   return {
-    label: statusLabel,
-    textColor: baseColor,
-    borderColor: withOpacity(baseColor, 0.42),
-    bgColor: withOpacity(baseColor, 0.12),
+    label: statusPresentation.labelUpper,
+    textColor: statusPresentation.color,
+    borderColor: withOpacity(statusPresentation.color, 0.42),
+    bgColor: withOpacity(statusPresentation.color, 0.12),
   }
 }
 
