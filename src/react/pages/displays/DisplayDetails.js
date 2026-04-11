@@ -1,38 +1,132 @@
-import React, { useEffect, useLayoutEffect, useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import { BackHandler, View, Text, StyleSheet } from 'react-native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import ProductsDisplay from './products';
 import OrdersDisplay from './orders';
 import { useStore } from '@store';
+import { api } from '@controleonline/ui-common/src/api';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
+import {
+    buildForcedDisplayParams,
+    doesDisplayBelongToCompany,
+    normalizeEntityId,
+    resolveForcedDisplayId,
+} from '@controleonline/ui-ppc/src/react/utils/forcedDisplay';
 
 const DisplayDetails = () => {
     const navigation = useNavigation();
     const route = useRoute();
-    const displayId = decodeURIComponent(route.params?.id || '');
     const routeDisplayType = String(route.params?.displayType || '').toLowerCase();
-    const { ppcColors } = useDisplayTheme();
+    const displayId = normalizeEntityId(route.params?.id);
+    const { ppcColors, currentCompany } = useDisplayTheme();
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
-    const displayQueueStore = useStore('displays');
-    const { actions, getters } = displayQueueStore;
+    const displayStore = useStore('displays');
+    const deviceConfigStore = useStore('device_config');
+    const { actions, getters } = displayStore;
     const { item: display } = getters;
+    const { item: deviceConfig } = deviceConfigStore.getters;
+    const forcedDisplayId = useMemo(
+        () => resolveForcedDisplayId(deviceConfig),
+        [deviceConfig?.configs],
+    );
+    const isForcedDisplay = forcedDisplayId !== null && displayId === forcedDisplayId;
     const effectiveDisplayType = String(display?.displayType || routeDisplayType || '').toLowerCase();
     const isTvDisplay = effectiveDisplayType === 'tv';
+    const shouldHideNavigation = isTvDisplay || isForcedDisplay;
 
     useLayoutEffect(() => {
         navigation.setOptions({
-            headerShown: !isTvDisplay,
+            headerShown: !shouldHideNavigation,
+            headerBackVisible: !isForcedDisplay,
+            gestureEnabled: !isForcedDisplay,
         });
 
-        if (route.params?.hideBottomToolBar !== isTvDisplay) {
-            navigation.setParams({ hideBottomToolBar: isTvDisplay });
+        if (
+            route.params?.hideBottomToolBar !== shouldHideNavigation ||
+            route.params?.forcedDisplay !== isForcedDisplay
+        ) {
+            navigation.setParams({
+                hideBottomToolBar: shouldHideNavigation,
+                forcedDisplay: isForcedDisplay,
+            });
         }
-    }, [navigation, isTvDisplay, route.params?.hideBottomToolBar]);
+    }, [
+        navigation,
+        isForcedDisplay,
+        route.params?.forcedDisplay,
+        route.params?.hideBottomToolBar,
+        shouldHideNavigation,
+    ]);
 
     useEffect(() => {
         if (displayId) actions.get(displayId);
     }, [actions, displayId]);
+
+    useEffect(() => {
+        if (
+            !forcedDisplayId ||
+            !currentCompany?.id ||
+            displayId === forcedDisplayId
+        ) {
+            return;
+        }
+
+        let cancelled = false;
+
+        api.fetch(`displays/${forcedDisplayId}`)
+            .then(forcedDisplay => {
+                if (
+                    cancelled ||
+                    !forcedDisplay?.id ||
+                    !doesDisplayBelongToCompany(forcedDisplay, currentCompany.id)
+                ) {
+                    return;
+                }
+
+                const params = buildForcedDisplayParams(forcedDisplay);
+                if (!params) {
+                    return;
+                }
+
+                navigation.replace('DisplayDetails', params);
+            })
+            .catch(() => { });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [currentCompany?.id, displayId, forcedDisplayId, navigation]);
+
+    useEffect(() => {
+        if (!isForcedDisplay) {
+            return undefined;
+        }
+
+        const unsubscribe = navigation.addListener('beforeRemove', event => {
+            event.preventDefault();
+        });
+
+        return unsubscribe;
+    }, [isForcedDisplay, navigation]);
+
+    useFocusEffect(
+        useCallback(() => {
+            if (!isForcedDisplay) {
+                return undefined;
+            }
+
+            const onHardwareBackPress = () => true;
+            const subscription = BackHandler.addEventListener(
+                'hardwareBackPress',
+                onHardwareBackPress,
+            );
+
+            return () => {
+                subscription.remove();
+            };
+        }, [isForcedDisplay]),
+    );
 
     if (effectiveDisplayType === 'products') {
         return <ProductsDisplay display={display} />;

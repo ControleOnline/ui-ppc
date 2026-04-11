@@ -14,39 +14,36 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useStore } from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
 import DisplayCard from '@controleonline/ui-ppc/src/react/components/DisplayCard';
+import { api } from '@controleonline/ui-common/src/api';
 import { env } from '@env';
 import { withOpacity } from '@controleonline/../../src/styles/branding';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
+import {
+  buildForcedDisplayParams,
+  doesDisplayBelongToCompany,
+  normalizeEntityId,
+  resolveForcedDisplayId,
+} from '@controleonline/ui-ppc/src/react/utils/forcedDisplay';
 
 const BRAND_LOGO = require('@assets/ppc/logo 512x512 r.png');
-
-const parseEntityId = (value) => {
-  if (!value) return null;
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (/^\d+$/.test(trimmed)) return Number(trimmed);
-    const iriMatch = trimmed.match(/\/(\d+)(?:\/)?$/);
-    if (iriMatch?.[1]) return Number(iriMatch[1]);
-    return null;
-  }
-  if (typeof value.id === 'number') return value.id;
-  if (typeof value.id === 'string') return parseEntityId(value.id);
-  if (value['@id']) return parseEntityId(String(value['@id']));
-  return null;
-};
 
 const DisplaysPage = () => {
   const { width } = useWindowDimensions();
   const displaysStore = useStore('displays');
   const displayQueuesStore = useStore('display_queues');
+  const deviceConfigStore = useStore('device_config');
   const navigation = useNavigation();
   const { ppcColors, brandColors, currentCompany } = useDisplayTheme();
 
   const { actions, items, isLoading, error } = displaysStore;
   const { actions: displayQueuesActions } = displayQueuesStore;
+  const { item: deviceConfig } = deviceConfigStore.getters;
   const [displayQueuesRows, setDisplayQueuesRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(50);
+  const forcedDisplayId = useMemo(
+    () => resolveForcedDisplayId(deviceConfig),
+    [deviceConfig?.configs],
+  );
 
   const styles = useMemo(
     () => createStyles(ppcColors, brandColors),
@@ -62,12 +59,41 @@ const DisplaysPage = () => {
   const skeletonCount = useMemo(() => Math.max(numColumns * 2, 3), [numColumns]);
   const isCompact = width < 920;
 
+  const openForcedDisplay = useCallback(
+    display => {
+      const params = buildForcedDisplayParams(display);
+      if (!params) {
+        return false;
+      }
+
+      navigation.replace('DisplayDetails', params);
+      return true;
+    },
+    [navigation],
+  );
+
   const refreshDisplays = useCallback(async () => {
     if (!currentCompany?.id) return;
     setVisibleCount(50);
+
+    if (forcedDisplayId) {
+      try {
+        const forcedDisplay = await api.fetch(`displays/${forcedDisplayId}`);
+        if (
+          forcedDisplay?.id &&
+          doesDisplayBelongToCompany(forcedDisplay, currentCompany.id) &&
+          openForcedDisplay(forcedDisplay)
+        ) {
+          return;
+        }
+      } catch (e) {
+        // segue para a listagem quando o display vinculado nao existe
+      }
+    }
+
     const displays = await actions.getItems({ company: currentCompany.id, itemsPerPage: 50 });
     const displayIds = (Array.isArray(displays) ? displays : [])
-      .map((row) => parseEntityId(row?.id || row?.['@id'] || row))
+      .map(row => normalizeEntityId(row?.id || row?.['@id'] || row))
       .filter(Boolean);
 
     if (!displayIds.length) {
@@ -81,13 +107,19 @@ const DisplaysPage = () => {
     });
     const linkedRows = Array.isArray(linked) ? linked : [];
     const filtered = linkedRows.filter((row) => {
-      const displayId = parseEntityId(
+      const displayId = normalizeEntityId(
         row?.display?.id || row?.display?.['@id'] || row?.display,
       );
       return displayId && displayIds.includes(displayId);
     });
     setDisplayQueuesRows(filtered);
-  }, [actions, currentCompany?.id, displayQueuesActions]);
+  }, [
+    actions,
+    currentCompany?.id,
+    displayQueuesActions,
+    forcedDisplayId,
+    openForcedDisplay,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -98,7 +130,7 @@ const DisplaysPage = () => {
   const prefetchedByDisplay = useMemo(() => {
     const grouped = {};
     (Array.isArray(displayQueuesRows) ? displayQueuesRows : []).forEach((row) => {
-      const displayId = parseEntityId(
+      const displayId = normalizeEntityId(
         row?.display?.id || row?.display?.['@id'] || row?.display,
       );
       if (!displayId) return;
@@ -143,7 +175,7 @@ const DisplaysPage = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-      <StateStore store="displays" />
+      <StateStore stores={['displays', 'display_queues', 'device_config']} />
 
       <View style={styles.hero}>
         <View style={styles.heroGlow} />
