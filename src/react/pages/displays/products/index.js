@@ -130,7 +130,11 @@ const DisplayProducts = ({ display = {} }) => {
     }, [orders]);
 
     // 🔥 REQUEST SEM FLICKER
-    const onRequest = async () => {
+    const onRequest = useCallback(async () => {
+        if (!currentCompany?.id || !displayId) {
+            return;
+        }
+
         const rows = getResponsiveItemsPerPage();
 
         const result = await displayQueueActions.getItems({ display: displayId });
@@ -210,7 +214,7 @@ const DisplayProducts = ({ display = {} }) => {
         setStatusIn(_statusIn);
         setStatusWorking(_statusWorking);
         setStatusOut(_statusOut);
-    };
+    }, [currentCompany?.id, displayId, displayQueueActions]);
 
     const hasDisplayQueueRefreshMessage = useMemo(
         () =>
