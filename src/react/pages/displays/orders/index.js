@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native'
@@ -21,6 +22,7 @@ import {
 import { resolveDisplayedOrderStatus } from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
+import { useDisplayPrint } from '../useDisplayPrint'
 const normalizeText = value => String(value || '').trim()
 const parseEntityId = value => {
   if (!value) return null
@@ -190,6 +192,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const websocketConnected = Boolean(websocketStatus?.connected)
   const { currentCompany } = peopleStore.getters
   const { ppcColors } = useDisplayTheme()
+  const { canPrint, printToAttachedPrinter } = useDisplayPrint()
 
   const [orders, setOrders] = useState([])
   const [visibleCount, setVisibleCount] = useState(50)
@@ -253,6 +256,18 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         return safeATime - safeBTime
       })
   }, [orders])
+
+  const handlePrintOrder = useCallback(
+    item => {
+      const orderId = parseEntityId(item?.id)
+      if (!orderId) {
+        return
+      }
+
+      printToAttachedPrinter({ orderId })
+    },
+    [printToAttachedPrinter],
+  )
 
   const hasQueueRefreshMessage = useMemo(
     () =>
@@ -323,139 +338,156 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       const price = Number(item?.price || 0)
 
       return (
-        <Pressable
-          style={styles.orderCard}
-          onPress={() =>
-            navigation.navigate('OrderDetails', {
-              order: item,
-              kds: true,
-              displayType: display?.displayType,
-              hideBottomToolBar: tvMode,
-            })
-          }
-        >
-          <View style={[styles.orderAccentBar, { backgroundColor: statusVisual.textColor }]} />
-          <View style={[styles.orderCardInner, tvMode && styles.tvOrderCardInner]}>
-          <View style={[styles.orderTopRow, tvMode && styles.tvOrderTopRow]}>
-            <View style={styles.orderIdentity}>
-              <View style={[styles.orderIconWrap, tvMode && styles.tvOrderIconWrap]}>
-                {channelLogo ? (
-                  <Image source={channelLogo} style={styles.orderChannelLogo} resizeMode="contain" />
-                ) : (
-                  <MaterialCommunityIcons
-                    name="receipt-text"
-                    size={16}
-                    color={ppcColors.accentInfo}
-                  />
-                )}
+        <View style={styles.orderCard}>
+          <Pressable
+            style={styles.orderCardPressable}
+            onPress={() =>
+              navigation.navigate('OrderDetails', {
+                order: item,
+                kds: true,
+                displayType: display?.displayType,
+                hideBottomToolBar: tvMode,
+              })
+            }
+          >
+            <View style={[styles.orderAccentBar, { backgroundColor: statusVisual.textColor }]} />
+            <View style={[styles.orderCardInner, tvMode && styles.tvOrderCardInner]}>
+            <View style={[styles.orderTopRow, tvMode && styles.tvOrderTopRow]}>
+              <View style={styles.orderIdentity}>
+                <View style={[styles.orderIconWrap, tvMode && styles.tvOrderIconWrap]}>
+                  {channelLogo ? (
+                    <Image source={channelLogo} style={styles.orderChannelLogo} resizeMode="contain" />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name="receipt-text"
+                      size={16}
+                      color={ppcColors.accentInfo}
+                    />
+                  )}
+                </View>
+
+                <View style={styles.orderTitleWrap}>
+                  <Text style={[styles.orderTitle, tvMode && styles.tvOrderTitle]}>Pedido #{item?.id}</Text>
+                  <Text style={[styles.orderDate, tvMode && styles.tvOrderDate]}>{formatOrderDate(orderDateValue)}</Text>
+                </View>
               </View>
 
-              <View style={styles.orderTitleWrap}>
-                <Text style={[styles.orderTitle, tvMode && styles.tvOrderTitle]}>Pedido #{item?.id}</Text>
-                <Text style={[styles.orderDate, tvMode && styles.tvOrderDate]}>{formatOrderDate(orderDateValue)}</Text>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.orderStatusBadge,
-                tvMode && styles.tvOrderStatusBadge,
-                {
-                  borderColor: statusVisual.borderColor,
-                  backgroundColor: statusVisual.bgColor,
-                },
-              ]}
-            >
               <View
                 style={[
-                  styles.orderStatusDot,
-                  { backgroundColor: statusVisual.textColor },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.orderStatusText,
-                  tvMode && styles.tvOrderStatusText,
-                  { color: statusVisual.textColor },
+                  styles.orderStatusBadge,
+                  tvMode && styles.tvOrderStatusBadge,
+                  {
+                    borderColor: statusVisual.borderColor,
+                    backgroundColor: statusVisual.bgColor,
+                  },
                 ]}
               >
-                {statusVisual.label}
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.orderMetaRow, tvMode && styles.tvOrderMetaRow]}>
-            <View style={[styles.waitingChip, tvMode && styles.tvWaitingChip]}>
-              <MaterialCommunityIcons
-                name="clock-time-four-outline"
-                size={tvMode ? 10 : 12}
-                color={ppcColors.danger}
-              />
-              <Text style={[styles.waitingText, tvMode && styles.tvWaitingText]}>{waitingMinutes} min</Text>
-            </View>
-
-            <View style={styles.amountWrap}>
-              <Text style={[styles.channelMetaText, tvMode && styles.tvChannelMetaText]} numberOfLines={1}>
-                {channelDisplay}
-              </Text>
-              <Text style={[styles.amountText, tvMode && styles.tvAmountText]}>{Formatter.formatMoney(price)}</Text>
-            </View>
-          </View>
-
-          {products.length > 0 && (
-            <View style={[styles.productsWrap, tvMode && styles.tvProductsWrap]}>
-              {products.map((product, index) => (
                 <View
-                  key={String(product.id)}
                   style={[
-                    styles.productBlock,
-                    index < products.length - 1 && styles.productRowDivider,
+                    styles.orderStatusDot,
+                    { backgroundColor: statusVisual.textColor },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.orderStatusText,
+                    tvMode && styles.tvOrderStatusText,
+                    { color: statusVisual.textColor },
                   ]}
                 >
-                  {/* Produto principal */}
-                  <View style={styles.productRow}>
-                    <View style={[styles.qtyPill, tvMode && styles.tvQtyPill]}>
-                      <Text style={[styles.qtyPillText, tvMode && styles.tvQtyPillText]}>{product.quantity}x</Text>
-                    </View>
+                  {statusVisual.label}
+                </Text>
+              </View>
+            </View>
 
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.productName, tvMode && styles.tvProductName]} numberOfLines={1}>
-                        {product.name}
-                      </Text>
+            <View style={[styles.orderMetaRow, tvMode && styles.tvOrderMetaRow]}>
+              <View style={[styles.waitingChip, tvMode && styles.tvWaitingChip]}>
+                <MaterialCommunityIcons
+                  name="clock-time-four-outline"
+                  size={tvMode ? 10 : 12}
+                  color={ppcColors.danger}
+                />
+                <Text style={[styles.waitingText, tvMode && styles.tvWaitingText]}>{waitingMinutes} min</Text>
+              </View>
 
-                      {!!product.description && (
-                        <Text style={[styles.productDescription, tvMode && styles.tvProductDescription]} numberOfLines={1}>
-                          {product.description}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
+              <View style={styles.amountWrap}>
+                <Text style={[styles.channelMetaText, tvMode && styles.tvChannelMetaText]} numberOfLines={1}>
+                  {channelDisplay}
+                </Text>
+                <Text style={[styles.amountText, tvMode && styles.tvAmountText]}>{Formatter.formatMoney(price)}</Text>
+              </View>
+            </View>
 
-                  {/* Grupos */}
-                  {Object.entries(product.groups || {}).map(([groupName, items]) => (
-                    <View key={groupName} style={styles.groupWrap}>
-                      <View style={[styles.groupTitlePill, tvMode && styles.tvGroupTitlePill]}>
-                        <Text style={[styles.groupTitle, tvMode && styles.tvGroupTitle]}>{groupName}</Text>
+            {products.length > 0 && (
+              <View style={[styles.productsWrap, tvMode && styles.tvProductsWrap]}>
+                {products.map((product, index) => (
+                  <View
+                    key={String(product.id)}
+                    style={[
+                      styles.productBlock,
+                      index < products.length - 1 && styles.productRowDivider,
+                    ]}
+                  >
+                    <View style={styles.productRow}>
+                      <View style={[styles.qtyPill, tvMode && styles.tvQtyPill]}>
+                        <Text style={[styles.qtyPillText, tvMode && styles.tvQtyPillText]}>{product.quantity}x</Text>
                       </View>
 
-                      {items.map(child => (
-                        <View key={child.id} style={[styles.groupItem, { marginLeft: 12 }]}>
-                          <Text style={[styles.groupItemText, tvMode && styles.tvGroupItemText]}>
-                            {child.quantity}x {child.name}
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.productName, tvMode && styles.tvProductName]} numberOfLines={1}>
+                          {product.name}
+                        </Text>
+
+                        {!!product.description && (
+                          <Text style={[styles.productDescription, tvMode && styles.tvProductDescription]} numberOfLines={1}>
+                            {product.description}
                           </Text>
-                        </View>
-                      ))}
+                        )}
+                      </View>
                     </View>
-                  ))}
-                </View>
-              ))}
+
+                    {Object.entries(product.groups || {}).map(([groupName, items]) => (
+                      <View key={groupName} style={styles.groupWrap}>
+                        <View style={[styles.groupTitlePill, tvMode && styles.tvGroupTitlePill]}>
+                          <Text style={[styles.groupTitle, tvMode && styles.tvGroupTitle]}>{groupName}</Text>
+                        </View>
+
+                        {items.map(child => (
+                          <View key={child.id} style={[styles.groupItem, { marginLeft: 12 }]}>
+                            <Text style={[styles.groupItemText, tvMode && styles.tvGroupItemText]}>
+                              {child.quantity}x {child.name}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            )}
+            </View>
+          </Pressable>
+
+          {!tvMode && canPrint && (
+            <View style={styles.orderActions}>
+              <TouchableOpacity
+                activeOpacity={0.86}
+                style={styles.printActionButton}
+                onPress={() => handlePrintOrder(item)}
+              >
+                <MaterialCommunityIcons
+                  name="printer-outline"
+                  size={16}
+                  color={ppcColors.pillTextDark}
+                />
+                <Text style={styles.printActionButtonText}>Imprimir pedido</Text>
+              </TouchableOpacity>
             </View>
           )}
-          </View>
-        </Pressable>
+        </View>
       )
     },
-    [display?.displayType, navigation, ppcColors, styles, tvMode],
+    [canPrint, display?.displayType, handlePrintOrder, navigation, ppcColors, styles, tvMode],
   )
 
   return (
@@ -692,11 +724,43 @@ const createStyles = ppcColors =>
       maxWidth: '100%',
       overflow: 'hidden',
     },
+    orderCardPressable: {
+      flex: 1,
+    },
     orderAccentBar: {
       height: 3,
     },
     orderCardInner: {
       padding: 10,
+    },
+    orderActions: {
+      paddingHorizontal: 10,
+      paddingBottom: 10,
+      paddingTop: 2,
+      borderTopWidth: 1,
+      borderTopColor: ppcColors.border,
+      backgroundColor: ppcColors.cardBg,
+    },
+    printActionButton: {
+      minHeight: 40,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: withOpacity(ppcColors.accent, 0.42),
+      backgroundColor: ppcColors.accent,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    printActionButtonText: {
+      color: ppcColors.pillTextDark,
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: 0.3,
     },
     tvOrderCardInner: {
       padding: 8,

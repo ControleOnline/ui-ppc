@@ -9,6 +9,7 @@ const InOut = ({
     total = 0,
     status_in,
     status_working,
+    onPrint = null,
     onReload,
     ppcColorsOverride = null,
 }) => {
@@ -69,8 +70,25 @@ const InOut = ({
                                 </Text>
                             </Card.Content>
 
-                            {status_working && (
+                            {(status_working || typeof onPrint === 'function') && (
                                 <Card.Actions style={styles.actions}>
+                                    {typeof onPrint === 'function' && (
+                                        <Button
+                                            mode="outlined"
+                                            textColor={ppcColors.textPrimary}
+                                            style={[
+                                                styles.actionButton,
+                                                styles.secondaryActionButton,
+                                            ]}
+                                            labelStyle={[
+                                                styles.actionLabel,
+                                                styles.secondaryActionLabel,
+                                            ]}
+                                            onPress={() => onPrint(order)}
+                                        >
+                                            Imprimir
+                                        </Button>
+                                    )}
                                     <Button
                                         mode="contained"
                                         buttonColor={ppcColors.accent}
@@ -201,14 +219,24 @@ const createStyles = (ppcColors) =>
             paddingHorizontal: 14,
             paddingBottom: 10,
             paddingTop: 4,
+            flexWrap: 'wrap',
         },
         actionButton: {
             borderRadius: 999,
             minWidth: 132,
         },
+        secondaryActionButton: {
+            marginRight: 8,
+            borderColor: ppcColors.borderSoft,
+            backgroundColor: ppcColors.panelBg,
+            minWidth: 120,
+        },
         actionLabel: {
             fontWeight: '900',
             fontSize: 14,
+        },
+        secondaryActionLabel: {
+            fontWeight: '800',
         },
     });
 

@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import InOut from './Status/InOut';
 import Working from './Status/Working';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
+import { useDisplayPrint } from '../useDisplayPrint';
 
 const parseEntityId = value => {
     if (!value) return null;
@@ -73,6 +74,7 @@ const DisplayProducts = ({ display = {} }) => {
     const displayQueueMessages = displayQueueGetters?.messages;
     const websocketStatus = websocketStore?.getters?.summary || {};
     const websocketConnected = Boolean(websocketStatus?.connected);
+    const { canPrint, printToAttachedPrinter } = useDisplayPrint();
 
     const [loaded, setLoaded] = useState({});
     const [statusIn, setStatusIn] = useState(null);
@@ -232,6 +234,23 @@ const DisplayProducts = ({ display = {} }) => {
         [currentCompany?.id, orderProductQueueMessages]
     );
 
+    const handlePrintQueueItem = useCallback(
+        orderProductQueue => {
+            const orderId = parseEntityId(orderProductQueue?.order_product?.order?.id);
+            const queueItemId = parseEntityId(orderProductQueue?.id);
+
+            if (!orderId || !queueItemId) {
+                return;
+            }
+
+            printToAttachedPrinter({
+                orderId,
+                orderProductQueueIds: [queueItemId],
+            });
+        },
+        [printToAttachedPrinter]
+    );
+
     useEffect(() => {
         if (isSaving || (!hasDisplayQueueRefreshMessage && !hasOrderProductQueueRefreshMessage)) {
             return;
@@ -313,6 +332,7 @@ const DisplayProducts = ({ display = {} }) => {
                         total={totals.status_working}
                         status_working={statusWorking}
                         status_out={statusOut}
+                        onPrint={canPrint ? handlePrintQueueItem : null}
                         ppcColorsOverride={ppcColors}
                         onReload={onRequest}
                     />
@@ -332,6 +352,7 @@ const DisplayProducts = ({ display = {} }) => {
                             total={totals.status_in}
                             status_in={statusIn}
                             status_working={statusWorking}
+                            onPrint={canPrint ? handlePrintQueueItem : null}
                             ppcColorsOverride={ppcColors}
                             onReload={onRequest}
                         />
@@ -342,6 +363,7 @@ const DisplayProducts = ({ display = {} }) => {
                             orders={orders.status_out}
                             total={totals.status_out}
                             status_in={statusOut}
+                            onPrint={canPrint ? handlePrintQueueItem : null}
                             ppcColorsOverride={ppcColors}
                             onReload={onRequest}
                         />
