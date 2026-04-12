@@ -9,7 +9,10 @@ import {
   View,
 } from 'react-native';
 import {useDisplayTheme} from '@controleonline/ui-ppc/src/react/theme/displayTheme';
-import {getPrinterLabel} from '@controleonline/ui-common/src/react/utils/printerDevices';
+import {
+  getDeviceTypeLabel,
+  getPrinterLabel,
+} from '@controleonline/ui-common/src/react/utils/printerDevices';
 import {normalizeDeviceId} from '@controleonline/ui-common/src/react/utils/paymentDevices';
 
 const DisplayPrinterSelectionModal = ({
@@ -42,7 +45,9 @@ const DisplayPrinterSelectionModal = ({
         <View style={styles.printerCopy}>
           <Text style={styles.printerName}>{getPrinterLabel(item)}</Text>
           {!!printerDeviceId && (
-            <Text style={styles.printerMeta}>{printerDeviceId}</Text>
+            <Text style={styles.printerMeta}>
+              {`${getDeviceTypeLabel(item?.type)} • ${printerDeviceId}`}
+            </Text>
           )}
         </View>
 

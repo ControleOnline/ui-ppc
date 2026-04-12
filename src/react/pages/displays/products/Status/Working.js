@@ -115,7 +115,7 @@ const Working = ({
 
                                 {!!productDescription && (
                                     <Text style={styles.detailLine}>
-                                        DESC: {productDescription}
+                                         {productDescription}
                                     </Text>
                                 )}
 

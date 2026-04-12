@@ -150,7 +150,7 @@ const DisplayProducts = ({ display = {} }) => {
     const websocketStatus = websocketStore?.getters?.summary || {};
     const websocketConnected = Boolean(websocketStatus?.connected);
     const {
-        printToAttachedPrinter,
+        printOrderProductToAttachedPrinter,
         printerOptions,
         selectedPrinterDeviceId,
         isPrinterSelectionVisible,
@@ -309,22 +309,25 @@ const DisplayProducts = ({ display = {} }) => {
     const handlePrintQueueItem = useCallback(
         (orderProduct, orderProductQueue = null) => {
             const resolvedOrderProduct = orderProduct || orderProductQueue?.order_product || null;
-            const orderId = parseEntityId(resolvedOrderProduct?.order?.id);
             const queueItemId =
                 parseEntityId(orderProductQueue?.id) ||
                 parseEntityId(orderProductQueue?.queueEntry?.id) ||
                 null;
 
-            if (!orderId || !queueItemId) {
+            const orderProductId = parseEntityId(
+                resolvedOrderProduct?.id || resolvedOrderProduct?.['@id']
+            );
+
+            if (!orderProductId || !queueItemId) {
                 return;
             }
 
-            printToAttachedPrinter({
-                orderId,
+            printOrderProductToAttachedPrinter({
+                orderProductId,
                 orderProductQueueIds: [queueItemId],
             });
         },
-        [printToAttachedPrinter]
+        [printOrderProductToAttachedPrinter]
     );
 
     useEffect(() => {

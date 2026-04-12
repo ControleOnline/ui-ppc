@@ -1,5 +1,5 @@
 import {useCallback, useMemo, useState} from 'react';
-import {Alert, Platform} from 'react-native';
+import {Alert} from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {useStore} from '@store';
 import {parseConfigsObject} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
@@ -24,16 +24,17 @@ import {
 
 const DISPLAY_DEVICE_LINK_CONFIG_KEY = 'display-id';
 const DISPLAY_DEVICE_PRINTER_CONFIG_KEY = 'printer';
+const PRINT_JOB_TYPE_ORDER = 'order';
+const PRINT_JOB_TYPE_ORDER_PRODUCT = 'order-product';
 
 const normalizePrintIds = value =>
   (Array.isArray(value) ? value : [value])
     .map(item => String(item || '').replace(/\D+/g, '').trim())
     .filter(Boolean);
 
-const normalizePrintRequest = ({
+const normalizeOrderPrintRequest = ({
   orderId,
   queueIds = [],
-  orderProductQueueIds = [],
 } = {}) => {
   const normalizedOrderId = String(orderId || '').replace(/\D+/g, '').trim();
   if (!normalizedOrderId) {
@@ -43,6 +44,23 @@ const normalizePrintRequest = ({
   return {
     orderId: normalizedOrderId,
     queueIds: normalizePrintIds(queueIds),
+  };
+};
+
+const normalizeOrderProductPrintRequest = ({
+  orderProductId,
+  orderProductQueueIds = [],
+} = {}) => {
+  const normalizedOrderProductId = String(orderProductId || '')
+    .replace(/\D+/g, '')
+    .trim();
+
+  if (!normalizedOrderProductId) {
+    return null;
+  }
+
+  return {
+    orderProductId: normalizedOrderProductId,
     orderProductQueueIds: normalizePrintIds(orderProductQueueIds),
   };
 };
@@ -252,17 +270,21 @@ export const useDisplayPrint = ({display = null} = {}) => {
     setPendingPrintRequest(null);
   }, [isSavingPrinterSelection]);
 
-  const openPrinterSelection = useCallback(request => {
-    if (request) {
-      setPendingPrintRequest(request);
+  const openPrinterSelection = useCallback(pendingJob => {
+    if (pendingJob) {
+      setPendingPrintRequest(pendingJob);
     }
 
     setPrinterSelectionVisible(true);
   }, []);
 
-  const executePrint = useCallback(
-    async (request, overrides = {}) => {
-      const normalizedRequest = normalizePrintRequest(request);
+  const executePrintJob = useCallback(
+    async ({jobType, request, overrides = {}}) => {
+      const normalizedRequest =
+        jobType === PRINT_JOB_TYPE_ORDER_PRODUCT
+          ? normalizeOrderProductPrintRequest(request)
+          : normalizeOrderPrintRequest(request);
+
       if (!normalizedRequest) {
         return false;
       }
@@ -276,7 +298,10 @@ export const useDisplayPrint = ({display = null} = {}) => {
       );
 
       if (!targetPrinterDeviceId || !targetAttachedPrinter) {
-        openPrinterSelection(normalizedRequest);
+        openPrinterSelection({
+          jobType,
+          request: normalizedRequest,
+        });
         return false;
       }
 
@@ -285,10 +310,9 @@ export const useDisplayPrint = ({display = null} = {}) => {
       );
       const shouldDispatchSelectedDisplayThroughBackend = Boolean(
         selectedDisplayId &&
-          !targetIsNetworkPrinter &&
           targetManagerDeviceId &&
-          (Platform.OS === 'web' ||
-            (currentDeviceId && targetManagerDeviceId !== currentDeviceId)),
+          currentDeviceId &&
+          targetManagerDeviceId !== currentDeviceId,
       );
       const shouldDispatchSocketPrinterThroughBackend = Boolean(
         !targetIsNetworkPrinter &&
@@ -303,16 +327,23 @@ export const useDisplayPrint = ({display = null} = {}) => {
 
       if (shouldDispatchThroughBackend) {
         try {
-          await printActions.printOrder({
-            id: normalizedRequest.orderId,
-            device: targetManagerDeviceId,
-            ...(normalizedRequest.queueIds.length > 0
-              ? {queueIds: normalizedRequest.queueIds}
-              : {}),
-            ...(normalizedRequest.orderProductQueueIds.length > 0
-              ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
-              : {}),
-          });
+          if (jobType === PRINT_JOB_TYPE_ORDER_PRODUCT) {
+            await printActions.printOrderProduct({
+              id: normalizedRequest.orderProductId,
+              device: targetManagerDeviceId,
+              ...(normalizedRequest.orderProductQueueIds.length > 0
+                ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
+                : {}),
+            });
+          } else {
+            await printActions.printOrder({
+              id: normalizedRequest.orderId,
+              device: targetManagerDeviceId,
+              ...(normalizedRequest.queueIds.length > 0
+                ? {queueIds: normalizedRequest.queueIds}
+                : {}),
+            });
+          }
           return true;
         } catch (error) {
           Alert.alert('Impressao', resolveErrorMessage(error));
@@ -321,17 +352,27 @@ export const useDisplayPrint = ({display = null} = {}) => {
       }
 
       if (!targetIsNetworkPrinter) {
-        printActions.addToPrint({
-          printType: 'order',
-          id: normalizedRequest.orderId,
-          device: targetPrinterDeviceId,
-          ...(normalizedRequest.queueIds.length > 0
-            ? {queueIds: normalizedRequest.queueIds}
-            : {}),
-          ...(normalizedRequest.orderProductQueueIds.length > 0
-            ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
-            : {}),
-        });
+        if (jobType === PRINT_JOB_TYPE_ORDER_PRODUCT) {
+          printActions.addToPrint({
+            printType: PRINT_JOB_TYPE_ORDER_PRODUCT,
+            id: normalizedRequest.orderProductId,
+            orderProductId: normalizedRequest.orderProductId,
+            device: targetPrinterDeviceId,
+            ...(normalizedRequest.orderProductQueueIds.length > 0
+              ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
+              : {}),
+          });
+        } else {
+          printActions.addToPrint({
+            printType: PRINT_JOB_TYPE_ORDER,
+            id: normalizedRequest.orderId,
+            orderId: normalizedRequest.orderId,
+            device: targetPrinterDeviceId,
+            ...(normalizedRequest.queueIds.length > 0
+              ? {queueIds: normalizedRequest.queueIds}
+              : {}),
+          });
+        }
         return true;
       }
 
@@ -358,16 +399,22 @@ export const useDisplayPrint = ({display = null} = {}) => {
       );
 
       try {
-        const spoolData = await printActions.printOrder({
-          id: normalizedRequest.orderId,
-          device: targetPrinterDeviceId,
-          ...(normalizedRequest.queueIds.length > 0
-            ? {queueIds: normalizedRequest.queueIds}
-            : {}),
-          ...(normalizedRequest.orderProductQueueIds.length > 0
-            ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
-            : {}),
-        });
+        const spoolData =
+          jobType === PRINT_JOB_TYPE_ORDER_PRODUCT
+            ? await printActions.printOrderProduct({
+                id: normalizedRequest.orderProductId,
+                device: targetPrinterDeviceId,
+                ...(normalizedRequest.orderProductQueueIds.length > 0
+                  ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
+                  : {}),
+              })
+            : await printActions.printOrder({
+                id: normalizedRequest.orderId,
+                device: targetPrinterDeviceId,
+                ...(normalizedRequest.queueIds.length > 0
+                  ? {queueIds: normalizedRequest.queueIds}
+                  : {}),
+              });
         const spoolContent = spoolData?.file?.content;
 
         if (!spoolContent) {
@@ -448,14 +495,17 @@ export const useDisplayPrint = ({display = null} = {}) => {
           .getItems({people: `/people/${currentCompany.id}`})
           .catch(() => {});
 
-        const queuedRequest = pendingPrintRequest;
+        const queuedPrintJob = pendingPrintRequest;
         setPendingPrintRequest(null);
 
-        if (queuedRequest) {
-          return executePrint(queuedRequest, {
-            attachedPrinter: selectedPrinter,
-            printerDeviceId: nextPrinterDeviceId,
-            managerDeviceId: configTargetDeviceId,
+        if (queuedPrintJob?.jobType && queuedPrintJob?.request) {
+          return executePrintJob({
+            ...queuedPrintJob,
+            overrides: {
+              attachedPrinter: selectedPrinter,
+              printerDeviceId: nextPrinterDeviceId,
+              managerDeviceId: configTargetDeviceId,
+            },
           });
         }
 
@@ -471,16 +521,29 @@ export const useDisplayPrint = ({display = null} = {}) => {
       configTargetDeviceId,
       currentCompany?.id,
       deviceConfigActions,
-      executePrint,
+      executePrintJob,
       pendingPrintRequest,
       printerOptions,
       selectedDisplayId,
     ],
   );
 
-  const printToAttachedPrinter = useCallback(
-    async request => executePrint(request),
-    [executePrint],
+  const printOrderToAttachedPrinter = useCallback(
+    async request =>
+      executePrintJob({
+        jobType: PRINT_JOB_TYPE_ORDER,
+        request,
+      }),
+    [executePrintJob],
+  );
+
+  const printOrderProductToAttachedPrinter = useCallback(
+    async request =>
+      executePrintJob({
+        jobType: PRINT_JOB_TYPE_ORDER_PRODUCT,
+        request,
+      }),
+    [executePrintJob],
   );
 
   return {
@@ -492,7 +555,8 @@ export const useDisplayPrint = ({display = null} = {}) => {
     closePrinterSelection,
     handleSelectPrinter,
     openPrinterSelection,
-    printToAttachedPrinter,
+    printOrderToAttachedPrinter,
+    printOrderProductToAttachedPrinter,
     printerOptions,
     selectedPrinterDeviceId,
   };

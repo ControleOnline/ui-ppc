@@ -399,7 +399,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const { currentCompany } = peopleStore.getters
   const { ppcColors } = useDisplayTheme()
   const {
-    printToAttachedPrinter,
+    printOrderToAttachedPrinter,
     printerOptions,
     selectedPrinterDeviceId,
     isPrinterSelectionVisible,
@@ -530,9 +530,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         return
       }
 
-      printToAttachedPrinter({ orderId })
+      printOrderToAttachedPrinter({ orderId })
     },
-    [printToAttachedPrinter],
+    [printOrderToAttachedPrinter],
   )
 
   const hasQueueRefreshMessage = useMemo(
