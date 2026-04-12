@@ -1,9 +1,12 @@
-import {useCallback, useMemo} from 'react';
+import {useCallback, useMemo, useState} from 'react';
 import {Alert, Platform} from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {useStore} from '@store';
 import {parseConfigsObject} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
-import {printOnNetworkPrinter} from '@controleonline/ui-common/src/react/services/NetworkPrinterService';
+import {
+  isNetworkPrinterRuntimeSupported,
+  printOnNetworkPrinter,
+} from '@controleonline/ui-common/src/react/services/NetworkPrinterService';
 import {
   DEFAULT_NETWORK_PRINTER_PORT,
   DISPLAY_DEVICE_TYPE,
@@ -26,6 +29,23 @@ const normalizePrintIds = value =>
   (Array.isArray(value) ? value : [value])
     .map(item => String(item || '').replace(/\D+/g, '').trim())
     .filter(Boolean);
+
+const normalizePrintRequest = ({
+  orderId,
+  queueIds = [],
+  orderProductQueueIds = [],
+} = {}) => {
+  const normalizedOrderId = String(orderId || '').replace(/\D+/g, '').trim();
+  if (!normalizedOrderId) {
+    return null;
+  }
+
+  return {
+    orderId: normalizedOrderId,
+    queueIds: normalizePrintIds(queueIds),
+    orderProductQueueIds: normalizePrintIds(orderProductQueueIds),
+  };
+};
 
 const resolveErrorMessage = error =>
   error?.response?.data?.['hydra:description'] ||
@@ -101,6 +121,11 @@ export const useDisplayPrint = ({display = null} = {}) => {
   const currentDeviceId = normalizeDeviceId(
     currentDevice?.id || currentDevice?.device,
   );
+  const [isPrinterSelectionVisible, setPrinterSelectionVisible] = useState(false);
+  const [isSavingPrinterSelection, setIsSavingPrinterSelection] = useState(false);
+  const [selectedPrinterDeviceIdOverride, setSelectedPrinterDeviceIdOverride] =
+    useState('');
+  const [pendingPrintRequest, setPendingPrintRequest] = useState(null);
   const selectedDisplayId = useMemo(
     () => normalizeEntityId(display?.id || display?.['@id'] || display),
     [display],
@@ -160,8 +185,12 @@ export const useDisplayPrint = ({display = null} = {}) => {
     () => normalizeDeviceId(effectiveDeviceConfig?.device?.device),
     [effectiveDeviceConfig?.device?.device],
   );
+  const resolvedManagerDeviceId = useMemo(
+    () => normalizeDeviceId(managerDeviceId || currentDeviceId),
+    [currentDeviceId, managerDeviceId],
+  );
 
-  const printerDeviceId = useMemo(
+  const configuredPrinterDeviceId = useMemo(
     () =>
       normalizeDeviceId(
         parseConfigsObject(effectiveDeviceConfig?.configs)?.[
@@ -169,6 +198,13 @@ export const useDisplayPrint = ({display = null} = {}) => {
         ],
       ),
     [effectiveDeviceConfig?.configs],
+  );
+  const selectedPrinterDeviceId = useMemo(
+    () =>
+      normalizeDeviceId(
+        selectedPrinterDeviceIdOverride || configuredPrinterDeviceId,
+      ),
+    [configuredPrinterDeviceId, selectedPrinterDeviceIdOverride],
   );
 
   const printerOptions = useMemo(
@@ -184,51 +220,97 @@ export const useDisplayPrint = ({display = null} = {}) => {
   const attachedPrinter = useMemo(
     () =>
       printerOptions.find(
-        printer => normalizeDeviceId(printer?.device) === printerDeviceId,
+        printer => normalizeDeviceId(printer?.device) === selectedPrinterDeviceId,
       ) || null,
-    [printerDeviceId, printerOptions],
+    [printerOptions, selectedPrinterDeviceId],
   );
 
-  const canPrint = Boolean(managerDeviceId && printerDeviceId && attachedPrinter);
+  const canPrint = Boolean(selectedPrinterDeviceId && attachedPrinter);
   const isNetworkPrinter = isPrinterDeviceType(attachedPrinter?.type);
-  const shouldDispatchSelectedDisplayThroughBackend = Boolean(
-    selectedDisplayId &&
-      managerDeviceId &&
-      (Platform.OS === 'web' ||
-        (currentDeviceId && managerDeviceId !== currentDeviceId)),
+  const configTargetDeviceId = useMemo(
+    () =>
+      normalizeDeviceId(
+        effectiveDeviceConfig?.device?.device ||
+          effectiveDeviceConfig?.device?.id ||
+          currentDeviceId ||
+          managerDeviceId,
+      ),
+    [
+      currentDeviceId,
+      effectiveDeviceConfig?.device?.device,
+      effectiveDeviceConfig?.device?.id,
+      managerDeviceId,
+    ],
   );
-  const shouldDispatchSocketPrinterThroughBackend = Boolean(
-    !isNetworkPrinter &&
-      managerDeviceId &&
-      printerDeviceId &&
-      currentDeviceId &&
-      printerDeviceId !== currentDeviceId,
-  );
-  const shouldDispatchThroughBackend =
-    shouldDispatchSelectedDisplayThroughBackend ||
-    shouldDispatchSocketPrinterThroughBackend;
 
-  const printToAttachedPrinter = useCallback(
-    async ({orderId, queueIds = [], orderProductQueueIds = []}) => {
-      const normalizedOrderId = String(orderId || '').replace(/\D+/g, '').trim();
-      if (!canPrint || !normalizedOrderId) {
+  const closePrinterSelection = useCallback(() => {
+    if (isSavingPrinterSelection) {
+      return;
+    }
+
+    setPrinterSelectionVisible(false);
+    setPendingPrintRequest(null);
+  }, [isSavingPrinterSelection]);
+
+  const openPrinterSelection = useCallback(request => {
+    if (request) {
+      setPendingPrintRequest(request);
+    }
+
+    setPrinterSelectionVisible(true);
+  }, []);
+
+  const executePrint = useCallback(
+    async (request, overrides = {}) => {
+      const normalizedRequest = normalizePrintRequest(request);
+      if (!normalizedRequest) {
         return false;
       }
 
-      const normalizedQueueIds = normalizePrintIds(queueIds);
-      const normalizedOrderProductQueueIds =
-        normalizePrintIds(orderProductQueueIds);
+      const targetPrinterDeviceId = normalizeDeviceId(
+        overrides.printerDeviceId || selectedPrinterDeviceId,
+      );
+      const targetAttachedPrinter = overrides.attachedPrinter || attachedPrinter;
+      const targetManagerDeviceId = normalizeDeviceId(
+        overrides.managerDeviceId || resolvedManagerDeviceId,
+      );
+
+      if (!targetPrinterDeviceId || !targetAttachedPrinter) {
+        openPrinterSelection(normalizedRequest);
+        return false;
+      }
+
+      const targetIsNetworkPrinter = isPrinterDeviceType(
+        targetAttachedPrinter?.type,
+      );
+      const shouldDispatchSelectedDisplayThroughBackend = Boolean(
+        selectedDisplayId &&
+          !targetIsNetworkPrinter &&
+          targetManagerDeviceId &&
+          (Platform.OS === 'web' ||
+            (currentDeviceId && targetManagerDeviceId !== currentDeviceId)),
+      );
+      const shouldDispatchSocketPrinterThroughBackend = Boolean(
+        !targetIsNetworkPrinter &&
+          targetManagerDeviceId &&
+          targetPrinterDeviceId &&
+          currentDeviceId &&
+          targetPrinterDeviceId !== currentDeviceId,
+      );
+      const shouldDispatchThroughBackend =
+        shouldDispatchSelectedDisplayThroughBackend ||
+        shouldDispatchSocketPrinterThroughBackend;
 
       if (shouldDispatchThroughBackend) {
         try {
           await printActions.printOrder({
-            id: normalizedOrderId,
-            device: managerDeviceId,
-            ...(normalizedQueueIds.length > 0
-              ? {queueIds: normalizedQueueIds}
+            id: normalizedRequest.orderId,
+            device: targetManagerDeviceId,
+            ...(normalizedRequest.queueIds.length > 0
+              ? {queueIds: normalizedRequest.queueIds}
               : {}),
-            ...(normalizedOrderProductQueueIds.length > 0
-              ? {orderProductQueueIds: normalizedOrderProductQueueIds}
+            ...(normalizedRequest.orderProductQueueIds.length > 0
+              ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
               : {}),
           });
           return true;
@@ -238,22 +320,30 @@ export const useDisplayPrint = ({display = null} = {}) => {
         }
       }
 
-      if (!isNetworkPrinter) {
+      if (!targetIsNetworkPrinter) {
         printActions.addToPrint({
           printType: 'order',
-          id: normalizedOrderId,
-          device: printerDeviceId,
-          ...(normalizedQueueIds.length > 0
-            ? {queueIds: normalizedQueueIds}
+          id: normalizedRequest.orderId,
+          device: targetPrinterDeviceId,
+          ...(normalizedRequest.queueIds.length > 0
+            ? {queueIds: normalizedRequest.queueIds}
             : {}),
-          ...(normalizedOrderProductQueueIds.length > 0
-            ? {orderProductQueueIds: normalizedOrderProductQueueIds}
+          ...(normalizedRequest.orderProductQueueIds.length > 0
+            ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
             : {}),
         });
         return true;
       }
 
-      const printerHost = getPrinterHost(attachedPrinter);
+      if (!isNetworkPrinterRuntimeSupported) {
+        Alert.alert(
+          'Impressao',
+          'Impressora IP precisa ser usada no app nativo deste KDS.',
+        );
+        return false;
+      }
+
+      const printerHost = getPrinterHost(targetAttachedPrinter);
       if (!printerHost) {
         Alert.alert(
           'Impressao',
@@ -263,19 +353,19 @@ export const useDisplayPrint = ({display = null} = {}) => {
       }
 
       const printerPort = normalizePrinterPort(
-        attachedPrinter?.configs?.[NETWORK_PRINTER_PORT_CONFIG_KEY] ||
+        targetAttachedPrinter?.configs?.[NETWORK_PRINTER_PORT_CONFIG_KEY] ||
           DEFAULT_NETWORK_PRINTER_PORT,
       );
 
       try {
         const spoolData = await printActions.printOrder({
-          id: normalizedOrderId,
-          device: printerDeviceId,
-          ...(normalizedQueueIds.length > 0
-            ? {queueIds: normalizedQueueIds}
+          id: normalizedRequest.orderId,
+          device: targetPrinterDeviceId,
+          ...(normalizedRequest.queueIds.length > 0
+            ? {queueIds: normalizedRequest.queueIds}
             : {}),
-          ...(normalizedOrderProductQueueIds.length > 0
-            ? {orderProductQueueIds: normalizedOrderProductQueueIds}
+          ...(normalizedRequest.orderProductQueueIds.length > 0
+            ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
             : {}),
         });
         const spoolContent = spoolData?.file?.content;
@@ -302,19 +392,108 @@ export const useDisplayPrint = ({display = null} = {}) => {
     },
     [
       attachedPrinter,
-      canPrint,
-      isNetworkPrinter,
-      managerDeviceId,
+      currentDeviceId,
+      openPrinterSelection,
       printActions,
-      printerDeviceId,
-      shouldDispatchThroughBackend,
+      resolvedManagerDeviceId,
+      selectedDisplayId,
+      selectedPrinterDeviceId,
     ],
+  );
+
+  const handleSelectPrinter = useCallback(
+    async printer => {
+      const nextPrinterDeviceId = normalizeDeviceId(printer?.device);
+      if (!nextPrinterDeviceId) {
+        Alert.alert('Impressao', 'Selecione uma impressora valida.');
+        return false;
+      }
+
+      if (!currentCompany?.id) {
+        Alert.alert('Impressao', 'Nao foi possivel identificar a empresa ativa.');
+        return false;
+      }
+
+      if (!configTargetDeviceId) {
+        Alert.alert(
+          'Impressao',
+          'Nao foi possivel identificar o device deste display.',
+        );
+        return false;
+      }
+
+      setIsSavingPrinterSelection(true);
+
+      const selectedPrinter =
+        printerOptions.find(
+          option => normalizeDeviceId(option?.device) === nextPrinterDeviceId,
+        ) || printer;
+
+      try {
+        await deviceConfigActions.addDeviceConfigs({
+          device: configTargetDeviceId,
+          people: `/people/${currentCompany.id}`,
+          configs: JSON.stringify({
+            [DISPLAY_DEVICE_PRINTER_CONFIG_KEY]: nextPrinterDeviceId,
+            ...(selectedDisplayId
+              ? {[DISPLAY_DEVICE_LINK_CONFIG_KEY]: selectedDisplayId}
+              : {}),
+          }),
+        });
+
+        setSelectedPrinterDeviceIdOverride(nextPrinterDeviceId);
+        setPrinterSelectionVisible(false);
+
+        deviceConfigActions
+          .getItems({people: `/people/${currentCompany.id}`})
+          .catch(() => {});
+
+        const queuedRequest = pendingPrintRequest;
+        setPendingPrintRequest(null);
+
+        if (queuedRequest) {
+          return executePrint(queuedRequest, {
+            attachedPrinter: selectedPrinter,
+            printerDeviceId: nextPrinterDeviceId,
+            managerDeviceId: configTargetDeviceId,
+          });
+        }
+
+        return true;
+      } catch (error) {
+        Alert.alert('Impressao', resolveErrorMessage(error));
+        return false;
+      } finally {
+        setIsSavingPrinterSelection(false);
+      }
+    },
+    [
+      configTargetDeviceId,
+      currentCompany?.id,
+      deviceConfigActions,
+      executePrint,
+      pendingPrintRequest,
+      printerOptions,
+      selectedDisplayId,
+    ],
+  );
+
+  const printToAttachedPrinter = useCallback(
+    async request => executePrint(request),
+    [executePrint],
   );
 
   return {
     attachedPrinter,
     canPrint,
     isNetworkPrinter,
+    isPrinterSelectionVisible,
+    isSavingPrinterSelection,
+    closePrinterSelection,
+    handleSelectPrinter,
+    openPrinterSelection,
     printToAttachedPrinter,
+    printerOptions,
+    selectedPrinterDeviceId,
   };
 };

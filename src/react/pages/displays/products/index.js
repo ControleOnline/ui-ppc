@@ -17,6 +17,7 @@ import InOut from './Status/InOut';
 import Working from './Status/Working';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import { useDisplayPrint } from '../useDisplayPrint';
+import DisplayPrinterSelectionModal from '../DisplayPrinterSelectionModal';
 
 const normalizeText = value => String(value || '').trim();
 
@@ -148,7 +149,15 @@ const DisplayProducts = ({ display = {} }) => {
     const displayQueueMessages = displayQueueGetters?.messages;
     const websocketStatus = websocketStore?.getters?.summary || {};
     const websocketConnected = Boolean(websocketStatus?.connected);
-    const { canPrint, printToAttachedPrinter } = useDisplayPrint({display});
+    const {
+        printToAttachedPrinter,
+        printerOptions,
+        selectedPrinterDeviceId,
+        isPrinterSelectionVisible,
+        isSavingPrinterSelection,
+        handleSelectPrinter,
+        closePrinterSelection,
+    } = useDisplayPrint({display});
 
     const [loaded, setLoaded] = useState({});
     const [statusIn, setStatusIn] = useState(null);
@@ -298,9 +307,13 @@ const DisplayProducts = ({ display = {} }) => {
     );
 
     const handlePrintQueueItem = useCallback(
-        orderProductQueue => {
-            const orderId = parseEntityId(orderProductQueue?.order_product?.order?.id);
-            const queueItemId = parseEntityId(orderProductQueue?.id);
+        (orderProduct, orderProductQueue = null) => {
+            const resolvedOrderProduct = orderProduct || orderProductQueue?.order_product || null;
+            const orderId = parseEntityId(resolvedOrderProduct?.order?.id);
+            const queueItemId =
+                parseEntityId(orderProductQueue?.id) ||
+                parseEntityId(orderProductQueue?.queueEntry?.id) ||
+                null;
 
             if (!orderId || !queueItemId) {
                 return;
@@ -392,7 +405,7 @@ const DisplayProducts = ({ display = {} }) => {
                         total={totals.status_working}
                         status_working={statusWorking}
                         status_out={statusOut}
-                        onPrint={canPrint ? handlePrintQueueItem : null}
+                        onPrint={handlePrintQueueItem}
                         ppcColorsOverride={ppcColors}
                         onReload={onRequest}
                     />
@@ -412,7 +425,7 @@ const DisplayProducts = ({ display = {} }) => {
                             total={totals.status_in}
                             status_in={statusIn}
                             status_working={statusWorking}
-                            onPrint={canPrint ? handlePrintQueueItem : null}
+                            onPrint={handlePrintQueueItem}
                             ppcColorsOverride={ppcColors}
                             onReload={onRequest}
                         />
@@ -423,13 +436,23 @@ const DisplayProducts = ({ display = {} }) => {
                             orders={orders.status_out}
                             total={totals.status_out}
                             status_in={statusOut}
-                            onPrint={canPrint ? handlePrintQueueItem : null}
+                            onPrint={handlePrintQueueItem}
                             ppcColorsOverride={ppcColors}
                             onReload={onRequest}
                         />
                     )}
                 </SafeAreaView>
             </Modal>
+
+            <DisplayPrinterSelectionModal
+                visible={isPrinterSelectionVisible}
+                printers={printerOptions}
+                selectedPrinterDeviceId={selectedPrinterDeviceId}
+                saving={isSavingPrinterSelection}
+                onSelectPrinter={handleSelectPrinter}
+                onClose={closePrinterSelection}
+                ppcColorsOverride={ppcColors}
+            />
         </SafeAreaView>
     );
 };

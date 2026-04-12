@@ -3,6 +3,26 @@ import { View, StyleSheet } from 'react-native';
 import { Card, Text, Button } from 'react-native-paper';
 import { useStore } from '@store';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
+import {
+    resolveDisplayTicketSummary,
+    resolveOrderProductComment,
+    resolveOrderProductDescription,
+} from '../displayPrintRules';
+
+const formatDisplayTime = value => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '--:--';
+    }
+
+    return date.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
+
+const resolveMarketplaceTitle = marketplaceLabel =>
+    marketplaceLabel ? `Pedido ${marketplaceLabel}` : 'Pedido delivery';
 
 const InOut = ({
     orders = [],
@@ -43,31 +63,66 @@ const InOut = ({
                             <Text style={styles.emptyText}>Nenhum item neste status.</Text>
                         </View>
                     )}
-                    {orders.map(order => (
+                    {orders.map(order => {
+                        const orderProduct = order.order_product || {};
+                        const orderEntity = orderProduct.order || {};
+                        const orderSummary = resolveDisplayTicketSummary(orderEntity);
+                        const productDescription =
+                            resolveOrderProductDescription(orderProduct);
+                        const productComment = resolveOrderProductComment(orderProduct);
+
+                        return (
                         <Card key={order.id} style={styles.orderCard}>
                             <Card.Content style={styles.orderContent}>
-                                <Text style={styles.orderTitle}>Pedido #{order.order_product?.order.id}</Text>
-                                <Text style={styles.orderSubtitle}>{order.order_product?.order.client?.name}</Text>
-                                <Text style={styles.orderMeta}>
-                                    Horário do pedido:{' '}
-                                    {new Date(order.registerTime).toLocaleTimeString('pt-br', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                    })}
-                                </Text>
-                                {order.registerTime !== order.updateTime && (
+                                <View style={styles.ticketTopRow}>
+                                    <Text style={styles.internalOrderCode}>
+                                        Pedido #{orderSummary.internalOrderCode || '-'}
+                                    </Text>
                                     <Text style={styles.orderMeta}>
-                                        Iniciou nesse status:{' '}
-                                        {new Date(order.updateTime).toLocaleTimeString('pt-br', {
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                        })}
+                                        Pedido as {formatDisplayTime(order.registerTime)}
+                                    </Text>
+                                </View>
+
+                                {!!orderSummary.marketplaceOrderCode && (
+                                    <View style={styles.marketplaceHighlight}>
+                                        <Text style={styles.marketplaceLabel}>
+                                            {resolveMarketplaceTitle(
+                                                orderSummary.marketplaceLabel
+                                            )}
+                                        </Text>
+                                        <Text style={styles.marketplaceCode}>
+                                            {orderSummary.marketplaceOrderCode}
+                                        </Text>
+                                    </View>
+                                )}
+
+                                {!!orderSummary.clientName && (
+                                    <Text style={styles.clientName}>
+                                        {orderSummary.clientName}
                                     </Text>
                                 )}
+
+                                {order.registerTime !== order.updateTime && (
+                                    <Text style={styles.orderMeta}>
+                                        Alterado as {formatDisplayTime(order.updateTime)}
+                                    </Text>
+                                )}
+
                                 <Text style={styles.orderQty}>
-                                    {order.order_product?.quantity}{' '}
-                                    {order.order_product?.product.product}(s)
+                                    {orderProduct?.quantity} {orderProduct?.product?.product}(s)
                                 </Text>
+
+                                {!!productDescription && (
+                                    <Text style={styles.detailLine}>
+                                        DESC: {productDescription}
+                                    </Text>
+                                )}
+
+                                {!!productComment && (
+                                    <Text style={styles.detailLine}>
+                                        OBS: {productComment}
+                                    </Text>
+                                )}
                             </Card.Content>
 
                             {(status_working || typeof onPrint === 'function') && (
@@ -84,7 +139,7 @@ const InOut = ({
                                                 styles.actionLabel,
                                                 styles.secondaryActionLabel,
                                             ]}
-                                            onPress={() => onPrint(order)}
+                                            onPress={() => onPrint(order.order_product, order)}
                                         >
                                             Imprimir
                                         </Button>
@@ -102,7 +157,8 @@ const InOut = ({
                                 </Card.Actions>
                             )}
                         </Card>
-                    ))}
+                        );
+                    })}
                 </Card.Content>
             </Card>
         </View>
@@ -190,29 +246,69 @@ const createStyles = (ppcColors) =>
         orderContent: {
             paddingBottom: 4,
         },
-        orderTitle: {
-            color: ppcColors.textPrimary,
-            fontSize: 19,
-            fontWeight: '900',
-            lineHeight: 22,
+        ticketTopRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 8,
         },
-        orderSubtitle: {
-            marginTop: 1,
+        internalOrderCode: {
+            flex: 1,
             color: ppcColors.textSecondary,
-            fontSize: 14,
-            fontWeight: '700',
+            fontSize: 11,
+            fontWeight: '900',
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+        },
+        marketplaceHighlight: {
+            marginTop: 8,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: ppcColors.accent,
+            backgroundColor: ppcColors.isLight
+                ? 'rgba(250, 204, 21, 0.12)'
+                : 'rgba(250, 204, 21, 0.14)',
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+        },
+        marketplaceLabel: {
+            color: ppcColors.textSecondary,
+            fontSize: 11,
+            fontWeight: '900',
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+        },
+        marketplaceCode: {
+            marginTop: 3,
+            color: ppcColors.textPrimary,
+            fontSize: 24,
+            fontWeight: '900',
+            lineHeight: 28,
+        },
+        clientName: {
+            marginTop: 8,
+            color: ppcColors.textPrimary,
+            fontSize: 16,
+            fontWeight: '800',
         },
         orderMeta: {
-            marginTop: 1,
+            marginTop: 4,
             color: ppcColors.textSecondary,
             fontSize: 12,
             fontWeight: '600',
         },
         orderQty: {
-            marginTop: 4,
+            marginTop: 7,
             color: ppcColors.textPrimary,
-            fontSize: 14,
-            fontWeight: '800',
+            fontSize: 16,
+            fontWeight: '900',
+        },
+        detailLine: {
+            marginTop: 4,
+            color: ppcColors.textSecondary,
+            fontSize: 12,
+            fontWeight: '700',
+            lineHeight: 17,
         },
         actions: {
             justifyContent: 'flex-end',

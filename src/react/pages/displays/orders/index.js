@@ -23,6 +23,7 @@ import { resolveDisplayedOrderStatus } from '@controleonline/ui-orders/src/react
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
 import { useDisplayPrint } from '../useDisplayPrint'
+import DisplayPrinterSelectionModal from '../DisplayPrinterSelectionModal'
 const normalizeText = value => String(value || '').trim()
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
 
@@ -397,7 +398,15 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const websocketConnected = Boolean(websocketStatus?.connected)
   const { currentCompany } = peopleStore.getters
   const { ppcColors } = useDisplayTheme()
-  const { canPrint, printToAttachedPrinter } = useDisplayPrint({ display })
+  const {
+    printToAttachedPrinter,
+    printerOptions,
+    selectedPrinterDeviceId,
+    isPrinterSelectionVisible,
+    isSavingPrinterSelection,
+    handleSelectPrinter,
+    closePrinterSelection,
+  } = useDisplayPrint({ display })
 
   const [orders, setOrders] = useState([])
   const [visibleCount, setVisibleCount] = useState(50)
@@ -782,7 +791,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             </View>
           </Pressable>
 
-          {!tvMode && canPrint && (
+          {!tvMode && (
             <View style={styles.orderActions}>
               <TouchableOpacity
                 activeOpacity={0.86}
@@ -801,7 +810,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         </View>
       )
     },
-    [canPrint, display?.displayType, display?.id, displayId, handlePrintOrder, navigation, ppcColors, route.params?.displayType, styles, tvMode],
+    [display?.displayType, display?.id, displayId, handlePrintOrder, navigation, ppcColors, route.params?.displayType, styles, tvMode],
   )
 
   return (
@@ -940,6 +949,18 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             if (visibleCount < sortedOrders.length) setVisibleCount(v => v + 50)
           }}
           onEndReachedThreshold={0.3}
+        />
+      )}
+
+      {!tvMode && (
+        <DisplayPrinterSelectionModal
+          visible={isPrinterSelectionVisible}
+          printers={printerOptions}
+          selectedPrinterDeviceId={selectedPrinterDeviceId}
+          saving={isSavingPrinterSelection}
+          onSelectPrinter={handleSelectPrinter}
+          onClose={closePrinterSelection}
+          ppcColorsOverride={ppcColors}
         />
       )}
     </SafeAreaView>
