@@ -4,6 +4,7 @@ import {useFocusEffect} from '@react-navigation/native';
 import {useStore} from '@store';
 import {parseConfigsObject} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 import {
+  decodeNetworkPrinterPayload,
   isNetworkPrinterRuntimeSupported,
   printOnNetworkPrinter,
 } from '@controleonline/ui-common/src/react/services/NetworkPrinterService';
@@ -424,7 +425,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
         await printOnNetworkPrinter({
           host: printerHost,
           port: printerPort,
-          payload: spoolContent,
+          payload: decodeNetworkPrinterPayload(spoolContent),
         });
 
         if (spoolData?.id) {
