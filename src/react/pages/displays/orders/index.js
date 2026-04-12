@@ -24,6 +24,26 @@ import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayT
 import { withOpacity } from '@controleonline/../../src/styles/branding'
 import { useDisplayPrint } from '../useDisplayPrint'
 const normalizeText = value => String(value || '').trim()
+
+const getOrderRealStatus = order => {
+  const candidates = [
+    order?.status?.realStatus,
+    order?.status?.real_status,
+    order?.realStatus,
+    order?.real_status,
+    order?.order?.status?.realStatus,
+    order?.order?.status?.real_status,
+    order?.order?.realStatus,
+    order?.order?.real_status,
+  ]
+
+  return normalizeText(
+    candidates.find(value => normalizeText(value)),
+  ).toLowerCase()
+}
+
+const isDisplayVisibleOrder = order => getOrderRealStatus(order) === 'open'
+
 const parseEntityId = value => {
   if (!value) return null
   if (typeof value === 'number') return value
@@ -185,7 +205,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const ordersStore = useStore('orders')
   const websocketStore = useStore('websocket')
   const { getters, actions } = queuesStore
-  const { totalItems, isLoading, messages: queueMessages } = getters
+  const { isLoading, messages: queueMessages } = getters
   const ordersActions = ordersStore.actions
   const ordersMessages = ordersStore?.getters?.messages
   const websocketStatus = websocketStore?.getters?.summary || {}
@@ -226,7 +246,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
   const showSkeleton = isLoading && (!Array.isArray(orders) || orders.length === 0)
-  const listCount = Number(totalItems || orders?.length || 0)
 
   const fetchOrders = useCallback(() => {
     if (!displayId || !currentCompany?.id) return
@@ -247,7 +266,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     if (!Array.isArray(orders)) return []
 
     return [...orders]
-      .filter(order => normalizeText(order?.status?.realStatus).toLowerCase() === 'open')
+      .filter(isDisplayVisibleOrder)
       .sort((a, b) => {
         const aTime = new Date(resolveOrderDateValue(a)).getTime()
         const bTime = new Date(resolveOrderDateValue(b)).getTime()
@@ -256,6 +275,8 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         return safeATime - safeBTime
       })
   }, [orders])
+
+  const listCount = sortedOrders.length
 
   const handlePrintOrder = useCallback(
     item => {

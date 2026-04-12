@@ -18,6 +18,80 @@ import Working from './Status/Working';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import { useDisplayPrint } from '../useDisplayPrint';
 
+const normalizeText = value => String(value || '').trim();
+
+const DISPLAY_QUEUE_FETCH_PAGE_SIZE = 50;
+const DISPLAY_QUEUE_FETCH_MAX_PAGES = 10;
+
+const getQueueOrderRealStatus = queueItem => {
+    const order = queueItem?.order_product?.order || queueItem?.order || {};
+    const candidates = [
+        order?.status?.realStatus,
+        order?.status?.real_status,
+        order?.realStatus,
+        order?.real_status,
+        queueItem?.orderQueue?.status?.realStatus,
+        queueItem?.orderQueue?.status?.real_status,
+    ];
+
+    return normalizeText(
+        candidates.find(value => normalizeText(value))
+    ).toLowerCase();
+};
+
+const isDisplayVisibleQueueItem = queueItem => getQueueOrderRealStatus(queueItem) === 'open';
+
+const filterDisplayVisibleQueueItems = items =>
+    (Array.isArray(items) ? items : []).filter(isDisplayVisibleQueueItem);
+
+const fetchDisplayVisibleQueueItems = async ({
+    statusIds,
+    queueIds,
+    providerId,
+    itemsPerPage = DISPLAY_QUEUE_FETCH_PAGE_SIZE,
+    maxPages = DISPLAY_QUEUE_FETCH_MAX_PAGES,
+}) => {
+    const normalizedStatusIds = [...new Set((Array.isArray(statusIds) ? statusIds : []).filter(Boolean))];
+    const normalizedQueueIds = [...new Set((Array.isArray(queueIds) ? queueIds : []).filter(Boolean))];
+
+    if (!providerId || normalizedStatusIds.length === 0 || normalizedQueueIds.length === 0) {
+        return [];
+    }
+
+    const visibleItems = [];
+    let page = 1;
+
+    while (page <= maxPages) {
+        const response = await api.fetch('order_product_queues', {
+            params: {
+                status: normalizedStatusIds,
+                itemsPerPage,
+                page,
+                'order_product.order.provider': providerId,
+                queue: normalizedQueueIds,
+            },
+        });
+
+        const pageItems = Array.isArray(response?.member) ? response.member : [];
+        visibleItems.push(...filterDisplayVisibleQueueItems(pageItems));
+
+        const responseTotalItems = Number(response?.totalItems);
+        const totalItems = Number.isFinite(responseTotalItems) && responseTotalItems > 0
+            ? responseTotalItems
+            : pageItems.length;
+        const fetchedCount = ((page - 1) * itemsPerPage) + pageItems.length;
+        const hasMorePages = pageItems.length === itemsPerPage && fetchedCount < totalItems;
+
+        if (!hasMorePages) {
+            break;
+        }
+
+        page += 1;
+    }
+
+    return visibleItems;
+};
+
 const parseEntityId = value => {
     if (!value) return null;
     if (typeof value === 'number') return value;
@@ -137,8 +211,6 @@ const DisplayProducts = ({ display = {} }) => {
             return;
         }
 
-        const rows = getResponsiveItemsPerPage();
-
         const result = await displayQueueActions.getItems({ display: displayId });
 
         const inIds = [];
@@ -167,44 +239,35 @@ const DisplayProducts = ({ display = {} }) => {
             }
         });
 
-        const [inData, workingData, outData] = await Promise.all([
-            api.fetch('order_product_queues', {
-                params: {
-                    status: [...new Set(inIds)],
-                    itemsPerPage: rows,
-                    'order_product.order.provider': currentCompany?.id,
-                    queue: queueIds,
-                },
+        const [visibleInOrders, visibleWorkingOrders, visibleOutOrders] = await Promise.all([
+            fetchDisplayVisibleQueueItems({
+                statusIds: inIds,
+                queueIds,
+                providerId: currentCompany?.id,
             }),
-            api.fetch('order_product_queues', {
-                params: {
-                    status: [...new Set(workingIds)],
-                    itemsPerPage: rows,
-                    'order_product.order.provider': currentCompany?.id,
-                    queue: queueIds,
-                },
+            fetchDisplayVisibleQueueItems({
+                statusIds: workingIds,
+                queueIds,
+                providerId: currentCompany?.id,
             }),
-            api.fetch('order_product_queues', {
-                params: {
-                    status: [...new Set(outIds)],
-                    itemsPerPage: rows,
-                    'order_product.order.provider': currentCompany?.id,
-                    queue: queueIds,
-                },
+            fetchDisplayVisibleQueueItems({
+                statusIds: outIds,
+                queueIds,
+                providerId: currentCompany?.id,
             }),
         ]);
 
         // 🔥 UPDATE ATÔMICO (sem piscar)
         setOrders({
-            status_in: inData?.member || [],
-            status_working: workingData?.member || [],
-            status_out: outData?.member || [],
+            status_in: visibleInOrders,
+            status_working: visibleWorkingOrders,
+            status_out: visibleOutOrders,
         });
 
         setTotals({
-            status_in: Number(inData?.totalItems) || 0,
-            status_working: Number(workingData?.totalItems) || 0,
-            status_out: Number(outData?.totalItems) || 0,
+            status_in: visibleInOrders.length,
+            status_working: visibleWorkingOrders.length,
+            status_out: visibleOutOrders.length,
         });
 
         setLoaded({
