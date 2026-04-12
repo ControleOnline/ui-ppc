@@ -24,6 +24,13 @@ import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayT
 import { withOpacity } from '@controleonline/../../src/styles/branding'
 import { useDisplayPrint } from '../useDisplayPrint'
 const normalizeText = value => String(value || '').trim()
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
+
+const TV_LAYOUT_GAP = 8
+const TV_MIN_CARD_WIDTH = 300
+const TV_MIN_CARD_HEIGHT = 240
+const TV_BASE_PAGE_ROTATION_MS = 9000
+const TV_MAX_PAGE_ROTATION_MS = 22000
 
 const getOrderRealStatus = order => {
   const candidates = [
@@ -134,6 +141,19 @@ const formatOrderDate = dateValue => {
   )}:${pad2(date.getMinutes())}`
 }
 
+const updateMeasuredLayoutSize = (setter, value) => {
+  const nextValue = Math.max(0, Math.round(Number(value || 0)))
+  setter(previous => (previous === nextValue ? previous : nextValue))
+}
+
+const estimateTextUnits = (value, charsPerLine = 28) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return 0
+
+  const safeCharsPerLine = Math.max(12, Math.round(Number(charsPerLine || 0)))
+  return Math.max(1, Math.ceil(normalized.length / safeCharsPerLine))
+}
+
 const getStatusVisual = (order, ppcColors) => {
   const statusPresentation = resolveDisplayedOrderStatus(order, ppcColors.textSecondary)
 
@@ -188,7 +208,172 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
     }
   })
 
-  return Array.from(map.values()).slice(0, maxItems)
+  const products = Array.from(map.values())
+
+  return Number.isFinite(maxItems)
+    ? products.slice(0, Math.max(0, maxItems))
+    : products
+}
+
+const estimateTvProductUnits = (product, charsPerLine = 28) => {
+  const groupEntries = Object.entries(product?.groups || {})
+  let units = 1
+
+  units += estimateTextUnits(product?.name, charsPerLine)
+  units += estimateTextUnits(product?.description, charsPerLine + 8)
+
+  groupEntries.forEach(([groupName, items]) => {
+    units += estimateTextUnits(groupName, charsPerLine + 10)
+
+    ;(Array.isArray(items) ? items : []).forEach(child => {
+      units += estimateTextUnits(
+        `${Number(child?.quantity || 1)}x ${normalizeText(child?.name)}`,
+        charsPerLine,
+      )
+    })
+  })
+
+  return Math.max(3, units)
+}
+
+const buildTvOrderSegments = (orders, maxUnitsPerCard, charsPerLine = 28) =>
+  (Array.isArray(orders) ? orders : []).flatMap(order => {
+    const products = getOrderProductsPreview(order, Number.POSITIVE_INFINITY)
+
+    if (products.length === 0) {
+      return [{
+        key: `tv-order-${order?.id || Math.random()}-0`,
+        order,
+        products: [],
+        segmentIndex: 0,
+        segmentCount: 1,
+        totalUnits: 0,
+      }]
+    }
+
+    const segments = []
+    let currentProducts = []
+    let currentUnits = 0
+
+    products.forEach(product => {
+      const productUnits = estimateTvProductUnits(product, charsPerLine)
+      const wouldOverflow =
+        currentProducts.length > 0 &&
+        currentUnits + productUnits > maxUnitsPerCard
+
+      if (wouldOverflow) {
+        segments.push({
+          order,
+          products: currentProducts,
+          totalUnits: currentUnits,
+        })
+        currentProducts = []
+        currentUnits = 0
+      }
+
+      currentProducts.push(product)
+      currentUnits += productUnits
+    })
+
+    if (currentProducts.length > 0) {
+      segments.push({
+        order,
+        products: currentProducts,
+        totalUnits: currentUnits,
+      })
+    }
+
+    return segments.map((segment, index) => ({
+      key: `tv-order-${order?.id || index}-${index}`,
+      order,
+      products: segment.products,
+      totalUnits: segment.totalUnits,
+      segmentIndex: index,
+      segmentCount: segments.length,
+    }))
+  })
+
+const chunkItems = (items, size) => {
+  const safeItems = Array.isArray(items) ? items : []
+  const safeSize = Math.max(1, Number(size) || 1)
+  const chunks = []
+
+  for (let index = 0; index < safeItems.length; index += safeSize) {
+    chunks.push(safeItems.slice(index, index + safeSize))
+  }
+
+  return chunks
+}
+
+const getTvBaseColumns = width => {
+  if (width >= 3400) return 5
+  if (width >= 2560) return 4
+  if (width >= 1700) return 3
+  if (width >= 1100) return 2
+  return 1
+}
+
+const getTvBaseRows = height => {
+  if (height >= 1700) return 4
+  if (height >= 1200) return 3
+  if (height >= 780) return 2
+  return 1
+}
+
+const resolveTvLayoutMetrics = ({
+  width,
+  height,
+  summaryHeight,
+  sectionHeight,
+}) => {
+  const contentWidth = Math.max(220, Math.round(width - 24))
+  const availableHeight = Math.max(140, Math.round(height - summaryHeight - sectionHeight - 20))
+
+  let columns = getTvBaseColumns(width)
+  while (
+    columns > 1 &&
+    Math.floor((contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / columns) < TV_MIN_CARD_WIDTH
+  ) {
+    columns -= 1
+  }
+
+  let rows = getTvBaseRows(height)
+  while (
+    rows > 1 &&
+    Math.floor((availableHeight - (TV_LAYOUT_GAP * (rows - 1))) / rows) < TV_MIN_CARD_HEIGHT
+  ) {
+    rows -= 1
+  }
+
+  const cardWidth = Math.floor(
+    (contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / Math.max(1, columns),
+  )
+  const cardHeight = Math.floor(
+    (availableHeight - (TV_LAYOUT_GAP * (rows - 1))) / Math.max(1, rows),
+  )
+  const fixedChromeHeight = cardHeight >= 520 ? 184 : cardHeight >= 380 ? 158 : 138
+  const charsPerLine = clamp(
+    Math.floor((cardWidth - 92) / 7),
+    16,
+    42,
+  )
+  const maxUnitsPerCard = clamp(
+    Math.floor((cardHeight - fixedChromeHeight) / 16),
+    3,
+    36,
+  )
+
+  return {
+    columns,
+    rows,
+    cardWidth,
+    cardHeight,
+    contentWidth,
+    availableHeight,
+    cardsPerPage: Math.max(1, columns * rows),
+    charsPerLine,
+    maxUnitsPerCard,
+  }
 }
 
 // Display exibe apenas pedidos ativos (realStatus === 'open')
@@ -197,7 +382,7 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
 const Orders = ({ display = {}, isTvDisplay = false }) => {
   const route = useRoute()
   const navigation = useNavigation()
-  const { width } = useWindowDimensions()
+  const { width, height } = useWindowDimensions()
   const displayId = decodeURIComponent(route.params?.id || '')
 
   const peopleStore = useStore('people')
@@ -216,6 +401,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
   const [orders, setOrders] = useState([])
   const [visibleCount, setVisibleCount] = useState(50)
+  const [summaryHeight, setSummaryHeight] = useState(0)
+  const [sectionTitleHeight, setSectionTitleHeight] = useState(0)
+  const [tvCurrentPage, setTvCurrentPage] = useState(0)
   const tvMode =
     Boolean(isTvDisplay) || String(display?.displayType || '').toLowerCase() === 'tv'
 
@@ -225,15 +413,26 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     return Math.max(windowWidth, screenWidth)
   }, [width])
 
+  const effectiveHeight = useMemo(() => {
+    const screenHeight = Number(Dimensions.get('screen')?.height || 0)
+    const windowHeight = Number(height || 0)
+    return Math.max(windowHeight, screenHeight)
+  }, [height])
+
+  const tvLayout = useMemo(() => {
+    if (!tvMode) return null
+
+    return resolveTvLayoutMetrics({
+      width: effectiveWidth,
+      height: effectiveHeight,
+      summaryHeight,
+      sectionHeight: sectionTitleHeight,
+    })
+  }, [effectiveHeight, effectiveWidth, sectionTitleHeight, summaryHeight, tvMode])
+
   const columns = useMemo(() => {
     if (tvMode) {
-      if (effectiveWidth >= 2500) return 6
-      if (effectiveWidth >= 1920) return 5
-      if (effectiveWidth >= 1400) return 4
-      if (effectiveWidth >= 1100) return 3
-      if (effectiveWidth >= 760) return 3
-      if (effectiveWidth >= 560) return 2
-      return 1
+      return tvLayout?.columns || 1
     }
 
     if (effectiveWidth >= 1920) return 6
@@ -242,7 +441,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     if (effectiveWidth >= 800) return 3
     if (effectiveWidth >= 600) return 2
     return 1
-  }, [effectiveWidth, tvMode])
+  }, [effectiveWidth, tvLayout?.columns, tvMode])
 
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
   const showSkeleton = isLoading && (!Array.isArray(orders) || orders.length === 0)
@@ -277,6 +476,43 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   }, [orders])
 
   const listCount = sortedOrders.length
+
+  const tvOrderSegments = useMemo(() => {
+    if (!tvMode || !tvLayout) return []
+
+    return buildTvOrderSegments(
+      sortedOrders,
+      tvLayout.maxUnitsPerCard,
+      tvLayout.charsPerLine,
+    )
+  }, [sortedOrders, tvLayout, tvMode])
+
+  const tvPages = useMemo(() => {
+    if (!tvMode || !tvLayout) return []
+
+    return chunkItems(tvOrderSegments, tvLayout.cardsPerPage).map(items => ({
+      items,
+      totalUnits: items.reduce(
+        (total, segment) => total + Number(segment?.totalUnits || 0),
+        0,
+      ),
+    }))
+  }, [tvLayout, tvMode, tvOrderSegments])
+
+  const currentTvPage = useMemo(() => {
+    if (!tvPages.length) return null
+    return tvPages[Math.min(tvCurrentPage, tvPages.length - 1)] || null
+  }, [tvCurrentPage, tvPages])
+
+  const tvPageRotationMs = useMemo(() => {
+    if (!currentTvPage) return TV_BASE_PAGE_ROTATION_MS
+
+    return clamp(
+      TV_BASE_PAGE_ROTATION_MS + (Number(currentTvPage.totalUnits || 0) * 420),
+      TV_BASE_PAGE_ROTATION_MS,
+      TV_MAX_PAGE_ROTATION_MS,
+    )
+  }, [currentTvPage])
 
   const handlePrintOrder = useCallback(
     item => {
@@ -343,25 +579,63 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     }, [fetchOrders, websocketConnected]),
   )
 
+  useEffect(() => {
+    if (!tvMode) return
+
+    setTvCurrentPage(previousPage =>
+      previousPage >= tvPages.length ? 0 : previousPage,
+    )
+  }, [tvMode, tvPages.length])
+
+  useEffect(() => {
+    if (!tvMode || tvPages.length <= 1) {
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setTvCurrentPage(previousPage => (previousPage + 1) % tvPages.length)
+    }, tvPageRotationMs)
+
+    return () => clearTimeout(timer)
+  }, [tvMode, tvPageRotationMs, tvPages.length, tvCurrentPage])
+
   const renderOrderCard = useCallback(
-    ({ item }) => {
-      const orderDateValue = resolveOrderDateValue(item)
-      const statusVisual = getStatusVisual(item, ppcColors)
+    (itemOrRenderInfo, cardStyle = null) => {
+      const normalizedItem =
+        itemOrRenderInfo?.item &&
+        !itemOrRenderInfo?.order &&
+        !itemOrRenderInfo?.products
+          ? itemOrRenderInfo.item
+          : itemOrRenderInfo
+
+      const order = normalizedItem?.order || normalizedItem
+      const segmentIndex = Number(normalizedItem?.segmentIndex || 0)
+      const segmentCount = Number(normalizedItem?.segmentCount || 1)
+      const isSplitSegment = segmentCount > 1
+      const orderDateValue = resolveOrderDateValue(order)
+      const statusVisual = getStatusVisual(order, ppcColors)
       const waitingMinutes = getWaitingMinutes(orderDateValue)
-      const channelLogo = getOrderChannelLogo(item)
-      const channelLabel = String(getOrderChannelLabel(item) || 'SHOP').toUpperCase()
-      const externalRef = truncateMiddle(getExternalOrderRef(item))
+      const channelLogo = getOrderChannelLogo(order)
+      const channelLabel = String(getOrderChannelLabel(order) || 'SHOP').toUpperCase()
+      const externalRef = truncateMiddle(getExternalOrderRef(order))
       const channelDisplay = externalRef ? `${channelLabel} (${externalRef})` : channelLabel
-      const products = getOrderProductsPreview(item, tvMode ? 3 : 5)
-      const price = Number(item?.price || 0)
+      const products = normalizedItem?.products || getOrderProductsPreview(order, tvMode ? 3 : 5)
+      const price = Number(order?.price || 0)
 
       return (
-        <View style={styles.orderCard}>
+        <View
+          key={normalizedItem?.key || `order-card-${parseEntityId(order?.id) || segmentIndex}`}
+          style={[
+            styles.orderCard,
+            tvMode && styles.tvOrderCard,
+            cardStyle,
+          ]}
+        >
           <Pressable
             style={styles.orderCardPressable}
             onPress={() =>
               navigation.navigate('OrderDetails', {
-                order: item,
+                order,
                 kds: true,
                 displayType: display?.displayType,
                 display: {
@@ -389,36 +663,45 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 </View>
 
                 <View style={styles.orderTitleWrap}>
-                  <Text style={[styles.orderTitle, tvMode && styles.tvOrderTitle]}>Pedido #{item?.id}</Text>
+                  <Text style={[styles.orderTitle, tvMode && styles.tvOrderTitle]}>Pedido #{order?.id}</Text>
                   <Text style={[styles.orderDate, tvMode && styles.tvOrderDate]}>{formatOrderDate(orderDateValue)}</Text>
                 </View>
               </View>
 
-              <View
-                style={[
-                  styles.orderStatusBadge,
-                  tvMode && styles.tvOrderStatusBadge,
-                  {
-                    borderColor: statusVisual.borderColor,
-                    backgroundColor: statusVisual.bgColor,
-                  },
-                ]}
-              >
+              <View style={styles.orderStatusWrap}>
+                {isSplitSegment && tvMode ? (
+                  <View style={styles.tvSegmentBadge}>
+                    <Text style={styles.tvSegmentBadgeText}>
+                      {segmentIndex + 1}/{segmentCount}
+                    </Text>
+                  </View>
+                ) : null}
                 <View
                   style={[
-                    styles.orderStatusDot,
-                    { backgroundColor: statusVisual.textColor },
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.orderStatusText,
-                    tvMode && styles.tvOrderStatusText,
-                    { color: statusVisual.textColor },
+                    styles.orderStatusBadge,
+                    tvMode && styles.tvOrderStatusBadge,
+                    {
+                      borderColor: statusVisual.borderColor,
+                      backgroundColor: statusVisual.bgColor,
+                    },
                   ]}
                 >
-                  {statusVisual.label}
-                </Text>
+                  <View
+                    style={[
+                      styles.orderStatusDot,
+                      { backgroundColor: statusVisual.textColor },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.orderStatusText,
+                      tvMode && styles.tvOrderStatusText,
+                      { color: statusVisual.textColor },
+                    ]}
+                  >
+                    {statusVisual.label}
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -433,7 +716,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               </View>
 
               <View style={styles.amountWrap}>
-                <Text style={[styles.channelMetaText, tvMode && styles.tvChannelMetaText]} numberOfLines={1}>
+                <Text
+                  style={[styles.channelMetaText, tvMode && styles.tvChannelMetaText]}
+                  numberOfLines={tvMode ? 2 : 1}
+                >
                   {channelDisplay}
                 </Text>
                 <Text style={[styles.amountText, tvMode && styles.tvAmountText]}>{Formatter.formatMoney(price)}</Text>
@@ -456,12 +742,18 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                       </View>
 
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.productName, tvMode && styles.tvProductName]} numberOfLines={1}>
+                        <Text
+                          style={[styles.productName, tvMode && styles.tvProductName]}
+                          numberOfLines={tvMode ? 2 : 1}
+                        >
                           {product.name}
                         </Text>
 
                         {!!product.description && (
-                          <Text style={[styles.productDescription, tvMode && styles.tvProductDescription]} numberOfLines={1}>
+                          <Text
+                            style={[styles.productDescription, tvMode && styles.tvProductDescription]}
+                            numberOfLines={tvMode ? 2 : 1}
+                          >
                             {product.description}
                           </Text>
                         )}
@@ -495,7 +787,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               <TouchableOpacity
                 activeOpacity={0.86}
                 style={styles.printActionButton}
-                onPress={() => handlePrintOrder(item)}
+                onPress={() => handlePrintOrder(order)}
               >
                 <MaterialCommunityIcons
                   name="printer-outline"
@@ -509,15 +801,26 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         </View>
       )
     },
-    [canPrint, display?.displayType, handlePrintOrder, navigation, ppcColors, styles, tvMode],
+    [canPrint, display?.displayType, display?.id, displayId, handlePrintOrder, navigation, ppcColors, route.params?.displayType, styles, tvMode],
   )
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryHeader}>
+      <View
+        style={[styles.summaryCard, tvMode && styles.tvSummaryCard]}
+        onLayout={
+          tvMode
+            ? event =>
+                updateMeasuredLayoutSize(
+                  setSummaryHeight,
+                  event?.nativeEvent?.layout?.height,
+                )
+            : undefined
+        }
+      >
+        <View style={[styles.summaryHeader, tvMode && styles.tvSummaryHeader]}>
           <View style={styles.summaryIdentity}>
-            <View style={styles.summaryIconWrap}>
+            <View style={[styles.summaryIconWrap, tvMode && styles.tvSummaryIconWrap]}>
               <MaterialCommunityIcons
                 name={display?.displayType === 'products' ? 'silverware-fork-knife' : 'receipt-text'}
                 size={18}
@@ -525,24 +828,24 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               />
             </View>
             <View style={styles.summaryTitleWrap}>
-              <Text numberOfLines={1} style={styles.summaryTitle}>
+              <Text numberOfLines={1} style={[styles.summaryTitle, tvMode && styles.tvSummaryTitle]}>
                 {String(display?.display || 'Display')}
               </Text>
-              <Text style={styles.summarySubtitle}>Pedidos na fila</Text>
+              <Text style={[styles.summarySubtitle, tvMode && styles.tvSummarySubtitle]}>Pedidos na fila</Text>
             </View>
           </View>
 
-          <View style={styles.countBubble}>
+          <View style={[styles.countBubble, tvMode && styles.tvCountBubble]}>
             {isLoading ? (
               <View style={styles.countBubbleSkeleton} />
             ) : (
-              <Text style={styles.countBubbleText}>{listCount}</Text>
+              <Text style={[styles.countBubbleText, tvMode && styles.tvCountBubbleText]}>{listCount}</Text>
             )}
           </View>
 
         </View>
 
-        <View style={styles.summaryFooter}>
+        <View style={[styles.summaryFooter, tvMode && styles.tvSummaryFooter]}>
           <View style={styles.summaryTypePill}>
             <Text
               style={[
@@ -553,12 +856,31 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               {String(display?.displayType || 'orders').toUpperCase()}
             </Text>
           </View>
+
+          {tvMode && tvPages.length > 1 ? (
+            <View style={styles.tvSummaryPagePill}>
+              <Text style={styles.tvSummaryPageText}>
+                PAG {Math.min(tvCurrentPage + 1, tvPages.length)}/{tvPages.length}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
-      <View style={styles.sectionTitleRow}>
+      <View
+        style={[styles.sectionTitleRow, tvMode && styles.tvSectionTitleRow]}
+        onLayout={
+          tvMode
+            ? event =>
+                updateMeasuredLayoutSize(
+                  setSectionTitleHeight,
+                  event?.nativeEvent?.layout?.height,
+                )
+            : undefined
+        }
+      >
         <View style={styles.sectionLine} />
-        <Text style={styles.sectionTitle}>LISTA DE PEDIDOS</Text>
+        <Text style={[styles.sectionTitle, tvMode && styles.tvSectionTitle]}>LISTA DE PEDIDOS</Text>
         <View style={styles.sectionLine} />
       </View>
 
@@ -585,6 +907,25 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               </View>
             </View>
           ))}
+        </View>
+      ) : tvMode ? (
+        <View
+          style={[
+            styles.tvPageViewport,
+            tvLayout ? { height: tvLayout.availableHeight } : null,
+          ]}
+        >
+          <View style={styles.tvPageGrid}>
+            {(currentTvPage?.items || []).map(segment =>
+              renderOrderCard(segment, {
+                width: tvLayout?.cardWidth,
+                height: tvLayout?.cardHeight,
+                marginBottom: 0,
+                flexGrow: 0,
+                flexShrink: 0,
+              }),
+            )}
+          </View>
         </View>
       ) : (
         <FlatList
@@ -786,6 +1127,7 @@ const createStyles = ppcColors =>
     },
     tvOrderCardInner: {
       padding: 8,
+      flex: 1,
     },
     orderTopRow: {
       flexDirection: 'row',
@@ -872,6 +1214,10 @@ const createStyles = ppcColors =>
     },
     tvOrderStatusText: {
       fontSize: 9,
+    },
+    orderStatusWrap: {
+      alignItems: 'flex-end',
+      gap: 4,
     },
     orderMetaRow: {
       marginTop: 10,
@@ -1134,6 +1480,94 @@ const createStyles = ppcColors =>
     },
     tvGroupItemText: {
       fontSize: 10,
+    },
+    tvSummaryCard: {
+      marginHorizontal: 10,
+      marginTop: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    tvSummaryHeader: {
+      minHeight: 0,
+    },
+    tvSummaryIconWrap: {
+      width: 32,
+      height: 32,
+      marginRight: 8,
+    },
+    tvSummaryTitle: {
+      fontSize: 15,
+      lineHeight: 18,
+    },
+    tvSummarySubtitle: {
+      fontSize: 11,
+    },
+    tvCountBubble: {
+      width: 42,
+      height: 42,
+    },
+    tvCountBubbleText: {
+      fontSize: 17,
+      lineHeight: 20,
+    },
+    tvSummaryFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 8,
+    },
+    tvSummaryPagePill: {
+      alignSelf: 'flex-end',
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      backgroundColor: ppcColors.panelBg,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+    },
+    tvSummaryPageText: {
+      color: ppcColors.textSecondary,
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 0.5,
+    },
+    tvSectionTitleRow: {
+      marginTop: 0,
+      marginBottom: 0,
+      marginHorizontal: 10,
+      gap: 6,
+    },
+    tvSectionTitle: {
+      fontSize: 10,
+    },
+    tvPageViewport: {
+      paddingHorizontal: 10,
+      paddingTop: 6,
+      paddingBottom: 6,
+      overflow: 'hidden',
+    },
+    tvPageGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'flex-start',
+      gap: TV_LAYOUT_GAP,
+    },
+    tvOrderCard: {
+      marginBottom: 0,
+    },
+    tvSegmentBadge: {
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: withOpacity(ppcColors.textSecondary, 0.25),
+      backgroundColor: ppcColors.panelBg,
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+    },
+    tvSegmentBadgeText: {
+      color: ppcColors.textSecondary,
+      fontSize: 8,
+      fontWeight: '900',
+      letterSpacing: 0.4,
     },
   })
 
