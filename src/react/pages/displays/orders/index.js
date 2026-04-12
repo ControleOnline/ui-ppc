@@ -312,14 +312,11 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   useFocusEffect(
     useCallback(() => {
       fetchOrders()
-
-      if (websocketConnected) {
-        return undefined
-      }
+      const refreshIntervalMs = websocketConnected ? 30000 : 20000
 
       const interval = setInterval(() => {
         fetchOrders()
-      }, 20000)
+      }, refreshIntervalMs)
 
       return () => clearInterval(interval)
     }, [fetchOrders, websocketConnected]),

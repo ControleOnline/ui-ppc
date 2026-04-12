@@ -281,16 +281,13 @@ const DisplayProducts = ({ display = {} }) => {
         useCallback(() => {
             if (!currentCompany?.id) return undefined;
             onRequest();
-
-            if (websocketConnected) {
-                return undefined;
-            }
+            const refreshIntervalMs = websocketConnected ? 30000 : 20000;
 
             const interval = setInterval(() => {
                 if (!isSaving) {
                     onRequest();
                 }
-            }, 20000);
+            }, refreshIntervalMs);
 
             return () => clearInterval(interval);
         }, [currentCompany?.id, isSaving, onRequest, websocketConnected])
