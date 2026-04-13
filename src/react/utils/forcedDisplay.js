@@ -1,5 +1,11 @@
 export const DISPLAY_DEVICE_LINK_CONFIG_KEY = 'display-id';
 
+const normalizeDeviceId = value =>
+  String(value?.device || value?.id || value || '').trim();
+
+const normalizeDeviceConfigType = value =>
+  String(value || '').trim().toUpperCase();
+
 export const normalizeEntityId = value => {
   if (value === null || value === undefined || value === '') {
     return null;
@@ -50,6 +56,49 @@ export const normalizeEntityId = value => {
 
 export const resolveForcedDisplayId = deviceConfig =>
   normalizeEntityId(deviceConfig?.configs?.[DISPLAY_DEVICE_LINK_CONFIG_KEY]);
+
+export const doesDeviceConfigBelongToRuntime = (
+  deviceConfig,
+  {companyId = null, deviceId = null, type = null} = {},
+) => {
+  if (!deviceConfig || typeof deviceConfig !== 'object') {
+    return false;
+  }
+
+  const normalizedCompanyId = normalizeEntityId(companyId);
+  const normalizedConfigCompanyId = normalizeEntityId(
+    deviceConfig?.people?.id || deviceConfig?.people,
+  );
+  if (
+    normalizedCompanyId &&
+    normalizedConfigCompanyId &&
+    normalizedCompanyId !== normalizedConfigCompanyId
+  ) {
+    return false;
+  }
+
+  const normalizedDeviceId = normalizeDeviceId(deviceId);
+  const normalizedConfigDeviceId = normalizeDeviceId(
+    deviceConfig?.device?.device || deviceConfig?.device?.id || deviceConfig?.device,
+  );
+  if (
+    normalizedDeviceId &&
+    normalizedConfigDeviceId &&
+    normalizedDeviceId !== normalizedConfigDeviceId
+  ) {
+    return false;
+  }
+
+  const normalizedType = normalizeDeviceConfigType(type);
+  const normalizedConfigType = normalizeDeviceConfigType(
+    deviceConfig?.type || deviceConfig?.device?.type,
+  );
+  if (normalizedType && normalizedConfigType && normalizedType !== normalizedConfigType) {
+    return false;
+  }
+
+  return true;
+};
 
 export const doesDisplayBelongToCompany = (display, companyId) => {
   const normalizedCompanyId = normalizeEntityId(companyId);

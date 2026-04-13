@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
     View,
     Text,
@@ -41,8 +41,6 @@ const getQueueOrderRealStatus = queueItem => {
         order?.status?.real_status,
         order?.realStatus,
         order?.real_status,
-        queueItem?.orderQueue?.status?.realStatus,
-        queueItem?.orderQueue?.status?.real_status,
     ];
 
     return normalizeText(
@@ -150,6 +148,7 @@ const DisplayProducts = ({ display = {} }) => {
 
     const peopleStore = useStore('people');
     const queuesStore = useStore('queues');
+    const ordersStore = useStore('orders');
     const displayQueueStore = useStore('display_queues');
     const websocketStore = useStore('websocket');
     const runtimeDebugStore = useStore('runtime_debug');
@@ -158,9 +157,11 @@ const DisplayProducts = ({ display = {} }) => {
 
     const { currentCompany } = peopleStore.getters;
     const { actions: queuesActions, getters: queuesGetters } = queuesStore;
+    const { actions: ordersActions, getters: ordersGetters } = ordersStore;
     const { actions: displayQueueActions, getters: displayQueueGetters } = displayQueueStore;
     const runtimeDebugActions = runtimeDebugStore.actions;
     const queueMessages = queuesGetters?.messages;
+    const orderMessages = ordersGetters?.messages;
     const displayQueueMessages = displayQueueGetters?.messages;
     const websocketStatus = websocketStore?.getters?.summary || {};
     const websocketConnected = Boolean(websocketStatus?.connected);
@@ -201,6 +202,40 @@ const DisplayProducts = ({ display = {} }) => {
         lastSource: 'boot',
         lastDetail: 'startup',
     });
+    const ordersRef = useRef({
+        status_in: [],
+        status_working: [],
+        status_out: [],
+    });
+    const queueBindingsRef = useRef({
+        queueIds: [],
+        inIds: [],
+        workingIds: [],
+        outIds: [],
+        statusIn: null,
+        statusWorking: null,
+        statusOut: null,
+    });
+    const requestQueueRef = useRef(null);
+    const requestInFlightRef = useRef(false);
+    const previousSocketConnectedRef = useRef(websocketConnected);
+    const autoStartingIdsRef = useRef(new Set());
+    const applyLocalQueueTransitionRef = useRef(() => {});
+
+    useEffect(() => {
+        queueBindingsRef.current = {
+            queueIds: [],
+            inIds: [],
+            workingIds: [],
+            outIds: [],
+            statusIn: null,
+            statusWorking: null,
+            statusOut: null,
+        };
+        requestQueueRef.current = null;
+        requestInFlightRef.current = false;
+        autoStartingIdsRef.current = new Set();
+    }, [currentCompany?.id, displayId]);
 
     const getResponsiveItemsPerPage = () => 6;
 
@@ -212,27 +247,61 @@ const DisplayProducts = ({ display = {} }) => {
             if (isSaving) return;
             if (!loaded.status_working) return;
             if (!loaded.status_in) return;
+            if (!statusWorking?.['@id']) return;
             if (!orders.status_in.length) return;
             if (totals.status_working >= itensPerPage) return;
             if (totals.status_in === 0) return;
 
+            const pendingAutoStarts = autoStartingIdsRef.current;
+            const visibleInIds = new Set(
+                (Array.isArray(orders.status_in) ? orders.status_in : [])
+                    .map(order => Number(order?.id || 0))
+                    .filter(Boolean)
+            );
+            pendingAutoStarts.forEach(id => {
+                if (!visibleInIds.has(id)) {
+                    pendingAutoStarts.delete(id);
+                }
+            });
+
             const needed = itensPerPage - totals.status_working;
-            const ordersToStart = orders.status_in.slice(0, needed);
+            const ordersToStart = orders.status_in
+                .filter(order => {
+                    const orderId = Number(order?.id || 0);
+                    return orderId > 0 && !pendingAutoStarts.has(orderId);
+                })
+                .slice(0, needed);
+
+            if (!ordersToStart.length) return;
+
+            ordersToStart.forEach(order => {
+                const orderId = Number(order?.id || 0);
+                if (orderId > 0) {
+                    pendingAutoStarts.add(orderId);
+                }
+            });
 
             for (const order of ordersToStart) {
-                await actions.save({
-                    id: order.id,
-                    status: statusWorking['@id'],
-                });
-            }
-
-            if (ordersToStart.length > 0) {
-                await onRequest();
+                const orderId = Number(order?.id || 0);
+                try {
+                    const updatedQueueItem = await actions.save({
+                        id: order.id,
+                        status: statusWorking['@id'],
+                    });
+                    applyLocalQueueTransitionRef.current(updatedQueueItem, 'status_in', 'status_working');
+                    if (orderId > 0) {
+                        pendingAutoStarts.delete(orderId);
+                    }
+                } catch (e) {
+                    if (orderId > 0) {
+                        pendingAutoStarts.delete(orderId);
+                    }
+                }
             }
         };
 
         autoStart();
-    }, [orders]);
+    }, [actions, isSaving, loaded.status_in, loaded.status_working, orders.status_in, statusWorking, totals.status_in, totals.status_working]);
 
     // 🔥 REQUEST SEM FLICKER
     const noteRefresh = useCallback((source, detail = '') => {
@@ -258,81 +327,229 @@ const DisplayProducts = ({ display = {} }) => {
         };
     }, [runtimeDebugActions]);
 
-    const onRequest = useCallback(async (source = 'manual', detail = '') => {
-        if (!currentCompany?.id || !displayId) {
+    const applyQueueSnapshot = useCallback((nextQueueState, { markLoaded = false } = {}) => {
+        const normalizedQueueState = {
+            status_in: Array.isArray(nextQueueState?.status_in) ? nextQueueState.status_in : [],
+            status_working: Array.isArray(nextQueueState?.status_working) ? nextQueueState.status_working : [],
+            status_out: Array.isArray(nextQueueState?.status_out) ? nextQueueState.status_out : [],
+        };
+
+        ordersRef.current = normalizedQueueState;
+        setOrders(normalizedQueueState);
+        setTotals({
+            status_in: normalizedQueueState.status_in.length,
+            status_working: normalizedQueueState.status_working.length,
+            status_out: normalizedQueueState.status_out.length,
+        });
+
+        if (markLoaded) {
+            setLoaded({
+                status_in: true,
+                status_working: true,
+                status_out: true,
+            });
+        }
+    }, []);
+
+    const applyLocalQueueTransition = useCallback((updatedQueueItem, fromStage, toStage) => {
+        const queueItemId = parseEntityId(updatedQueueItem?.id || updatedQueueItem?.['@id']);
+        if (!queueItemId) {
             return;
         }
 
-        const result = await displayQueueActions.getItems({ display: displayId });
+        const currentQueueState = ordersRef.current || {
+            status_in: [],
+            status_working: [],
+            status_out: [],
+        };
 
+        const previousQueueItem = [
+            ...(Array.isArray(currentQueueState.status_in) ? currentQueueState.status_in : []),
+            ...(Array.isArray(currentQueueState.status_working) ? currentQueueState.status_working : []),
+            ...(Array.isArray(currentQueueState.status_out) ? currentQueueState.status_out : []),
+        ].find(item => parseEntityId(item?.id || item?.['@id']) === queueItemId);
+
+        const nextQueueItem = previousQueueItem
+            ? {
+                ...previousQueueItem,
+                ...updatedQueueItem,
+                order_product: updatedQueueItem?.order_product || previousQueueItem?.order_product,
+                queue: updatedQueueItem?.queue || previousQueueItem?.queue,
+                status: updatedQueueItem?.status || previousQueueItem?.status,
+            }
+            : updatedQueueItem;
+
+        const nextQueueState = {
+            status_in: (Array.isArray(currentQueueState.status_in) ? currentQueueState.status_in : []).filter(
+                item => parseEntityId(item?.id || item?.['@id']) !== queueItemId
+            ),
+            status_working: (Array.isArray(currentQueueState.status_working) ? currentQueueState.status_working : []).filter(
+                item => parseEntityId(item?.id || item?.['@id']) !== queueItemId
+            ),
+            status_out: (Array.isArray(currentQueueState.status_out) ? currentQueueState.status_out : []).filter(
+                item => parseEntityId(item?.id || item?.['@id']) !== queueItemId
+            ),
+        };
+
+        const normalizedOriginStage = normalizeText(fromStage);
+        const normalizedTargetStage = normalizeText(toStage);
+        if (normalizedOriginStage && !normalizedTargetStage) {
+            applyQueueSnapshot(nextQueueState);
+            return;
+        }
+
+        if (
+            normalizedTargetStage &&
+            Array.isArray(nextQueueState[normalizedTargetStage]) &&
+            isDisplayVisibleQueueItem(nextQueueItem)
+        ) {
+            nextQueueState[normalizedTargetStage] = [
+                nextQueueItem,
+                ...nextQueueState[normalizedTargetStage],
+            ];
+        }
+
+        applyQueueSnapshot(nextQueueState);
+    }, [applyQueueSnapshot]);
+
+    useEffect(() => {
+        applyLocalQueueTransitionRef.current = applyLocalQueueTransition;
+    }, [applyLocalQueueTransition]);
+
+    const resolveQueueBindings = useCallback(async (forceRefresh = false) => {
+        if (!currentCompany?.id || !displayId) {
+            return {
+                queueIds: [],
+                inIds: [],
+                workingIds: [],
+                outIds: [],
+                statusIn: null,
+                statusWorking: null,
+                statusOut: null,
+            };
+        }
+
+        if (!forceRefresh && queueBindingsRef.current.queueIds.length > 0) {
+            return queueBindingsRef.current;
+        }
+
+        const result = await displayQueueActions.getItems({ display: displayId });
         const inIds = [];
         const workingIds = [];
         const outIds = [];
         const queueIds = [];
 
-        let _statusIn = null;
-        let _statusWorking = null;
-        let _statusOut = null;
+        let statusIn = null;
+        let statusWorking = null;
+        let statusOut = null;
 
         (Array.isArray(result) ? result : []).forEach(item => {
-            queueIds.push(item.queue.id);
+            if (item?.queue?.id) {
+                queueIds.push(item.queue.id);
+            }
 
-            if (item.queue.status_in) {
+            if (item?.queue?.status_in) {
                 inIds.push(item.queue.status_in.id);
-                _statusIn = item.queue.status_in;
+                statusIn = statusIn || item.queue.status_in;
             }
-            if (item.queue.status_working) {
+            if (item?.queue?.status_working) {
                 workingIds.push(item.queue.status_working.id);
-                _statusWorking = item.queue.status_working;
+                statusWorking = statusWorking || item.queue.status_working;
             }
-            if (item.queue.status_out) {
+            if (item?.queue?.status_out) {
                 outIds.push(item.queue.status_out.id);
-                _statusOut = item.queue.status_out;
+                statusOut = statusOut || item.queue.status_out;
             }
         });
 
+        const nextBindings = {
+            queueIds: [...new Set(queueIds.filter(Boolean))],
+            inIds: [...new Set(inIds.filter(Boolean))],
+            workingIds: [...new Set(workingIds.filter(Boolean))],
+            outIds: [...new Set(outIds.filter(Boolean))],
+            statusIn,
+            statusWorking,
+            statusOut,
+        };
+
+        queueBindingsRef.current = nextBindings;
+        return nextBindings;
+    }, [currentCompany?.id, displayId, displayQueueActions]);
+
+    const loadDisplayQueues = useCallback(async (source = 'manual', detail = '') => {
+        const refreshSources = new Set(
+            String(detail || '')
+                .split('+')
+                .map(entry => normalizeText(entry))
+                .filter(Boolean)
+        );
+        const queueBindings = await resolveQueueBindings(
+            !queueBindingsRef.current.queueIds.length ||
+            source === 'focus' ||
+            source === 'manual' ||
+            refreshSources.has('queues') ||
+            refreshSources.has('display_queues')
+        );
+
         const [visibleInOrders, visibleWorkingOrders, visibleOutOrders] = await Promise.all([
             fetchDisplayVisibleQueueItems({
-                statusIds: inIds,
-                queueIds,
+                statusIds: queueBindings.inIds,
+                queueIds: queueBindings.queueIds,
                 providerId: currentCompany?.id,
             }),
             fetchDisplayVisibleQueueItems({
-                statusIds: workingIds,
-                queueIds,
+                statusIds: queueBindings.workingIds,
+                queueIds: queueBindings.queueIds,
                 providerId: currentCompany?.id,
             }),
             fetchDisplayVisibleQueueItems({
-                statusIds: outIds,
-                queueIds,
+                statusIds: queueBindings.outIds,
+                queueIds: queueBindings.queueIds,
                 providerId: currentCompany?.id,
             }),
         ]);
 
-        // 🔥 UPDATE ATÔMICO (sem piscar)
-        setOrders({
+        applyQueueSnapshot({
             status_in: visibleInOrders,
             status_working: visibleWorkingOrders,
             status_out: visibleOutOrders,
-        });
+        }, { markLoaded: true });
 
-        setTotals({
-            status_in: visibleInOrders.length,
-            status_working: visibleWorkingOrders.length,
-            status_out: visibleOutOrders.length,
-        });
-
-        setLoaded({
-            status_in: true,
-            status_working: true,
-            status_out: true,
-        });
-
-        setStatusIn(_statusIn);
-        setStatusWorking(_statusWorking);
-        setStatusOut(_statusOut);
+        setStatusIn(queueBindings.statusIn);
+        setStatusWorking(queueBindings.statusWorking);
+        setStatusOut(queueBindings.statusOut);
         noteRefresh(source, detail);
-    }, [currentCompany?.id, displayId, displayQueueActions, noteRefresh]);
+    }, [applyQueueSnapshot, currentCompany?.id, noteRefresh, resolveQueueBindings]);
+
+    const onRequest = useCallback(async (source = 'manual', detail = '') => {
+        if (!currentCompany?.id || !displayId) {
+            return;
+        }
+
+        requestQueueRef.current = { source, detail };
+        if (requestInFlightRef.current) {
+            return;
+        }
+
+        requestInFlightRef.current = true;
+        try {
+            while (requestQueueRef.current) {
+                const nextRequest = requestQueueRef.current;
+                requestQueueRef.current = null;
+
+                try {
+                    await loadDisplayQueues(
+                        nextRequest?.source || 'manual',
+                        nextRequest?.detail || ''
+                    );
+                } catch (e) {
+                    // O proximo evento do socket pode reidratar a tela.
+                }
+            }
+        } finally {
+            requestInFlightRef.current = false;
+        }
+    }, [currentCompany?.id, displayId, loadDisplayQueues]);
 
     const hasQueueRefreshMessage = useMemo(
         () =>
@@ -348,6 +565,14 @@ const DisplayProducts = ({ display = {} }) => {
                 isMessageForCompany(message, currentCompany?.id)
             ),
         [currentCompany?.id, displayQueueMessages]
+    );
+
+    const hasOrderRefreshMessage = useMemo(
+        () =>
+            (Array.isArray(orderMessages) ? orderMessages : []).some(message =>
+                isMessageForCompany(message, currentCompany?.id)
+            ),
+        [currentCompany?.id, orderMessages]
     );
 
     const hasOrderProductQueueRefreshMessage = useMemo(
@@ -386,6 +611,7 @@ const DisplayProducts = ({ display = {} }) => {
         if (
             isSaving ||
             (!hasQueueRefreshMessage &&
+                !hasOrderRefreshMessage &&
                 !hasDisplayQueueRefreshMessage &&
                 !hasOrderProductQueueRefreshMessage)
         ) {
@@ -393,10 +619,12 @@ const DisplayProducts = ({ display = {} }) => {
         }
 
         queuesActions.setMessages(removeConsumedMessages(queueMessages, currentCompany?.id));
+        ordersActions.setMessages(removeConsumedMessages(orderMessages, currentCompany?.id));
         displayQueueActions.setMessages(removeConsumedMessages(displayQueueMessages, currentCompany?.id));
         actions.setMessages(removeConsumedMessages(orderProductQueueMessages, currentCompany?.id));
         const refreshSources = [
             hasQueueRefreshMessage ? 'queues' : '',
+            hasOrderRefreshMessage ? 'orders' : '',
             hasDisplayQueueRefreshMessage ? 'display_queues' : '',
             hasOrderProductQueueRefreshMessage ? 'order_products_queue' : '',
         ].filter(Boolean);
@@ -411,34 +639,35 @@ const DisplayProducts = ({ display = {} }) => {
         currentCompany?.id,
         displayQueueActions,
         displayQueueMessages,
+        hasOrderRefreshMessage,
         hasQueueRefreshMessage,
         hasDisplayQueueRefreshMessage,
         hasOrderProductQueueRefreshMessage,
         isSaving,
         onRequest,
+        orderMessages,
+        ordersActions,
         orderProductQueueMessages,
         queueMessages,
         queuesActions,
     ]);
 
     // 🔥 PRIMEIRA CARGA
+    useEffect(() => {
+        const wasConnected = previousSocketConnectedRef.current;
+        previousSocketConnectedRef.current = websocketConnected;
+
+        if (websocketConnected && !wasConnected && currentCompany?.id) {
+            onRequest('socket', 'reconnected-sync');
+        }
+    }, [currentCompany?.id, onRequest, websocketConnected]);
+
     useFocusEffect(
         useCallback(() => {
             if (!currentCompany?.id) return undefined;
             onRequest('focus', 'screen-focus');
-            const refreshIntervalMs = websocketConnected ? 30000 : 20000;
-
-            const interval = setInterval(() => {
-                if (!isSaving) {
-                    onRequest(
-                        'interval',
-                        websocketConnected ? 'connected-poll' : 'fallback-poll'
-                    );
-                }
-            }, refreshIntervalMs);
-
-            return () => clearInterval(interval);
-        }, [currentCompany?.id, isSaving, onRequest, websocketConnected])
+            return undefined;
+        }, [currentCompany?.id, onRequest])
     );
 
     return (
@@ -477,9 +706,9 @@ const DisplayProducts = ({ display = {} }) => {
                         total={totals.status_working}
                         status_working={statusWorking}
                         status_out={statusOut}
+                        onTransition={applyLocalQueueTransition}
                         onPrint={handlePrintQueueItem}
                         ppcColorsOverride={ppcColors}
-                        onReload={onRequest}
                     />
                 )}
             </ScrollView>
@@ -497,9 +726,9 @@ const DisplayProducts = ({ display = {} }) => {
                             total={totals.status_in}
                             status_in={statusIn}
                             status_working={statusWorking}
+                            onTransition={applyLocalQueueTransition}
                             onPrint={handlePrintQueueItem}
                             ppcColorsOverride={ppcColors}
-                            onReload={onRequest}
                         />
                     )}
 
@@ -508,9 +737,9 @@ const DisplayProducts = ({ display = {} }) => {
                             orders={orders.status_out}
                             total={totals.status_out}
                             status_in={statusOut}
+                            onTransition={applyLocalQueueTransition}
                             onPrint={handlePrintQueueItem}
                             ppcColorsOverride={ppcColors}
-                            onReload={onRequest}
                         />
                     )}
                 </SafeAreaView>

@@ -8,6 +8,7 @@ import { api } from '@controleonline/ui-common/src/api';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import {
     buildForcedDisplayParams,
+    doesDeviceConfigBelongToRuntime,
     doesDisplayBelongToCompany,
     normalizeEntityId,
     resolveForcedDisplayId,
@@ -23,12 +24,21 @@ const DisplayDetails = () => {
 
     const displayStore = useStore('displays');
     const deviceConfigStore = useStore('device_config');
+    const deviceStore = useStore('device');
     const { actions, getters } = displayStore;
     const { item: display } = getters;
     const { item: deviceConfig } = deviceConfigStore.getters;
+    const { item: currentDevice } = deviceStore.getters;
     const forcedDisplayId = useMemo(
-        () => resolveForcedDisplayId(deviceConfig),
-        [deviceConfig?.configs],
+        () =>
+            doesDeviceConfigBelongToRuntime(deviceConfig, {
+                companyId: currentCompany?.id,
+                deviceId: currentDevice?.id || currentDevice?.device,
+                type: 'DISPLAY',
+            })
+                ? resolveForcedDisplayId(deviceConfig)
+                : null,
+        [currentCompany?.id, currentDevice?.device, currentDevice?.id, deviceConfig],
     );
     const isForcedDisplay = forcedDisplayId !== null && displayId === forcedDisplayId;
     const effectiveDisplayType = String(display?.displayType || routeDisplayType || '').toLowerCase();

@@ -20,6 +20,7 @@ import { withOpacity } from '@controleonline/../../src/styles/branding';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import {
   buildForcedDisplayParams,
+  doesDeviceConfigBelongToRuntime,
   doesDisplayBelongToCompany,
   normalizeEntityId,
   resolveForcedDisplayId,
@@ -32,17 +33,26 @@ const DisplaysPage = () => {
   const displaysStore = useStore('displays');
   const displayQueuesStore = useStore('display_queues');
   const deviceConfigStore = useStore('device_config');
+  const deviceStore = useStore('device');
   const navigation = useNavigation();
   const { ppcColors, brandColors, currentCompany } = useDisplayTheme();
 
   const { actions, items, isLoading, error } = displaysStore;
   const { actions: displayQueuesActions } = displayQueuesStore;
   const { item: deviceConfig } = deviceConfigStore.getters;
+  const { item: currentDevice } = deviceStore.getters;
   const [displayQueuesRows, setDisplayQueuesRows] = useState([]);
   const [visibleCount, setVisibleCount] = useState(50);
   const forcedDisplayId = useMemo(
-    () => resolveForcedDisplayId(deviceConfig),
-    [deviceConfig?.configs],
+    () =>
+      doesDeviceConfigBelongToRuntime(deviceConfig, {
+        companyId: currentCompany?.id,
+        deviceId: currentDevice?.id || currentDevice?.device,
+        type: 'DISPLAY',
+      })
+        ? resolveForcedDisplayId(deviceConfig)
+        : null,
+    [currentCompany?.id, currentDevice?.device, currentDevice?.id, deviceConfig],
   );
 
   const styles = useMemo(

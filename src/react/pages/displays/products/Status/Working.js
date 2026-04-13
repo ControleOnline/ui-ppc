@@ -30,8 +30,8 @@ const Working = ({
     total = 0,
     status_working,
     status_out,
+    onTransition = null,
     onPrint = null,
-    onReload,
     ppcColorsOverride = null,
 }) => {
     const store = useStore('order_products_queue');
@@ -41,11 +41,14 @@ const Working = ({
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
     const finalize = async order => {
-        await actions.save({
+        const updatedQueueItem = await actions.save({
             id: order.id,
             status: status_out['@id'],
         });
-        onReload();
+
+        if (typeof onTransition === 'function') {
+            onTransition(updatedQueueItem, 'status_working', 'status_out');
+        }
     };
 
     return (
