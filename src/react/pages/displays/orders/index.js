@@ -26,6 +26,13 @@ import { useDisplayPrint } from '../useDisplayPrint'
 import DisplayPrinterSelectionModal from '../DisplayPrinterSelectionModal'
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
 const normalizeText = value => String(value || '').trim()
+const formatDebugClock = value => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '--'
+
+  const pad = entry => String(entry).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
 
 const TV_LAYOUT_GAP = 8
@@ -395,7 +402,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const queuesStore = useStore('queues')
   const ordersStore = useStore('orders')
   const websocketStore = useStore('websocket')
+  const runtimeDebugStore = useStore('runtime_debug')
   const { getters, actions } = queuesStore
+  const runtimeDebugActions = runtimeDebugStore.actions
   const { isLoading, messages: queueMessages } = getters
   const ordersActions = ordersStore.actions
   const ordersMessages = ordersStore?.getters?.messages
@@ -468,12 +477,27 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const showSkeleton = isLoading && (!Array.isArray(orders) || orders.length === 0)
 
   const noteRefresh = useCallback((source, detail = '') => {
+    const updatedAt = new Date().toISOString()
     setRefreshDebug({
-      lastAt: new Date().toISOString(),
+      lastAt: updatedAt,
       lastSource: source || 'manual',
       lastDetail: detail || '',
     })
-  }, [])
+    runtimeDebugActions.setFooterEntry({
+      key: 'screen-refresh',
+      order: 20,
+      updatedAt,
+      lines: [
+        `ultimo refresh: ${formatDebugClock(updatedAt)} | origem: ${source || 'manual'}${detail ? ` (${detail})` : ''}`,
+      ],
+    })
+  }, [runtimeDebugActions])
+
+  useEffect(() => {
+    return () => {
+      runtimeDebugActions.clearFooterEntry('screen-refresh')
+    }
+  }, [runtimeDebugActions])
 
   const fetchOrders = useCallback((source = 'manual', detail = '') => {
     if (!displayId || !currentCompany?.id) return

@@ -27,6 +27,10 @@ const DISPLAY_DEVICE_LINK_CONFIG_KEY = 'display-id';
 const DISPLAY_DEVICE_PRINTER_CONFIG_KEY = 'printer';
 const PRINT_JOB_TYPE_ORDER = 'order';
 const PRINT_JOB_TYPE_ORDER_PRODUCT = 'order-product';
+const getDeviceConfigType = deviceConfig =>
+  String(deviceConfig?.type || deviceConfig?.device?.type || '')
+    .trim()
+    .toUpperCase();
 
 const normalizePrintIds = value =>
   (Array.isArray(value) ? value : [value])
@@ -85,9 +89,7 @@ const resolveDisplayDeviceConfig = ({
 
   const matchingConfigs = filterDeviceConfigsByCompany(deviceConfigs, companyId)
     .filter(deviceConfig => {
-      const deviceType = String(deviceConfig?.device?.type || '')
-        .trim()
-        .toUpperCase();
+      const deviceType = getDeviceConfigType(deviceConfig);
 
       if (deviceType !== DISPLAY_DEVICE_TYPE) {
         return false;
@@ -261,6 +263,10 @@ export const useDisplayPrint = ({display = null} = {}) => {
       managerDeviceId,
     ],
   );
+  const configTargetDeviceType = useMemo(
+    () => getDeviceConfigType(effectiveDeviceConfig),
+    [effectiveDeviceConfig],
+  );
 
   const closePrinterSelection = useCallback(() => {
     if (isSavingPrinterSelection) {
@@ -332,6 +338,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
             await printActions.printOrderProduct({
               id: normalizedRequest.orderProductId,
               device: targetManagerDeviceId,
+              type: configTargetDeviceType,
               ...(normalizedRequest.orderProductQueueIds.length > 0
                 ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
                 : {}),
@@ -340,6 +347,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
             await printActions.printOrder({
               id: normalizedRequest.orderId,
               device: targetManagerDeviceId,
+              type: configTargetDeviceType,
               ...(normalizedRequest.queueIds.length > 0
                 ? {queueIds: normalizedRequest.queueIds}
                 : {}),
@@ -359,6 +367,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
             id: normalizedRequest.orderProductId,
             orderProductId: normalizedRequest.orderProductId,
             device: targetPrinterDeviceId,
+            deviceType: targetAttachedPrinter?.type,
             ...(normalizedRequest.orderProductQueueIds.length > 0
               ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
               : {}),
@@ -369,6 +378,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
             id: normalizedRequest.orderId,
             orderId: normalizedRequest.orderId,
             device: targetPrinterDeviceId,
+            deviceType: targetAttachedPrinter?.type,
             ...(normalizedRequest.queueIds.length > 0
               ? {queueIds: normalizedRequest.queueIds}
               : {}),
@@ -405,6 +415,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
             ? await printActions.printOrderProduct({
                 id: normalizedRequest.orderProductId,
                 device: targetPrinterDeviceId,
+                type: targetAttachedPrinter?.type,
                 ...(normalizedRequest.orderProductQueueIds.length > 0
                   ? {orderProductQueueIds: normalizedRequest.orderProductQueueIds}
                   : {}),
@@ -412,6 +423,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
             : await printActions.printOrder({
                 id: normalizedRequest.orderId,
                 device: targetPrinterDeviceId,
+                type: targetAttachedPrinter?.type,
                 ...(normalizedRequest.queueIds.length > 0
                   ? {queueIds: normalizedRequest.queueIds}
                   : {}),
@@ -440,6 +452,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
     },
     [
       attachedPrinter,
+      configTargetDeviceType,
       currentDeviceId,
       openPrinterSelection,
       printActions,
@@ -481,6 +494,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
         await deviceConfigActions.addDeviceConfigs({
           device: configTargetDeviceId,
           people: `/people/${currentCompany.id}`,
+          type: configTargetDeviceType,
           configs: JSON.stringify({
             [DISPLAY_DEVICE_PRINTER_CONFIG_KEY]: nextPrinterDeviceId,
             ...(selectedDisplayId
@@ -520,6 +534,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
     },
     [
       configTargetDeviceId,
+      configTargetDeviceType,
       currentCompany?.id,
       deviceConfigActions,
       executePrintJob,

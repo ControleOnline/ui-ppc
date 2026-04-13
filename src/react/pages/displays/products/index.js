@@ -21,6 +21,15 @@ import DisplayPrinterSelectionModal from '../DisplayPrinterSelectionModal';
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar';
 
 const normalizeText = value => String(value || '').trim();
+const formatDebugClock = value => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '--';
+    }
+
+    const pad = entry => String(entry).padStart(2, '0');
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
 
 const DISPLAY_QUEUE_FETCH_PAGE_SIZE = 50;
 const DISPLAY_QUEUE_FETCH_MAX_PAGES = 10;
@@ -143,12 +152,14 @@ const DisplayProducts = ({ display = {} }) => {
     const queuesStore = useStore('queues');
     const displayQueueStore = useStore('display_queues');
     const websocketStore = useStore('websocket');
+    const runtimeDebugStore = useStore('runtime_debug');
     const { ppcColors } = useDisplayTheme();
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
     const { currentCompany } = peopleStore.getters;
     const { actions: queuesActions, getters: queuesGetters } = queuesStore;
     const { actions: displayQueueActions, getters: displayQueueGetters } = displayQueueStore;
+    const runtimeDebugActions = runtimeDebugStore.actions;
     const queueMessages = queuesGetters?.messages;
     const displayQueueMessages = displayQueueGetters?.messages;
     const websocketStatus = websocketStore?.getters?.summary || {};
@@ -225,12 +236,27 @@ const DisplayProducts = ({ display = {} }) => {
 
     // 🔥 REQUEST SEM FLICKER
     const noteRefresh = useCallback((source, detail = '') => {
+        const updatedAt = new Date().toISOString();
         setRefreshDebug({
-            lastAt: new Date().toISOString(),
+            lastAt: updatedAt,
             lastSource: source || 'manual',
             lastDetail: detail || '',
         });
-    }, []);
+        runtimeDebugActions.setFooterEntry({
+            key: 'screen-refresh',
+            order: 20,
+            updatedAt,
+            lines: [
+                `ultimo refresh: ${formatDebugClock(updatedAt)} | origem: ${source || 'manual'}${detail ? ` (${detail})` : ''}`,
+            ],
+        });
+    }, [runtimeDebugActions]);
+
+    useEffect(() => {
+        return () => {
+            runtimeDebugActions.clearFooterEntry('screen-refresh');
+        };
+    }, [runtimeDebugActions]);
 
     const onRequest = useCallback(async (source = 'manual', detail = '') => {
         if (!currentCompany?.id || !displayId) {
