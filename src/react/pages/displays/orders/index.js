@@ -24,6 +24,7 @@ import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayT
 import { withOpacity } from '@controleonline/../../src/styles/branding'
 import { useDisplayPrint } from '../useDisplayPrint'
 import DisplayPrinterSelectionModal from '../DisplayPrinterSelectionModal'
+import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
 const normalizeText = value => String(value || '').trim()
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
 
@@ -326,9 +327,13 @@ const resolveTvLayoutMetrics = ({
   height,
   summaryHeight,
   sectionHeight,
+  footerHeight = 0,
 }) => {
   const contentWidth = Math.max(220, Math.round(width - 24))
-  const availableHeight = Math.max(140, Math.round(height - summaryHeight - sectionHeight - 20))
+  const availableHeight = Math.max(
+    140,
+    Math.round(height - summaryHeight - sectionHeight - footerHeight - 20),
+  )
 
   let columns = getTvBaseColumns(width)
   while (
@@ -412,7 +417,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const [visibleCount, setVisibleCount] = useState(50)
   const [summaryHeight, setSummaryHeight] = useState(0)
   const [sectionTitleHeight, setSectionTitleHeight] = useState(0)
+  const [debugBarHeight, setDebugBarHeight] = useState(0)
   const [tvCurrentPage, setTvCurrentPage] = useState(0)
+  const [refreshDebug, setRefreshDebug] = useState({
+    lastAt: null,
+    lastSource: 'boot',
+    lastDetail: 'startup',
+  })
   const tvMode =
     Boolean(isTvDisplay) || String(display?.displayType || '').toLowerCase() === 'tv'
 
@@ -436,8 +447,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       height: effectiveHeight,
       summaryHeight,
       sectionHeight: sectionTitleHeight,
+      footerHeight: tvMode ? debugBarHeight : 0,
     })
-  }, [effectiveHeight, effectiveWidth, sectionTitleHeight, summaryHeight, tvMode])
+  }, [debugBarHeight, effectiveHeight, effectiveWidth, sectionTitleHeight, summaryHeight, tvMode])
 
   const columns = useMemo(() => {
     if (tvMode) {
@@ -455,7 +467,15 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
   const showSkeleton = isLoading && (!Array.isArray(orders) || orders.length === 0)
 
-  const fetchOrders = useCallback(() => {
+  const noteRefresh = useCallback((source, detail = '') => {
+    setRefreshDebug({
+      lastAt: new Date().toISOString(),
+      lastSource: source || 'manual',
+      lastDetail: detail || '',
+    })
+  }, [])
+
+  const fetchOrders = useCallback((source = 'manual', detail = '') => {
     if (!displayId || !currentCompany?.id) return
 
     setVisibleCount(50)
@@ -467,8 +487,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       })
       .then(data => {
         setOrders(Array.isArray(data) ? data : [])
+        noteRefresh(source, detail)
       })
-  }, [actions, currentCompany?.id, displayId])
+  }, [actions, currentCompany?.id, displayId, noteRefresh])
 
   const sortedOrders = useMemo(() => {
     if (!Array.isArray(orders)) return []
@@ -558,9 +579,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
     actions.setMessages(removeConsumedMessages(queueMessages, currentCompany?.id))
     ordersActions.setMessages(removeConsumedMessages(ordersMessages, currentCompany?.id))
+    const refreshSources = [
+      hasQueueRefreshMessage ? 'queues' : '',
+      hasOrderRefreshMessage ? 'orders' : '',
+    ].filter(Boolean)
 
     const refreshTimeout = setTimeout(() => {
-      fetchOrders()
+      fetchOrders('socket', refreshSources.join('+'))
     }, 220)
 
     return () => clearTimeout(refreshTimeout)
@@ -577,11 +602,14 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
   useFocusEffect(
     useCallback(() => {
-      fetchOrders()
+      fetchOrders('focus', 'screen-focus')
       const refreshIntervalMs = websocketConnected ? 30000 : 20000
 
       const interval = setInterval(() => {
-        fetchOrders()
+        fetchOrders(
+          'interval',
+          websocketConnected ? 'connected-poll' : 'fallback-poll',
+        )
       }, refreshIntervalMs)
 
       return () => clearInterval(interval)
@@ -963,6 +991,25 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
           ppcColorsOverride={ppcColors}
         />
       )}
+
+      <View
+        onLayout={
+          tvMode
+            ? event =>
+                updateMeasuredLayoutSize(
+                  setDebugBarHeight,
+                  event?.nativeEvent?.layout?.height,
+                )
+            : undefined
+        }
+      >
+        <RealtimeDebugBar
+          companyId={currentCompany?.id}
+          ppcColors={ppcColors}
+          refreshState={refreshDebug}
+          websocketStatus={websocketStatus}
+        />
+      </View>
     </SafeAreaView>
   )
 }

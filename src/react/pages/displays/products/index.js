@@ -18,6 +18,7 @@ import Working from './Status/Working';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import { useDisplayPrint } from '../useDisplayPrint';
 import DisplayPrinterSelectionModal from '../DisplayPrinterSelectionModal';
+import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar';
 
 const normalizeText = value => String(value || '').trim();
 
@@ -139,13 +140,16 @@ const DisplayProducts = ({ display = {} }) => {
     );
 
     const peopleStore = useStore('people');
+    const queuesStore = useStore('queues');
     const displayQueueStore = useStore('display_queues');
     const websocketStore = useStore('websocket');
     const { ppcColors } = useDisplayTheme();
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
     const { currentCompany } = peopleStore.getters;
+    const { actions: queuesActions, getters: queuesGetters } = queuesStore;
     const { actions: displayQueueActions, getters: displayQueueGetters } = displayQueueStore;
+    const queueMessages = queuesGetters?.messages;
     const displayQueueMessages = displayQueueGetters?.messages;
     const websocketStatus = websocketStore?.getters?.summary || {};
     const websocketConnected = Boolean(websocketStatus?.connected);
@@ -181,6 +185,11 @@ const DisplayProducts = ({ display = {} }) => {
         status_working: 0,
         status_out: 0,
     });
+    const [refreshDebug, setRefreshDebug] = useState({
+        lastAt: null,
+        lastSource: 'boot',
+        lastDetail: 'startup',
+    });
 
     const getResponsiveItemsPerPage = () => 6;
 
@@ -215,7 +224,15 @@ const DisplayProducts = ({ display = {} }) => {
     }, [orders]);
 
     // 🔥 REQUEST SEM FLICKER
-    const onRequest = useCallback(async () => {
+    const noteRefresh = useCallback((source, detail = '') => {
+        setRefreshDebug({
+            lastAt: new Date().toISOString(),
+            lastSource: source || 'manual',
+            lastDetail: detail || '',
+        });
+    }, []);
+
+    const onRequest = useCallback(async (source = 'manual', detail = '') => {
         if (!currentCompany?.id || !displayId) {
             return;
         }
@@ -288,7 +305,16 @@ const DisplayProducts = ({ display = {} }) => {
         setStatusIn(_statusIn);
         setStatusWorking(_statusWorking);
         setStatusOut(_statusOut);
-    }, [currentCompany?.id, displayId, displayQueueActions]);
+        noteRefresh(source, detail);
+    }, [currentCompany?.id, displayId, displayQueueActions, noteRefresh]);
+
+    const hasQueueRefreshMessage = useMemo(
+        () =>
+            (Array.isArray(queueMessages) ? queueMessages : []).some(message =>
+                isMessageForCompany(message, currentCompany?.id)
+            ),
+        [currentCompany?.id, queueMessages]
+    );
 
     const hasDisplayQueueRefreshMessage = useMemo(
         () =>
@@ -331,15 +357,26 @@ const DisplayProducts = ({ display = {} }) => {
     );
 
     useEffect(() => {
-        if (isSaving || (!hasDisplayQueueRefreshMessage && !hasOrderProductQueueRefreshMessage)) {
+        if (
+            isSaving ||
+            (!hasQueueRefreshMessage &&
+                !hasDisplayQueueRefreshMessage &&
+                !hasOrderProductQueueRefreshMessage)
+        ) {
             return;
         }
 
+        queuesActions.setMessages(removeConsumedMessages(queueMessages, currentCompany?.id));
         displayQueueActions.setMessages(removeConsumedMessages(displayQueueMessages, currentCompany?.id));
         actions.setMessages(removeConsumedMessages(orderProductQueueMessages, currentCompany?.id));
+        const refreshSources = [
+            hasQueueRefreshMessage ? 'queues' : '',
+            hasDisplayQueueRefreshMessage ? 'display_queues' : '',
+            hasOrderProductQueueRefreshMessage ? 'order_products_queue' : '',
+        ].filter(Boolean);
 
         const refreshTimeout = setTimeout(() => {
-            onRequest();
+            onRequest('socket', refreshSources.join('+'));
         }, 220);
 
         return () => clearTimeout(refreshTimeout);
@@ -348,23 +385,29 @@ const DisplayProducts = ({ display = {} }) => {
         currentCompany?.id,
         displayQueueActions,
         displayQueueMessages,
+        hasQueueRefreshMessage,
         hasDisplayQueueRefreshMessage,
         hasOrderProductQueueRefreshMessage,
         isSaving,
         onRequest,
         orderProductQueueMessages,
+        queueMessages,
+        queuesActions,
     ]);
 
     // 🔥 PRIMEIRA CARGA
     useFocusEffect(
         useCallback(() => {
             if (!currentCompany?.id) return undefined;
-            onRequest();
+            onRequest('focus', 'screen-focus');
             const refreshIntervalMs = websocketConnected ? 30000 : 20000;
 
             const interval = setInterval(() => {
                 if (!isSaving) {
-                    onRequest();
+                    onRequest(
+                        'interval',
+                        websocketConnected ? 'connected-poll' : 'fallback-poll'
+                    );
                 }
             }, refreshIntervalMs);
 
@@ -455,6 +498,13 @@ const DisplayProducts = ({ display = {} }) => {
                 onSelectPrinter={handleSelectPrinter}
                 onClose={closePrinterSelection}
                 ppcColorsOverride={ppcColors}
+            />
+
+            <RealtimeDebugBar
+                companyId={currentCompany?.id}
+                ppcColors={ppcColors}
+                refreshState={refreshDebug}
+                websocketStatus={websocketStatus}
             />
         </SafeAreaView>
     );
