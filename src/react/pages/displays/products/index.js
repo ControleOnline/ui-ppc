@@ -221,6 +221,7 @@ const DisplayProducts = ({ display = {} }) => {
     const previousSocketConnectedRef = useRef(websocketConnected);
     const autoStartingIdsRef = useRef(new Set());
     const applyLocalQueueTransitionRef = useRef(() => {});
+    const socketRefreshTimeoutRef = useRef(null);
 
     useEffect(() => {
         queueBindingsRef.current = {
@@ -235,6 +236,10 @@ const DisplayProducts = ({ display = {} }) => {
         requestQueueRef.current = null;
         requestInFlightRef.current = false;
         autoStartingIdsRef.current = new Set();
+        if (socketRefreshTimeoutRef.current) {
+            clearTimeout(socketRefreshTimeoutRef.current);
+            socketRefreshTimeoutRef.current = null;
+        }
     }, [currentCompany?.id, displayId]);
 
     const getResponsiveItemsPerPage = () => 6;
@@ -324,6 +329,10 @@ const DisplayProducts = ({ display = {} }) => {
     useEffect(() => {
         return () => {
             runtimeDebugActions.clearFooterEntry('screen-refresh');
+            if (socketRefreshTimeoutRef.current) {
+                clearTimeout(socketRefreshTimeoutRef.current);
+                socketRefreshTimeoutRef.current = null;
+            }
         };
     }, [runtimeDebugActions]);
 
@@ -629,11 +638,14 @@ const DisplayProducts = ({ display = {} }) => {
             hasOrderProductQueueRefreshMessage ? 'order_products_queue' : '',
         ].filter(Boolean);
 
-        const refreshTimeout = setTimeout(() => {
+        if (socketRefreshTimeoutRef.current) {
+            clearTimeout(socketRefreshTimeoutRef.current);
+        }
+
+        socketRefreshTimeoutRef.current = setTimeout(() => {
+            socketRefreshTimeoutRef.current = null;
             onRequest('socket', refreshSources.join('+'));
         }, 220);
-
-        return () => clearTimeout(refreshTimeout);
     }, [
         actions,
         currentCompany?.id,
