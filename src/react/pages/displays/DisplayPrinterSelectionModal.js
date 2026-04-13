@@ -12,6 +12,7 @@ import {useDisplayTheme} from '@controleonline/ui-ppc/src/react/theme/displayThe
 import {
   getDeviceTypeLabel,
   getPrinterLabel,
+  getPrinterOptionValue,
 } from '@controleonline/ui-common/src/react/utils/printerDevices';
 import {normalizeDeviceId} from '@controleonline/ui-common/src/react/utils/paymentDevices';
 
@@ -33,9 +34,10 @@ const DisplayPrinterSelectionModal = ({
 
   const renderPrinterItem = ({item}) => {
     const printerDeviceId = normalizeDeviceId(item?.device);
+    const printerOptionValue = normalizeDeviceId(getPrinterOptionValue(item));
     const isSelected =
-      printerDeviceId !== '' &&
-      printerDeviceId === normalizedSelectedPrinterDeviceId;
+      printerOptionValue !== '' &&
+      printerOptionValue === normalizedSelectedPrinterDeviceId;
 
     return (
       <Pressable
@@ -82,7 +84,9 @@ const DisplayPrinterSelectionModal = ({
               data={printers}
               renderItem={renderPrinterItem}
               keyExtractor={item =>
-                normalizeDeviceId(item?.device) || getPrinterLabel(item)
+                normalizeDeviceId(getPrinterOptionValue(item)) ||
+                normalizeDeviceId(item?.device) ||
+                getPrinterLabel(item)
               }
               contentContainerStyle={styles.listContent}
             />

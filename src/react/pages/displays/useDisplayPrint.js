@@ -11,7 +11,9 @@ import {
 import {
   DEFAULT_NETWORK_PRINTER_PORT,
   DISPLAY_DEVICE_TYPE,
+  findPrinterOptionByValue,
   getPrinterHost,
+  getPrinterOptionValue,
   getPrinterOptions,
   isPrinterDeviceType,
   NETWORK_PRINTER_PORT_CONFIG_KEY,
@@ -144,7 +146,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
   );
   const [isPrinterSelectionVisible, setPrinterSelectionVisible] = useState(false);
   const [isSavingPrinterSelection, setIsSavingPrinterSelection] = useState(false);
-  const [selectedPrinterDeviceIdOverride, setSelectedPrinterDeviceIdOverride] =
+  const [selectedPrinterValueOverride, setSelectedPrinterValueOverride] =
     useState('');
   const [pendingPrintRequest, setPendingPrintRequest] = useState(null);
   const selectedDisplayId = useMemo(
@@ -211,7 +213,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
     [currentDeviceId, managerDeviceId],
   );
 
-  const configuredPrinterDeviceId = useMemo(
+  const configuredPrinterValue = useMemo(
     () =>
       normalizeDeviceId(
         parseConfigsObject(effectiveDeviceConfig?.configs)?.[
@@ -220,12 +222,12 @@ export const useDisplayPrint = ({display = null} = {}) => {
       ),
     [effectiveDeviceConfig?.configs],
   );
-  const selectedPrinterDeviceId = useMemo(
+  const selectedPrinterValue = useMemo(
     () =>
       normalizeDeviceId(
-        selectedPrinterDeviceIdOverride || configuredPrinterDeviceId,
+        selectedPrinterValueOverride || configuredPrinterValue,
       ),
-    [configuredPrinterDeviceId, selectedPrinterDeviceIdOverride],
+    [configuredPrinterValue, selectedPrinterValueOverride],
   );
 
   const printerOptions = useMemo(
@@ -239,14 +241,11 @@ export const useDisplayPrint = ({display = null} = {}) => {
   );
 
   const attachedPrinter = useMemo(
-    () =>
-      printerOptions.find(
-        printer => normalizeDeviceId(printer?.device) === selectedPrinterDeviceId,
-      ) || null,
-    [printerOptions, selectedPrinterDeviceId],
+    () => findPrinterOptionByValue(printerOptions, selectedPrinterValue),
+    [printerOptions, selectedPrinterValue],
   );
 
-  const canPrint = Boolean(selectedPrinterDeviceId && attachedPrinter);
+  const canPrint = Boolean(selectedPrinterValue && attachedPrinter);
   const isNetworkPrinter = isPrinterDeviceType(attachedPrinter?.type);
   const configTargetDeviceId = useMemo(
     () =>
@@ -297,7 +296,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
       }
 
       const targetPrinterDeviceId = normalizeDeviceId(
-        overrides.printerDeviceId || selectedPrinterDeviceId,
+        overrides.printerDeviceId || attachedPrinter?.device,
       );
       const targetAttachedPrinter = overrides.attachedPrinter || attachedPrinter;
       const targetManagerDeviceId = normalizeDeviceId(
@@ -458,14 +457,14 @@ export const useDisplayPrint = ({display = null} = {}) => {
       printActions,
       resolvedManagerDeviceId,
       selectedDisplayId,
-      selectedPrinterDeviceId,
+      attachedPrinter?.device,
     ],
   );
 
   const handleSelectPrinter = useCallback(
     async printer => {
-      const nextPrinterDeviceId = normalizeDeviceId(printer?.device);
-      if (!nextPrinterDeviceId) {
+      const nextPrinterValue = normalizeDeviceId(getPrinterOptionValue(printer));
+      if (!nextPrinterValue) {
         Alert.alert('Impressao', 'Selecione uma impressora valida.');
         return false;
       }
@@ -486,9 +485,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
       setIsSavingPrinterSelection(true);
 
       const selectedPrinter =
-        printerOptions.find(
-          option => normalizeDeviceId(option?.device) === nextPrinterDeviceId,
-        ) || printer;
+        findPrinterOptionByValue(printerOptions, nextPrinterValue) || printer;
 
       try {
         await deviceConfigActions.addDeviceConfigs({
@@ -496,14 +493,14 @@ export const useDisplayPrint = ({display = null} = {}) => {
           people: `/people/${currentCompany.id}`,
           type: configTargetDeviceType,
           configs: JSON.stringify({
-            [DISPLAY_DEVICE_PRINTER_CONFIG_KEY]: nextPrinterDeviceId,
+            [DISPLAY_DEVICE_PRINTER_CONFIG_KEY]: nextPrinterValue,
             ...(selectedDisplayId
               ? {[DISPLAY_DEVICE_LINK_CONFIG_KEY]: selectedDisplayId}
               : {}),
           }),
         });
 
-        setSelectedPrinterDeviceIdOverride(nextPrinterDeviceId);
+        setSelectedPrinterValueOverride(nextPrinterValue);
         setPrinterSelectionVisible(false);
 
         deviceConfigActions
@@ -518,7 +515,7 @@ export const useDisplayPrint = ({display = null} = {}) => {
             ...queuedPrintJob,
             overrides: {
               attachedPrinter: selectedPrinter,
-              printerDeviceId: nextPrinterDeviceId,
+              printerDeviceId: normalizeDeviceId(selectedPrinter?.device),
               managerDeviceId: configTargetDeviceId,
             },
           });
@@ -574,6 +571,6 @@ export const useDisplayPrint = ({display = null} = {}) => {
     printOrderToAttachedPrinter,
     printOrderProductToAttachedPrinter,
     printerOptions,
-    selectedPrinterDeviceId,
+    selectedPrinterDeviceId: selectedPrinterValue,
   };
 };
