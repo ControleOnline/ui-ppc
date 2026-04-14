@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Card, Text, Button } from 'react-native-paper';
-import { useStore } from '@store';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import {
     resolveDisplayTicketSummary,
@@ -29,18 +28,21 @@ const InOut = ({
     total = 0,
     status_in,
     status_working,
+    saveQueueItem = null,
     onTransition = null,
     onPrint = null,
     ppcColorsOverride = null,
 }) => {
-    const store = useStore('order_products_queue');
-    const { actions } = store;
     const { ppcColors: defaultPpcColors } = usePpcTheme();
     const ppcColors = ppcColorsOverride || defaultPpcColors;
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
     const start = async order => {
-        const updatedQueueItem = await actions.save({
+        if (!status_working?.['@id'] || typeof saveQueueItem !== 'function') {
+            return;
+        }
+
+        const updatedQueueItem = await saveQueueItem({
             id: order.id,
             status: status_working['@id'],
         });
@@ -153,6 +155,7 @@ const InOut = ({
                                         textColor={ppcColors.pillTextDark}
                                         style={styles.actionButton}
                                         labelStyle={styles.actionLabel}
+                                        disabled={!status_working?.['@id'] || typeof saveQueueItem !== 'function'}
                                         onPress={() => start(order)}
                                     >
                                         Iniciar

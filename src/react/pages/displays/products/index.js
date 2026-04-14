@@ -34,26 +34,7 @@ const formatDebugClock = value => {
 const DISPLAY_QUEUE_FETCH_PAGE_SIZE = 50;
 const DISPLAY_QUEUE_FETCH_MAX_PAGES = 10;
 
-const getQueueOrderRealStatus = queueItem => {
-    const order = queueItem?.order_product?.order || queueItem?.order || {};
-    const candidates = [
-        order?.status?.realStatus,
-        order?.status?.real_status,
-        order?.realStatus,
-        order?.real_status,
-    ];
-
-    return normalizeText(
-        candidates.find(value => normalizeText(value))
-    ).toLowerCase();
-};
-
-const isDisplayVisibleQueueItem = queueItem => getQueueOrderRealStatus(queueItem) === 'open';
-
-const filterDisplayVisibleQueueItems = items =>
-    (Array.isArray(items) ? items : []).filter(isDisplayVisibleQueueItem);
-
-const fetchDisplayVisibleQueueItems = async ({
+const fetchDisplayQueueItems = async ({
     statusIds,
     queueIds,
     providerId,
@@ -82,12 +63,9 @@ const fetchDisplayVisibleQueueItems = async ({
         });
 
         const pageItems = Array.isArray(response?.member) ? response.member : [];
-        visibleItems.push(...filterDisplayVisibleQueueItems(pageItems));
+        visibleItems.push(...pageItems);
 
-        const responseTotalItems = Number(response?.totalItems);
-        const totalItems = Number.isFinite(responseTotalItems) && responseTotalItems > 0
-            ? responseTotalItems
-            : pageItems.length;
+        const totalItems = Number(response?.totalItems) || pageItems.length;
         const fetchedCount = ((page - 1) * itemsPerPage) + pageItems.length;
         const hasMorePages = pageItems.length === itemsPerPage && fetchedCount < totalItems;
 
@@ -409,8 +387,7 @@ const DisplayProducts = ({ display = {} }) => {
 
         if (
             normalizedTargetStage &&
-            Array.isArray(nextQueueState[normalizedTargetStage]) &&
-            isDisplayVisibleQueueItem(nextQueueItem)
+            Array.isArray(nextQueueState[normalizedTargetStage])
         ) {
             nextQueueState[normalizedTargetStage] = [
                 nextQueueItem,
@@ -500,18 +477,18 @@ const DisplayProducts = ({ display = {} }) => {
             refreshSources.has('display_queues')
         );
 
-        const [visibleInOrders, visibleWorkingOrders, visibleOutOrders] = await Promise.all([
-            fetchDisplayVisibleQueueItems({
+        const [inOrders, workingOrders, outOrders] = await Promise.all([
+            fetchDisplayQueueItems({
                 statusIds: queueBindings.inIds,
                 queueIds: queueBindings.queueIds,
                 providerId: currentCompany?.id,
             }),
-            fetchDisplayVisibleQueueItems({
+            fetchDisplayQueueItems({
                 statusIds: queueBindings.workingIds,
                 queueIds: queueBindings.queueIds,
                 providerId: currentCompany?.id,
             }),
-            fetchDisplayVisibleQueueItems({
+            fetchDisplayQueueItems({
                 statusIds: queueBindings.outIds,
                 queueIds: queueBindings.queueIds,
                 providerId: currentCompany?.id,
@@ -519,9 +496,9 @@ const DisplayProducts = ({ display = {} }) => {
         ]);
 
         applyQueueSnapshot({
-            status_in: visibleInOrders,
-            status_working: visibleWorkingOrders,
-            status_out: visibleOutOrders,
+            status_in: inOrders,
+            status_working: workingOrders,
+            status_out: outOrders,
         }, { markLoaded: true });
 
         setStatusIn(queueBindings.statusIn);
@@ -614,6 +591,11 @@ const DisplayProducts = ({ display = {} }) => {
             });
         },
         [printOrderProductToAttachedPrinter]
+    );
+
+    const saveQueueItem = useCallback(
+        payload => actions.save(payload),
+        [actions]
     );
 
     useEffect(() => {
@@ -718,6 +700,7 @@ const DisplayProducts = ({ display = {} }) => {
                         total={totals.status_working}
                         status_working={statusWorking}
                         status_out={statusOut}
+                        saveQueueItem={saveQueueItem}
                         onTransition={applyLocalQueueTransition}
                         onPrint={handlePrintQueueItem}
                         ppcColorsOverride={ppcColors}
@@ -738,6 +721,7 @@ const DisplayProducts = ({ display = {} }) => {
                             total={totals.status_in}
                             status_in={statusIn}
                             status_working={statusWorking}
+                            saveQueueItem={saveQueueItem}
                             onTransition={applyLocalQueueTransition}
                             onPrint={handlePrintQueueItem}
                             ppcColorsOverride={ppcColors}
@@ -749,6 +733,7 @@ const DisplayProducts = ({ display = {} }) => {
                             orders={orders.status_out}
                             total={totals.status_out}
                             status_in={statusOut}
+                            saveQueueItem={saveQueueItem}
                             onTransition={applyLocalQueueTransition}
                             onPrint={handlePrintQueueItem}
                             ppcColorsOverride={ppcColors}
