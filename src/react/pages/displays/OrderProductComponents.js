@@ -7,6 +7,48 @@ import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 const DEFAULT_GROUP_KEY = 'default-group';
 
 const normalizeText = value => String(value || '').trim();
+const getProductCategoryLabel = product =>
+    normalizeText(
+        product?.product?.category?.name ||
+        product?.product?.category?.category ||
+        product?.category?.name ||
+        product?.category?.category ||
+        product?.product?.productCategory?.category?.name ||
+        product?.product?.productCategory?.category?.category ||
+        product?.product?.productCategories?.[0]?.category?.name ||
+        product?.product?.productCategories?.[0]?.category?.category ||
+        product?.productCategory?.category?.name ||
+        product?.productCategory?.category?.category ||
+        product?.product?.categoryName ||
+        '',
+    );
+
+const getProductGroupLabel = product =>
+    normalizeText(
+        product?.productGroup?.productGroup ||
+        product?.productGroup?.name ||
+        product?.productGroupName ||
+        product?.groupName ||
+        '',
+    );
+
+const getProductBucketLabel = product =>
+    getProductCategoryLabel(product) || getProductGroupLabel(product) || 'Outros';
+
+const getProductBucketKey = product =>
+    normalizeText(
+        product?.product?.category?.id ||
+        product?.product?.category?.['@id'] ||
+        product?.category?.id ||
+        product?.category?.['@id'] ||
+        product?.product?.productCategory?.category?.id ||
+        product?.product?.productCategory?.category?.['@id'] ||
+        product?.product?.productCategories?.[0]?.category?.id ||
+        product?.product?.productCategories?.[0]?.category?.['@id'] ||
+        product?.productCategory?.category?.id ||
+        product?.productCategory?.category?.['@id'] ||
+        getProductBucketLabel(product),
+    ) || DEFAULT_GROUP_KEY;
 
 const formatQuantity = value => {
     const numericValue = Number(value);
@@ -22,8 +64,8 @@ const formatQuantity = value => {
 const groupProducts = products => {
     const groupedMap = (Array.isArray(products) ? products : []).reduce(
         (currentGroups, product) => {
-            const groupId = String(product?.productGroup?.id || DEFAULT_GROUP_KEY);
-            const groupLabel = normalizeText(product?.productGroup?.productGroup);
+            const groupId = String(getProductBucketKey(product));
+            const groupLabel = getProductBucketLabel(product);
 
             if (!currentGroups[groupId]) {
                 currentGroups[groupId] = {

@@ -54,6 +54,22 @@ const OrderProducts = ({ order, styles, showDetails = false }) => {
             '',
         )
 
+    const getCategoryLabel = node =>
+        normalizeText(
+            node?.product?.category?.name ||
+            node?.product?.category?.category ||
+            node?.category?.name ||
+            node?.category?.category ||
+            node?.product?.productCategory?.category?.name ||
+            node?.product?.productCategory?.category?.category ||
+            node?.product?.productCategories?.[0]?.category?.name ||
+            node?.product?.productCategories?.[0]?.category?.category ||
+            node?.productCategory?.category?.name ||
+            node?.productCategory?.category?.category ||
+            node?.product?.categoryName ||
+            '',
+        )
+
     const getGroupLabel = node =>
         normalizeText(
             node?.productGroup?.productGroup ||
@@ -62,6 +78,9 @@ const OrderProducts = ({ order, styles, showDetails = false }) => {
             node?.groupName ||
             '',
         ) || 'Outros'
+
+    const getChildBucketLabel = node =>
+        getCategoryLabel(node) || getGroupLabel(node)
 
     const getParentReference = node =>
         node?.parentProduct || node?.productGroup?.parentProduct || null
@@ -225,7 +244,7 @@ const OrderProducts = ({ order, styles, showDetails = false }) => {
             const quantity = Number(item?.quantity || 0)
             const unitPrice = toMoney(item?.value ?? item?.price)
             const totalPrice = toMoney(item?.total ?? (unitPrice * quantity))
-            const groupLabel = getGroupLabel(item)
+            const groupLabel = getChildBucketLabel(item)
 
             if (!card.groups.has(groupLabel)) {
                 card.groups.set(groupLabel, {

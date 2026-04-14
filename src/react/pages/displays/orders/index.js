@@ -37,6 +37,34 @@ import {
   DISPLAY_MIN_COLUMNS_CONFIG_KEY,
 } from '@controleonline/ui-ppc/src/react/utils/forcedDisplay'
 const normalizeText = value => String(value || '').trim()
+const getOrderProductCategoryLabel = item =>
+  normalizeText(
+    item?.product?.category?.name ||
+    item?.product?.category?.category ||
+    item?.category?.name ||
+    item?.category?.category ||
+    item?.product?.productCategory?.category?.name ||
+    item?.product?.productCategory?.category?.category ||
+    item?.product?.productCategories?.[0]?.category?.name ||
+    item?.product?.productCategories?.[0]?.category?.category ||
+    item?.productCategory?.category?.name ||
+    item?.productCategory?.category?.category ||
+    item?.product?.categoryName ||
+    '',
+  )
+
+const getOrderProductGroupLabel = item =>
+  normalizeText(
+    item?.productGroup?.productGroup ||
+    item?.productGroup?.name ||
+    item?.productGroupName ||
+    item?.groupName ||
+    '',
+  )
+
+const getOrderProductBucketLabel = item =>
+  getOrderProductCategoryLabel(item) || getOrderProductGroupLabel(item) || 'Outros'
+
 const formatDebugClock = value => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '--'
@@ -259,7 +287,7 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
 
     // se tiver grupo → organizar
     if (item?.productGroup) {
-      const groupName = normalizeText(item?.productGroup?.productGroup || 'Outros')
+      const groupName = getOrderProductBucketLabel(item)
 
       if (!parent.groups[groupName]) {
         parent.groups[groupName] = []
