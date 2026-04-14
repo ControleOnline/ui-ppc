@@ -1,4 +1,5 @@
 export const DISPLAY_DEVICE_LINK_CONFIG_KEY = 'display-id';
+export const DISPLAY_MIN_COLUMNS_CONFIG_KEY = 'display-min-columns';
 
 const normalizeDeviceId = value =>
   String(value?.device || value?.id || value || '').trim();

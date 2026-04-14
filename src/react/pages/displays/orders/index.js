@@ -15,6 +15,7 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useStore } from '@store'
 import Formatter from '@controleonline/ui-common/src/utils/formatter'
+import { parseConfigsObject } from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
 import {
   getOrderChannelLabel,
   getOrderChannelLogo,
@@ -22,9 +23,19 @@ import {
 import { resolveDisplayedOrderStatus } from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
+import { DISPLAY_DEVICE_TYPE } from '@controleonline/ui-common/src/react/utils/printerDevices'
+import {
+  filterDeviceConfigsByCompany,
+  normalizeDeviceId,
+  normalizeEntityId,
+} from '@controleonline/ui-common/src/react/utils/paymentDevices'
 import { useDisplayPrint } from '../useDisplayPrint'
 import DisplayPrinterSelectionModal from '../DisplayPrinterSelectionModal'
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
+import {
+  DISPLAY_DEVICE_LINK_CONFIG_KEY,
+  DISPLAY_MIN_COLUMNS_CONFIG_KEY,
+} from '@controleonline/ui-ppc/src/react/utils/forcedDisplay'
 const normalizeText = value => String(value || '').trim()
 const formatDebugClock = value => {
   const date = new Date(value)
@@ -34,12 +45,57 @@ const formatDebugClock = value => {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
+const parsePositiveInteger = value => {
+  const normalized = String(value || '').replace(/\D+/g, '').trim()
+  if (!normalized) return null
+
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
 
 const TV_LAYOUT_GAP = 8
 const TV_MIN_CARD_WIDTH = 300
 const TV_MIN_CARD_HEIGHT = 240
 const TV_BASE_PAGE_ROTATION_MS = 9000
 const TV_MAX_PAGE_ROTATION_MS = 22000
+
+const resolveDisplayDeviceConfig = ({
+  deviceConfigs = [],
+  companyId,
+  currentDeviceId,
+  displayId,
+}) => {
+  const normalizedDisplayId = normalizeEntityId(displayId)
+  if (!normalizedDisplayId) {
+    return null
+  }
+
+  const matchingConfigs = filterDeviceConfigsByCompany(deviceConfigs, companyId)
+    .filter(deviceConfig => {
+      const deviceType = String(deviceConfig?.type || deviceConfig?.device?.type || '')
+        .trim()
+        .toUpperCase()
+
+      if (deviceType !== DISPLAY_DEVICE_TYPE) {
+        return false
+      }
+
+      const configs = parseConfigsObject(deviceConfig?.configs)
+      return normalizeEntityId(configs?.[DISPLAY_DEVICE_LINK_CONFIG_KEY]) === normalizedDisplayId
+    })
+
+  if (matchingConfigs.length === 0) {
+    return null
+  }
+
+  return (
+    matchingConfigs.find(
+      deviceConfig =>
+        normalizeDeviceId(deviceConfig?.device?.device) ===
+        normalizeDeviceId(currentDeviceId),
+    ) || matchingConfigs[0]
+  )
+}
 
 const getOrderRealStatus = order => {
   const candidates = [
@@ -401,6 +457,8 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const peopleStore = useStore('people')
   const queuesStore = useStore('queues')
   const ordersStore = useStore('orders')
+  const deviceConfigStore = useStore('device_config')
+  const deviceStore = useStore('device')
   const websocketStore = useStore('websocket')
   const runtimeDebugStore = useStore('runtime_debug')
   const { getters, actions } = queuesStore
@@ -408,6 +466,8 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const { isLoading, messages: queueMessages } = getters
   const ordersActions = ordersStore.actions
   const ordersMessages = ordersStore?.getters?.messages
+  const companyDeviceConfigs = deviceConfigStore?.getters?.items || []
+  const currentDevice = deviceStore?.getters?.item || {}
   const websocketStatus = websocketStore?.getters?.summary || {}
   const websocketConnected = Boolean(websocketStatus?.connected)
   const { currentCompany } = peopleStore.getters
@@ -435,6 +495,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   })
   const tvMode =
     Boolean(isTvDisplay) || String(display?.displayType || '').toLowerCase() === 'tv'
+  const useTvPagedLayout = false
 
   const effectiveWidth = useMemo(() => {
     const screenWidth = Number(Dimensions.get('screen')?.width || 0)
@@ -448,8 +509,30 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     return Math.max(windowHeight, screenHeight)
   }, [height])
 
+  const selectedDisplayId = useMemo(
+    () => normalizeEntityId(display?.id || display?.['@id'] || displayId),
+    [display, displayId],
+  )
+
+  const linkedDisplayDeviceConfig = useMemo(
+    () =>
+      resolveDisplayDeviceConfig({
+        deviceConfigs: companyDeviceConfigs,
+        companyId: currentCompany?.id,
+        currentDeviceId: currentDevice?.id || currentDevice?.device,
+        displayId: selectedDisplayId,
+      }),
+    [
+      companyDeviceConfigs,
+      currentCompany?.id,
+      currentDevice?.device,
+      currentDevice?.id,
+      selectedDisplayId,
+    ],
+  )
+
   const tvLayout = useMemo(() => {
-    if (!tvMode) return null
+    if (!useTvPagedLayout) return null
 
     return resolveTvLayoutMetrics({
       width: effectiveWidth,
@@ -458,20 +541,30 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       sectionHeight: sectionTitleHeight,
       footerHeight: tvMode ? debugBarHeight : 0,
     })
-  }, [debugBarHeight, effectiveHeight, effectiveWidth, sectionTitleHeight, summaryHeight, tvMode])
+  }, [debugBarHeight, effectiveHeight, effectiveWidth, sectionTitleHeight, summaryHeight, tvMode, useTvPagedLayout])
+
+  const configuredMinColumns = useMemo(() => {
+    const configs = parseConfigsObject(linkedDisplayDeviceConfig?.configs)
+    return parsePositiveInteger(configs?.[DISPLAY_MIN_COLUMNS_CONFIG_KEY])
+  }, [linkedDisplayDeviceConfig?.configs])
 
   const columns = useMemo(() => {
-    if (tvMode) {
-      return tvLayout?.columns || 1
-    }
+    const responsiveColumns = useTvPagedLayout
+      ? (tvLayout?.columns || 1)
+      : effectiveWidth > 1920
+        ? 6
+        : effectiveWidth >= 1600
+          ? 5
+          : effectiveWidth >= 1200
+            ? 4
+            : effectiveWidth >= 800
+              ? 3
+              : effectiveWidth >= 600
+                ? 2
+                : 1
 
-    if (effectiveWidth >= 1920) return 6
-    if (effectiveWidth >= 1600) return 5
-    if (effectiveWidth >= 1200) return 4
-    if (effectiveWidth >= 800) return 3
-    if (effectiveWidth >= 600) return 2
-    return 1
-  }, [effectiveWidth, tvLayout?.columns, tvMode])
+    return Math.max(responsiveColumns, configuredMinColumns || 1)
+  }, [configuredMinColumns, effectiveWidth, tvLayout?.columns, useTvPagedLayout])
 
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
   const showSkeleton = isLoading && (!Array.isArray(orders) || orders.length === 0)
@@ -532,17 +625,17 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const listCount = sortedOrders.length
 
   const tvOrderSegments = useMemo(() => {
-    if (!tvMode || !tvLayout) return []
+    if (!useTvPagedLayout || !tvLayout) return []
 
     return buildTvOrderSegments(
       sortedOrders,
       tvLayout.maxUnitsPerCard,
       tvLayout.charsPerLine,
     )
-  }, [sortedOrders, tvLayout, tvMode])
+  }, [sortedOrders, tvLayout, useTvPagedLayout])
 
   const tvPages = useMemo(() => {
-    if (!tvMode || !tvLayout) return []
+    if (!useTvPagedLayout || !tvLayout) return []
 
     return chunkItems(tvOrderSegments, tvLayout.cardsPerPage).map(items => ({
       items,
@@ -551,7 +644,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         0,
       ),
     }))
-  }, [tvLayout, tvMode, tvOrderSegments])
+  }, [tvLayout, tvOrderSegments, useTvPagedLayout])
 
   const currentTvPage = useMemo(() => {
     if (!tvPages.length) return null
@@ -641,15 +734,15 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   )
 
   useEffect(() => {
-    if (!tvMode) return
+    if (!useTvPagedLayout) return
 
     setTvCurrentPage(previousPage =>
       previousPage >= tvPages.length ? 0 : previousPage,
     )
-  }, [tvMode, tvPages.length])
+  }, [tvPages.length, useTvPagedLayout])
 
   useEffect(() => {
-    if (!tvMode || tvPages.length <= 1) {
+    if (!useTvPagedLayout || tvPages.length <= 1) {
       return
     }
 
@@ -658,10 +751,11 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     }, tvPageRotationMs)
 
     return () => clearTimeout(timer)
-  }, [tvMode, tvPageRotationMs, tvPages.length, tvCurrentPage])
+  }, [tvPageRotationMs, tvPages.length, tvCurrentPage, useTvPagedLayout])
 
   const renderOrderCard = useCallback(
     (itemOrRenderInfo, cardStyle = null) => {
+      const compactMode = useTvPagedLayout
       const normalizedItem =
         itemOrRenderInfo?.item &&
         !itemOrRenderInfo?.order &&
@@ -680,7 +774,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       const channelLabel = String(getOrderChannelLabel(order) || 'SHOP').toUpperCase()
       const externalRef = truncateMiddle(getExternalOrderRef(order))
       const channelDisplay = externalRef ? `${channelLabel} (${externalRef})` : channelLabel
-      const products = normalizedItem?.products || getOrderProductsPreview(order, tvMode ? 3 : 5)
+      const products = normalizedItem?.products || getOrderProductsPreview(order, compactMode ? 3 : 5)
       const price = Number(order?.price || 0)
 
       return (
@@ -688,7 +782,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
           key={normalizedItem?.key || `order-card-${parseEntityId(order?.id) || segmentIndex}`}
           style={[
             styles.orderCard,
-            tvMode && styles.tvOrderCard,
+            compactMode && styles.tvOrderCard,
             cardStyle,
           ]}
         >
@@ -708,10 +802,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             }
           >
             <View style={[styles.orderAccentBar, { backgroundColor: statusVisual.textColor }]} />
-            <View style={[styles.orderCardInner, tvMode && styles.tvOrderCardInner]}>
-            <View style={[styles.orderTopRow, tvMode && styles.tvOrderTopRow]}>
+            <View style={[styles.orderCardInner, compactMode && styles.tvOrderCardInner]}>
+            <View style={[styles.orderTopRow, compactMode && styles.tvOrderTopRow]}>
               <View style={styles.orderIdentity}>
-                <View style={[styles.orderIconWrap, tvMode && styles.tvOrderIconWrap]}>
+                <View style={[styles.orderIconWrap, compactMode && styles.tvOrderIconWrap]}>
                   {channelLogo ? (
                     <Image source={channelLogo} style={styles.orderChannelLogo} resizeMode="contain" />
                   ) : (
@@ -724,13 +818,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 </View>
 
                 <View style={styles.orderTitleWrap}>
-                  <Text style={[styles.orderTitle, tvMode && styles.tvOrderTitle]}>Pedido #{order?.id}</Text>
-                  <Text style={[styles.orderDate, tvMode && styles.tvOrderDate]}>{formatOrderDate(orderDateValue)}</Text>
+                  <Text style={[styles.orderTitle, compactMode && styles.tvOrderTitle]}>Pedido #{order?.id}</Text>
+                  <Text style={[styles.orderDate, compactMode && styles.tvOrderDate]}>{formatOrderDate(orderDateValue)}</Text>
                 </View>
               </View>
 
               <View style={styles.orderStatusWrap}>
-                {isSplitSegment && tvMode ? (
+                {isSplitSegment && compactMode ? (
                   <View style={styles.tvSegmentBadge}>
                     <Text style={styles.tvSegmentBadgeText}>
                       {segmentIndex + 1}/{segmentCount}
@@ -740,7 +834,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 <View
                   style={[
                     styles.orderStatusBadge,
-                    tvMode && styles.tvOrderStatusBadge,
+                    compactMode && styles.tvOrderStatusBadge,
                     {
                       borderColor: statusVisual.borderColor,
                       backgroundColor: statusVisual.bgColor,
@@ -756,7 +850,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                   <Text
                     style={[
                       styles.orderStatusText,
-                      tvMode && styles.tvOrderStatusText,
+                      compactMode && styles.tvOrderStatusText,
                       { color: statusVisual.textColor },
                     ]}
                   >
@@ -766,29 +860,29 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               </View>
             </View>
 
-            <View style={[styles.orderMetaRow, tvMode && styles.tvOrderMetaRow]}>
-              <View style={[styles.waitingChip, tvMode && styles.tvWaitingChip]}>
+            <View style={[styles.orderMetaRow, compactMode && styles.tvOrderMetaRow]}>
+              <View style={[styles.waitingChip, compactMode && styles.tvWaitingChip]}>
                 <MaterialCommunityIcons
                   name="clock-time-four-outline"
-                  size={tvMode ? 10 : 12}
+                  size={compactMode ? 10 : 12}
                   color={ppcColors.danger}
                 />
-                <Text style={[styles.waitingText, tvMode && styles.tvWaitingText]}>{waitingMinutes} min</Text>
+                <Text style={[styles.waitingText, compactMode && styles.tvWaitingText]}>{waitingMinutes} min</Text>
               </View>
 
               <View style={styles.amountWrap}>
                 <Text
-                  style={[styles.channelMetaText, tvMode && styles.tvChannelMetaText]}
-                  numberOfLines={tvMode ? 2 : 1}
+                  style={[styles.channelMetaText, compactMode && styles.tvChannelMetaText]}
+                  numberOfLines={compactMode ? 2 : 1}
                 >
                   {channelDisplay}
                 </Text>
-                <Text style={[styles.amountText, tvMode && styles.tvAmountText]}>{Formatter.formatMoney(price)}</Text>
+                <Text style={[styles.amountText, compactMode && styles.tvAmountText]}>{Formatter.formatMoney(price)}</Text>
               </View>
             </View>
 
             {products.length > 0 && (
-              <View style={[styles.productsWrap, tvMode && styles.tvProductsWrap]}>
+              <View style={[styles.productsWrap, compactMode && styles.tvProductsWrap]}>
                 {products.map((product, index) => (
                   <View
                     key={String(product.id)}
@@ -798,22 +892,22 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                     ]}
                   >
                     <View style={styles.productRow}>
-                      <View style={[styles.qtyPill, tvMode && styles.tvQtyPill]}>
-                        <Text style={[styles.qtyPillText, tvMode && styles.tvQtyPillText]}>{product.quantity}x</Text>
+                      <View style={[styles.qtyPill, compactMode && styles.tvQtyPill]}>
+                        <Text style={[styles.qtyPillText, compactMode && styles.tvQtyPillText]}>{product.quantity}x</Text>
                       </View>
 
                       <View style={{ flex: 1 }}>
                         <Text
-                          style={[styles.productName, tvMode && styles.tvProductName]}
-                          numberOfLines={tvMode ? 2 : 1}
+                          style={[styles.productName, compactMode && styles.tvProductName]}
+                          numberOfLines={compactMode ? 2 : 1}
                         >
                           {product.name}
                         </Text>
 
                         {!!product.description && (
                           <Text
-                            style={[styles.productDescription, tvMode && styles.tvProductDescription]}
-                            numberOfLines={tvMode ? 2 : 1}
+                            style={[styles.productDescription, compactMode && styles.tvProductDescription]}
+                            numberOfLines={compactMode ? 2 : 1}
                           >
                             {product.description}
                           </Text>
@@ -823,13 +917,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
                     {Object.entries(product.groups || {}).map(([groupName, items]) => (
                       <View key={groupName} style={styles.groupWrap}>
-                        <View style={[styles.groupTitlePill, tvMode && styles.tvGroupTitlePill]}>
-                          <Text style={[styles.groupTitle, tvMode && styles.tvGroupTitle]}>{groupName}</Text>
+                        <View style={[styles.groupTitlePill, compactMode && styles.tvGroupTitlePill]}>
+                          <Text style={[styles.groupTitle, compactMode && styles.tvGroupTitle]}>{groupName}</Text>
                         </View>
 
                         {items.map(child => (
                           <View key={child.id} style={[styles.groupItem, { marginLeft: 12 }]}>
-                            <Text style={[styles.groupItemText, tvMode && styles.tvGroupItemText]}>
+                            <Text style={[styles.groupItemText, compactMode && styles.tvGroupItemText]}>
                               {child.quantity}x {child.name}
                             </Text>
                           </View>
@@ -862,88 +956,63 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         </View>
       )
     },
-    [display?.displayType, display?.id, displayId, handlePrintOrder, navigation, ppcColors, route.params?.displayType, styles, tvMode],
+    [display?.displayType, display?.id, displayId, handlePrintOrder, navigation, ppcColors, route.params?.displayType, styles, tvMode, useTvPagedLayout],
   )
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View
-        style={[styles.summaryCard, tvMode && styles.tvSummaryCard]}
-        onLayout={
-          tvMode
-            ? event =>
-                updateMeasuredLayoutSize(
-                  setSummaryHeight,
-                  event?.nativeEvent?.layout?.height,
-                )
-            : undefined
-        }
-      >
-        <View style={[styles.summaryHeader, tvMode && styles.tvSummaryHeader]}>
-          <View style={styles.summaryIdentity}>
-            <View style={[styles.summaryIconWrap, tvMode && styles.tvSummaryIconWrap]}>
-              <MaterialCommunityIcons
-                name={display?.displayType === 'products' ? 'silverware-fork-knife' : 'receipt-text'}
-                size={18}
-                color={display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo}
-              />
+      {!tvMode && (
+        <>
+          <View
+            style={styles.summaryCard}
+          >
+            <View style={styles.summaryHeader}>
+              <View style={styles.summaryIdentity}>
+                <View style={styles.summaryIconWrap}>
+                  <MaterialCommunityIcons
+                    name={display?.displayType === 'products' ? 'silverware-fork-knife' : 'receipt-text'}
+                    size={18}
+                    color={display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo}
+                  />
+                </View>
+                <View style={styles.summaryTitleWrap}>
+                  <Text numberOfLines={1} style={styles.summaryTitle}>
+                    {String(display?.display || 'Display')}
+                  </Text>
+                  <Text style={styles.summarySubtitle}>Pedidos na fila</Text>
+                </View>
+              </View>
+
+              <View style={styles.countBubble}>
+                {isLoading ? (
+                  <View style={styles.countBubbleSkeleton} />
+                ) : (
+                  <Text style={styles.countBubbleText}>{listCount}</Text>
+                )}
+              </View>
             </View>
-            <View style={styles.summaryTitleWrap}>
-              <Text numberOfLines={1} style={[styles.summaryTitle, tvMode && styles.tvSummaryTitle]}>
-                {String(display?.display || 'Display')}
-              </Text>
-              <Text style={[styles.summarySubtitle, tvMode && styles.tvSummarySubtitle]}>Pedidos na fila</Text>
+
+            <View style={styles.summaryFooter}>
+              <View style={styles.summaryTypePill}>
+                <Text
+                  style={[
+                    styles.summaryTypeText,
+                    { color: display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo },
+                  ]}
+                >
+                  {String(display?.displayType || 'orders').toUpperCase()}
+                </Text>
+              </View>
             </View>
           </View>
 
-          <View style={[styles.countBubble, tvMode && styles.tvCountBubble]}>
-            {isLoading ? (
-              <View style={styles.countBubbleSkeleton} />
-            ) : (
-              <Text style={[styles.countBubbleText, tvMode && styles.tvCountBubbleText]}>{listCount}</Text>
-            )}
+          <View style={styles.sectionTitleRow}>
+            <View style={styles.sectionLine} />
+            <Text style={styles.sectionTitle}>LISTA DE PEDIDOS</Text>
+            <View style={styles.sectionLine} />
           </View>
-
-        </View>
-
-        <View style={[styles.summaryFooter, tvMode && styles.tvSummaryFooter]}>
-          <View style={styles.summaryTypePill}>
-            <Text
-              style={[
-                styles.summaryTypeText,
-                { color: display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo },
-              ]}
-            >
-              {String(display?.displayType || 'orders').toUpperCase()}
-            </Text>
-          </View>
-
-          {tvMode && tvPages.length > 1 ? (
-            <View style={styles.tvSummaryPagePill}>
-              <Text style={styles.tvSummaryPageText}>
-                PAG {Math.min(tvCurrentPage + 1, tvPages.length)}/{tvPages.length}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
-
-      <View
-        style={[styles.sectionTitleRow, tvMode && styles.tvSectionTitleRow]}
-        onLayout={
-          tvMode
-            ? event =>
-                updateMeasuredLayoutSize(
-                  setSectionTitleHeight,
-                  event?.nativeEvent?.layout?.height,
-                )
-            : undefined
-        }
-      >
-        <View style={styles.sectionLine} />
-        <Text style={[styles.sectionTitle, tvMode && styles.tvSectionTitle]}>LISTA DE PEDIDOS</Text>
-        <View style={styles.sectionLine} />
-      </View>
+        </>
+      )}
 
       {showSkeleton ? (
         <View style={styles.skeletonWrap}>
@@ -969,7 +1038,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             </View>
           ))}
         </View>
-      ) : tvMode ? (
+      ) : useTvPagedLayout ? (
         <View
           style={[
             styles.tvPageViewport,
@@ -990,7 +1059,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         </View>
       ) : (
         <FlatList
-          data={sortedOrders.slice(0, visibleCount)}
+          data={(tvMode ? sortedOrders : sortedOrders.slice(0, visibleCount))}
           key={`orders-cols-${columns}`}
           numColumns={columns}
           keyExtractor={item => String(item.id)}
@@ -1016,24 +1085,14 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         />
       )}
 
-      <View
-        onLayout={
-          tvMode
-            ? event =>
-                updateMeasuredLayoutSize(
-                  setDebugBarHeight,
-                  event?.nativeEvent?.layout?.height,
-                )
-            : undefined
-        }
-      >
+      {!tvMode && (
         <RealtimeDebugBar
           companyId={currentCompany?.id}
           ppcColors={ppcColors}
           refreshState={refreshDebug}
           websocketStatus={websocketStatus}
         />
-      </View>
+      )}
     </SafeAreaView>
   )
 }
@@ -1639,12 +1698,16 @@ const createStyles = ppcColors =>
       overflow: 'hidden',
     },
     tvPageGrid: {
+      width: '100%',
       flexDirection: 'row',
       flexWrap: 'wrap',
       alignItems: 'flex-start',
+      alignContent: 'flex-start',
       gap: TV_LAYOUT_GAP,
     },
     tvOrderCard: {
+      flex: 0,
+      flexBasis: 'auto',
       marginBottom: 0,
     },
     tvSegmentBadge: {
