@@ -16,8 +16,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import InOut from './Status/InOut';
 import Working from './Status/Working';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
-import { useDisplayPrint } from '../useDisplayPrint';
-import DisplayPrinterSelectionModal from '../DisplayPrinterSelectionModal';
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar';
 
 const normalizeText = value => String(value || '').trim();
@@ -143,16 +141,6 @@ const DisplayProducts = ({ display = {} }) => {
     const displayQueueMessages = displayQueueGetters?.messages;
     const websocketStatus = websocketStore?.getters?.summary || {};
     const websocketConnected = Boolean(websocketStatus?.connected);
-    const {
-        printOrderProductToAttachedPrinter,
-        printerOptions,
-        selectedPrinterDeviceId,
-        isPrinterSelectionVisible,
-        isSavingPrinterSelection,
-        handleSelectPrinter,
-        closePrinterSelection,
-    } = useDisplayPrint({display});
-
     const [loaded, setLoaded] = useState({});
     const [statusIn, setStatusIn] = useState(null);
     const [statusWorking, setStatusWorking] = useState(null);
@@ -569,28 +557,17 @@ const DisplayProducts = ({ display = {} }) => {
         [currentCompany?.id, orderProductQueueMessages]
     );
 
-    const handlePrintQueueItem = useCallback(
-        (orderProduct, orderProductQueue = null) => {
-            const resolvedOrderProduct = orderProduct || orderProductQueue?.order_product || null;
-            const queueItemId =
-                parseEntityId(orderProductQueue?.id) ||
-                parseEntityId(orderProductQueue?.queueEntry?.id) ||
-                null;
-
-            const orderProductId = parseEntityId(
-                resolvedOrderProduct?.id || resolvedOrderProduct?.['@id']
-            );
-
-            if (!orderProductId || !queueItemId) {
-                return;
-            }
-
-            printOrderProductToAttachedPrinter({
-                orderProductId,
-                orderProductQueueIds: [queueItemId],
-            });
-        },
-        [printOrderProductToAttachedPrinter]
+    const printButtonProps = useMemo(
+        () => ({
+            store: 'order_products_queue',
+            printerSelection: {
+                enabled: true,
+                context: 'display',
+                display,
+                displayId: display?.id,
+            },
+        }),
+        [display]
     );
 
     const saveQueueItem = useCallback(
@@ -702,7 +679,7 @@ const DisplayProducts = ({ display = {} }) => {
                         status_out={statusOut}
                         saveQueueItem={saveQueueItem}
                         onTransition={applyLocalQueueTransition}
-                        onPrint={handlePrintQueueItem}
+                        printButtonProps={printButtonProps}
                         ppcColorsOverride={ppcColors}
                     />
                 )}
@@ -723,7 +700,7 @@ const DisplayProducts = ({ display = {} }) => {
                             status_working={statusWorking}
                             saveQueueItem={saveQueueItem}
                             onTransition={applyLocalQueueTransition}
-                            onPrint={handlePrintQueueItem}
+                            printButtonProps={printButtonProps}
                             ppcColorsOverride={ppcColors}
                         />
                     )}
@@ -735,22 +712,12 @@ const DisplayProducts = ({ display = {} }) => {
                             status_in={statusOut}
                             saveQueueItem={saveQueueItem}
                             onTransition={applyLocalQueueTransition}
-                            onPrint={handlePrintQueueItem}
+                            printButtonProps={printButtonProps}
                             ppcColorsOverride={ppcColors}
                         />
                     )}
                 </SafeAreaView>
             </Modal>
-
-            <DisplayPrinterSelectionModal
-                visible={isPrinterSelectionVisible}
-                printers={printerOptions}
-                selectedPrinterDeviceId={selectedPrinterDeviceId}
-                saving={isSavingPrinterSelection}
-                onSelectPrinter={handleSelectPrinter}
-                onClose={closePrinterSelection}
-                ppcColorsOverride={ppcColors}
-            />
 
             <RealtimeDebugBar
                 companyId={currentCompany?.id}

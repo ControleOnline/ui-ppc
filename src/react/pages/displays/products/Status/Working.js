@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Card, Text, Button } from 'react-native-paper';
 import OrderProductComponents from './../../OrderProductComponents';
+import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import {
     resolveDisplayTicketSummary,
@@ -31,7 +32,7 @@ const Working = ({
     status_out,
     saveQueueItem = null,
     onTransition = null,
-    onPrint = null,
+    printButtonProps = null,
     ppcColorsOverride = null,
 }) => {
     const { ppcColors: defaultPpcColors } = usePpcTheme();
@@ -136,25 +137,25 @@ const Working = ({
                                 ppcColorsOverride={ppcColors}
                             />
 
-                            {(status_out || typeof onPrint === 'function') && (
+                            {(status_out || printButtonProps) && (
                                 <Card.Actions style={styles.actions}>
-                                    {typeof onPrint === 'function' && (
-                                        <Button
-                                            mode="outlined"
-                                            textColor={ppcColors.textPrimary}
+                                    {printButtonProps ? (
+                                        <PrintButton
+                                            {...printButtonProps}
+                                            job={{
+                                                type: 'order-product',
+                                                orderProductId:
+                                                    orderProduct?.id || orderProduct?.['@id'],
+                                                orderProductQueueIds: [order?.id],
+                                            }}
+                                            label="Imprimir"
+                                            iconColor={ppcColors.textPrimary}
                                             style={[
                                                 styles.actionButton,
                                                 styles.secondaryActionButton,
                                             ]}
-                                            labelStyle={[
-                                                styles.actionLabel,
-                                                styles.secondaryActionLabel,
-                                            ]}
-                                            onPress={() => onPrint(order.order_product, order)}
-                                        >
-                                            Imprimir
-                                        </Button>
-                                    )}
+                                        />
+                                    ) : null}
                                     <Button
                                         mode="contained"
                                         buttonColor={ppcColors.accent}

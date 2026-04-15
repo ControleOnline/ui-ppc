@@ -29,8 +29,7 @@ import {
   normalizeDeviceId,
   normalizeEntityId,
 } from '@controleonline/ui-common/src/react/utils/paymentDevices'
-import { useDisplayPrint } from '../useDisplayPrint'
-import DisplayPrinterSelectionModal from '../DisplayPrinterSelectionModal'
+import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton'
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
 import {
   DISPLAY_DEVICE_LINK_CONFIG_KEY,
@@ -500,15 +499,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const websocketConnected = Boolean(websocketStatus?.connected)
   const { currentCompany } = peopleStore.getters
   const { ppcColors } = useDisplayTheme()
-  const {
-    printOrderToAttachedPrinter,
-    printerOptions,
-    selectedPrinterDeviceId,
-    isPrinterSelectionVisible,
-    isSavingPrinterSelection,
-    handleSelectPrinter,
-    closePrinterSelection,
-  } = useDisplayPrint({ display })
 
   const [orders, setOrders] = useState([])
   const [visibleCount, setVisibleCount] = useState(50)
@@ -688,18 +678,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       TV_MAX_PAGE_ROTATION_MS,
     )
   }, [currentTvPage])
-
-  const handlePrintOrder = useCallback(
-    item => {
-      const orderId = parseEntityId(item?.id)
-      if (!orderId) {
-        return
-      }
-
-      printOrderToAttachedPrinter({ orderId })
-    },
-    [printOrderToAttachedPrinter],
-  )
 
   const hasQueueRefreshMessage = useMemo(
     () =>
@@ -967,24 +945,25 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
           {!tvMode && (
             <View style={styles.orderActions}>
-              <TouchableOpacity
-                activeOpacity={0.86}
+              <PrintButton
+                job={{ type: 'order', orderId: parseEntityId(order?.id) || order?.id }}
+                store="orders"
+                label="Imprimir pedido"
+                iconColor={ppcColors.pillTextDark}
                 style={styles.printActionButton}
-                onPress={() => handlePrintOrder(order)}
-              >
-                <MaterialCommunityIcons
-                  name="printer-outline"
-                  size={16}
-                  color={ppcColors.pillTextDark}
-                />
-                <Text style={styles.printActionButtonText}>Imprimir pedido</Text>
-              </TouchableOpacity>
+                printerSelection={{
+                  enabled: true,
+                  context: 'display',
+                  display,
+                  displayId: display?.id,
+                }}
+              />
             </View>
           )}
         </View>
       )
     },
-    [display?.displayType, display?.id, displayId, handlePrintOrder, navigation, ppcColors, route.params?.displayType, styles, tvMode, useTvPagedLayout],
+    [display?.displayType, display?.id, displayId, navigation, ppcColors, route.params?.displayType, styles, tvMode, useTvPagedLayout],
   )
 
   return (
@@ -1098,18 +1077,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             if (visibleCount < sortedOrders.length) setVisibleCount(v => v + 50)
           }}
           onEndReachedThreshold={0.3}
-        />
-      )}
-
-      {!tvMode && (
-        <DisplayPrinterSelectionModal
-          visible={isPrinterSelectionVisible}
-          printers={printerOptions}
-          selectedPrinterDeviceId={selectedPrinterDeviceId}
-          saving={isSavingPrinterSelection}
-          onSelectPrinter={handleSelectPrinter}
-          onClose={closePrinterSelection}
-          ppcColorsOverride={ppcColors}
         />
       )}
 
