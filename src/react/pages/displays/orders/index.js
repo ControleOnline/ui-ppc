@@ -31,6 +31,7 @@ import {
 } from '@controleonline/ui-common/src/react/utils/paymentDevices'
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton'
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
+import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
 import {
   DISPLAY_DEVICE_LINK_CONFIG_KEY,
   DISPLAY_MIN_COLUMNS_CONFIG_KEY,
@@ -794,18 +795,16 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         >
           <Pressable
             style={styles.orderCardPressable}
-            onPress={() =>
+            onPress={() => {
+              ordersActions.syncOrder?.(order)
               navigation.navigate('OrderDetails', {
-                order,
+                ...buildOrderDetailsRouteParams(order),
                 kds: true,
-                displayType: display?.displayType,
-                display: {
-                  id: parseEntityId(display?.id) || parseEntityId(displayId),
-                  displayType: display?.displayType || route.params?.displayType,
-                },
+                displayType: display?.displayType || route.params?.displayType,
+                displayId: parseEntityId(display?.id) || parseEntityId(displayId),
                 hideBottomToolBar: tvMode,
               })
-            }
+            }}
           >
             <View style={[styles.orderAccentBar, { backgroundColor: statusVisual.textColor }]} />
             <View style={[styles.orderCardInner, compactMode && styles.tvOrderCardInner]}>
