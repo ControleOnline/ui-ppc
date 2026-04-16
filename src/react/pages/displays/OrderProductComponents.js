@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useStore } from '@store';
+import createStyles from './OrderProductComponents.styles';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 
 const DEFAULT_GROUP_KEY = 'default-group';
@@ -84,71 +84,41 @@ const groupProducts = products => {
     return Object.values(groupedMap);
 };
 
+const resolveEmbeddedProducts = orderProduct => {
+    const candidates = [
+        orderProduct?.orderProductComponents,
+        orderProduct?.order_product_components,
+    ];
+
+    for (const candidate of candidates) {
+        if (Array.isArray(candidate)) {
+            return candidate;
+        }
+
+        if (Array.isArray(candidate?.member)) {
+            return candidate.member;
+        }
+
+        if (Array.isArray(candidate?.['hydra:member'])) {
+            return candidate['hydra:member'];
+        }
+    }
+
+    return [];
+};
+
 const OrderProductComponents = ({ order_product, ppcColorsOverride = null }) => {
-    const store = useStore('order_products');
-    const { actions } = store;
     const { ppcColors: defaultPpcColors } = usePpcTheme();
     const ppcColors = ppcColorsOverride || defaultPpcColors;
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
-    const [groups, setGroups] = useState([]);
     const embeddedProducts = useMemo(
-        () =>
-            Array.isArray(order_product?.orderProductComponents)
-                ? order_product.orderProductComponents
-                : Array.isArray(order_product?.order_product_components)
-                    ? order_product.order_product_components
-                    : [],
+        () => resolveEmbeddedProducts(order_product),
         [order_product?.orderProductComponents, order_product?.order_product_components],
     );
-
-    useEffect(() => {
-        let cancelled = false;
-
-        if (!order_product) {
-            setGroups([]);
-            return undefined;
-        }
-
-        if (embeddedProducts.length > 0) {
-            setGroups(groupProducts(embeddedProducts));
-            return undefined;
-        }
-
-        const onRequest = async () => {
-            const filter = {
-                order: order_product.order?.['@id'] || order_product.order?.id,
-                parentProduct: order_product.product?.['@id'] || order_product.product?.id,
-                orderProduct: order_product['@id'] || order_product.id,
-            };
-
-            try {
-                const products = await actions.getItems(filter);
-
-                if (!cancelled) {
-                    setGroups(groupProducts(products));
-                }
-            } catch {
-                if (!cancelled) {
-                    setGroups([]);
-                }
-            }
-        };
-
-        onRequest();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        actions,
-        embeddedProducts,
-        order_product?.id,
-        order_product?.['@id'],
-        order_product?.order?.id,
-        order_product?.order?.['@id'],
-        order_product?.product?.id,
-        order_product?.product?.['@id'],
-    ]);
+    const groups = useMemo(
+        () => groupProducts(embeddedProducts),
+        [embeddedProducts],
+    );
 
     if (!groups.length) {
         return null;
@@ -184,40 +154,5 @@ const OrderProductComponents = ({ order_product, ppcColorsOverride = null }) => 
         </View>
     );
 };
-
-const createStyles = ppcColors =>
-    StyleSheet.create({
-        wrap: {
-            paddingHorizontal: 16,
-            paddingBottom: 4,
-        },
-        groupWrap: {
-            marginBottom: 8,
-        },
-        groupLabel: {
-            marginBottom: 4,
-            color: ppcColors.textSecondary,
-            fontSize: 11,
-            fontWeight: '900',
-            textTransform: 'uppercase',
-            letterSpacing: 0.8,
-        },
-        itemWrap: {
-            marginBottom: 4,
-        },
-        itemLine: {
-            color: ppcColors.textPrimary,
-            fontSize: 13,
-            fontWeight: '700',
-            lineHeight: 18,
-        },
-        commentLine: {
-            marginTop: 2,
-            color: ppcColors.textSecondary,
-            fontSize: 12,
-            fontWeight: '600',
-            lineHeight: 17,
-        },
-    });
 
 export default OrderProductComponents;

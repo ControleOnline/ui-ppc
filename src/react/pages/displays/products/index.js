@@ -1,24 +1,52 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import {
-    View,
-    Text,
-    useWindowDimensions,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    Modal,
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRoute, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { useStore } from '@store';
-import { api } from '@controleonline/ui-common/src/api';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateShortcutFilter from './DateShortcutFilter';
 import InOut from './Status/InOut';
 import Working from './Status/Working';
+import createStyles from './index.styles';
+import { DEFAULT_DATE_FILTER_KEY, getDateRange } from './dateFilterUtils';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar';
 
-const normalizeText = value => String(value || '').trim();
+const STAGE_KEYS = ['status_in', 'status_working', 'status_out'];
+const WORKING_TAB_INDEX = 1;
+const TAB_ROUTES = [
+    { key: 'status_in', title: 'Fila' },
+    { key: 'status_working', title: 'Prep' },
+    { key: 'status_out', title: 'Pronto' },
+];
+
+const createEmptyOrders = () => ({
+    status_in: [],
+    status_working: [],
+    status_out: [],
+});
+
+const createEmptyCounters = () => ({
+    status_in: 0,
+    status_working: 0,
+    status_out: 0,
+});
+
+const createEmptyLoaded = () => ({
+    status_in: false,
+    status_working: false,
+    status_out: false,
+});
+
+const createEmptyBindings = () => ({
+    queueIds: [],
+    inIds: [],
+    workingIds: [],
+    outIds: [],
+    statusIn: null,
+    statusWorking: null,
+    statusOut: null,
+});
+
 const formatDebugClock = value => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
@@ -27,54 +55,6 @@ const formatDebugClock = value => {
 
     const pad = entry => String(entry).padStart(2, '0');
     return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-};
-
-const DISPLAY_QUEUE_FETCH_PAGE_SIZE = 50;
-const DISPLAY_QUEUE_FETCH_MAX_PAGES = 10;
-
-const fetchDisplayQueueItems = async ({
-    statusIds,
-    queueIds,
-    providerId,
-    itemsPerPage = DISPLAY_QUEUE_FETCH_PAGE_SIZE,
-    maxPages = DISPLAY_QUEUE_FETCH_MAX_PAGES,
-}) => {
-    const normalizedStatusIds = [...new Set((Array.isArray(statusIds) ? statusIds : []).filter(Boolean))];
-    const normalizedQueueIds = [...new Set((Array.isArray(queueIds) ? queueIds : []).filter(Boolean))];
-
-    if (!providerId || normalizedStatusIds.length === 0 || normalizedQueueIds.length === 0) {
-        return [];
-    }
-
-    const visibleItems = [];
-    let page = 1;
-
-    while (page <= maxPages) {
-        const response = await api.fetch('order_product_queues', {
-            params: {
-                status: normalizedStatusIds,
-                itemsPerPage,
-                page,
-                'order_product.order.provider': providerId,
-                queue: normalizedQueueIds,
-            },
-        });
-
-        const pageItems = Array.isArray(response?.member) ? response.member : [];
-        visibleItems.push(...pageItems);
-
-        const totalItems = Number(response?.totalItems) || pageItems.length;
-        const fetchedCount = ((page - 1) * itemsPerPage) + pageItems.length;
-        const hasMorePages = pageItems.length === itemsPerPage && fetchedCount < totalItems;
-
-        if (!hasMorePages) {
-            break;
-        }
-
-        page += 1;
-    }
-
-    return visibleItems;
 };
 
 const parseEntityId = value => {
@@ -108,18 +88,17 @@ const isMessageForCompany = (message, companyId) => {
 
 const removeConsumedMessages = (messages, companyId) =>
     (Array.isArray(messages) ? messages : []).filter(
-        message => !isMessageForCompany(message, companyId)
+        message => !isMessageForCompany(message, companyId),
     );
 
 const DisplayProducts = ({ display = {} }) => {
     const route = useRoute();
-    const { width } = useWindowDimensions();
 
     const displayId = decodeURIComponent(
         route.params?.id ||
         (typeof window !== 'undefined'
             ? new URLSearchParams(window.location.search).get('id') || ''
-            : '')
+            : ''),
     );
 
     const peopleStore = useStore('people');
@@ -128,6 +107,8 @@ const DisplayProducts = ({ display = {} }) => {
     const displayQueueStore = useStore('display_queues');
     const websocketStore = useStore('websocket');
     const runtimeDebugStore = useStore('runtime_debug');
+    const orderProductQueueStore = useStore('order_products_queue');
+
     const { ppcColors } = useDisplayTheme();
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
@@ -136,106 +117,341 @@ const DisplayProducts = ({ display = {} }) => {
     const { actions: ordersActions, getters: ordersGetters } = ordersStore;
     const { actions: displayQueueActions, getters: displayQueueGetters } = displayQueueStore;
     const runtimeDebugActions = runtimeDebugStore.actions;
+    const orderProductQueueActions = orderProductQueueStore.actions;
+    const {
+        isSaving,
+        messages: orderProductQueueMessages,
+    } = orderProductQueueStore.getters;
+
     const queueMessages = queuesGetters?.messages;
     const orderMessages = ordersGetters?.messages;
     const displayQueueMessages = displayQueueGetters?.messages;
     const websocketStatus = websocketStore?.getters?.summary || {};
     const websocketConnected = Boolean(websocketStatus?.connected);
-    const [loaded, setLoaded] = useState({});
-    const [statusIn, setStatusIn] = useState(null);
-    const [statusWorking, setStatusWorking] = useState(null);
-    const [statusOut, setStatusOut] = useState(null);
 
-    const store = useStore('order_products_queue');
-    const { actions, getters } = store;
-    const { isSaving, messages: orderProductQueueMessages } = getters;
-
-    const [modalType, setModalType] = useState(null);
-
-    const [orders, setOrders] = useState({
-        status_in: [],
-        status_working: [],
-        status_out: [],
-    });
-
-    const [totals, setTotals] = useState({
-        status_in: 0,
-        status_working: 0,
-        status_out: 0,
-    });
+    const [tabIndex, setTabIndex] = useState(WORKING_TAB_INDEX);
+    const [queueBindings, setQueueBindings] = useState(createEmptyBindings);
+    const [orders, setOrders] = useState(createEmptyOrders);
+    const [totals, setTotals] = useState(createEmptyCounters);
+    const [loaded, setLoaded] = useState(createEmptyLoaded);
+    const [dateFilterKey, setDateFilterKey] = useState(DEFAULT_DATE_FILTER_KEY);
+    const [statusRefreshTokens, setStatusRefreshTokens] = useState(createEmptyCounters);
+    const [bindingsRefreshToken, setBindingsRefreshToken] = useState(0);
     const [refreshDebug, setRefreshDebug] = useState({
         lastAt: null,
         lastSource: 'boot',
         lastDetail: 'startup',
     });
-    const ordersRef = useRef({
-        status_in: [],
-        status_working: [],
-        status_out: [],
-    });
-    const queueBindingsRef = useRef({
-        queueIds: [],
-        inIds: [],
-        workingIds: [],
-        outIds: [],
-        statusIn: null,
-        statusWorking: null,
-        statusOut: null,
-    });
-    const requestQueueRef = useRef(null);
-    const requestInFlightRef = useRef(false);
+
+    const ordersRef = useRef(createEmptyOrders());
     const previousSocketConnectedRef = useRef(websocketConnected);
     const autoStartingIdsRef = useRef(new Set());
     const applyLocalQueueTransitionRef = useRef(() => {});
     const socketRefreshTimeoutRef = useRef(null);
+    const hasHydratedStatusesRef = useRef(false);
 
     useEffect(() => {
-        queueBindingsRef.current = {
-            queueIds: [],
-            inIds: [],
-            workingIds: [],
-            outIds: [],
-            statusIn: null,
-            statusWorking: null,
-            statusOut: null,
-        };
-        requestQueueRef.current = null;
-        requestInFlightRef.current = false;
+        ordersRef.current = createEmptyOrders();
+        setOrders(createEmptyOrders());
+        setTotals(createEmptyCounters());
+        setLoaded(createEmptyLoaded());
+        setDateFilterKey(DEFAULT_DATE_FILTER_KEY);
+        setQueueBindings(createEmptyBindings());
+        setStatusRefreshTokens(createEmptyCounters());
+        setBindingsRefreshToken(0);
+        setTabIndex(WORKING_TAB_INDEX);
         autoStartingIdsRef.current = new Set();
+        hasHydratedStatusesRef.current = false;
+
         if (socketRefreshTimeoutRef.current) {
             clearTimeout(socketRefreshTimeoutRef.current);
             socketRefreshTimeoutRef.current = null;
         }
     }, [currentCompany?.id, displayId]);
 
+    const dateRange = useMemo(
+        () => getDateRange(dateFilterKey),
+        [dateFilterKey],
+    );
+
+    const noteRefresh = useCallback((source, detail = '') => {
+        const updatedAt = new Date().toISOString();
+        setRefreshDebug({
+            lastAt: updatedAt,
+            lastSource: source || 'manual',
+            lastDetail: detail || '',
+        });
+        runtimeDebugActions.setFooterEntry({
+            key: 'screen-refresh',
+            order: 20,
+            updatedAt,
+            lines: [
+                `ultimo refresh: ${formatDebugClock(updatedAt)} | origem: ${source || 'manual'}${detail ? ` (${detail})` : ''}`,
+            ],
+        });
+    }, [runtimeDebugActions]);
+
+    useEffect(() => () => {
+        runtimeDebugActions.clearFooterEntry('screen-refresh');
+        if (socketRefreshTimeoutRef.current) {
+            clearTimeout(socketRefreshTimeoutRef.current);
+            socketRefreshTimeoutRef.current = null;
+        }
+    }, [runtimeDebugActions]);
+
+    const resolveQueueBindings = useCallback(async () => {
+        if (!currentCompany?.id || !displayId) {
+            return createEmptyBindings();
+        }
+
+        const result = await displayQueueActions.getItems({
+            display: displayId,
+            itemsPerPage: 1000,
+            pagination: false,
+        });
+
+        const queueIds = [];
+        const inIds = [];
+        const workingIds = [];
+        const outIds = [];
+
+        let statusIn = null;
+        let statusWorking = null;
+        let statusOut = null;
+
+        (Array.isArray(result) ? result : []).forEach(item => {
+            if (item?.queue?.id) {
+                queueIds.push(item.queue.id);
+            }
+
+            if (item?.queue?.status_in) {
+                inIds.push(item.queue.status_in.id);
+                statusIn = statusIn || item.queue.status_in;
+            }
+
+            if (item?.queue?.status_working) {
+                workingIds.push(item.queue.status_working.id);
+                statusWorking = statusWorking || item.queue.status_working;
+            }
+
+            if (item?.queue?.status_out) {
+                outIds.push(item.queue.status_out.id);
+                statusOut = statusOut || item.queue.status_out;
+            }
+        });
+
+        return {
+            queueIds: [...new Set(queueIds.filter(Boolean))],
+            inIds: [...new Set(inIds.filter(Boolean))],
+            workingIds: [...new Set(workingIds.filter(Boolean))],
+            outIds: [...new Set(outIds.filter(Boolean))],
+            statusIn,
+            statusWorking,
+            statusOut,
+        };
+    }, [currentCompany?.id, displayId, displayQueueActions]);
+
+    useEffect(() => {
+        if (!currentCompany?.id || !displayId) {
+            return undefined;
+        }
+
+        let cancelled = false;
+
+        resolveQueueBindings()
+            .then(nextBindings => {
+                if (!cancelled) {
+                    setQueueBindings(nextBindings);
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setQueueBindings(createEmptyBindings());
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [bindingsRefreshToken, currentCompany?.id, displayId, resolveQueueBindings]);
+
+    const bumpStageRefreshTokens = useCallback((stages = STAGE_KEYS) => {
+        setStatusRefreshTokens(currentTokens => {
+            const nextTokens = { ...currentTokens };
+            stages.forEach(stage => {
+                if (!stage) {
+                    return;
+                }
+
+                nextTokens[stage] = Number(nextTokens[stage] || 0) + 1;
+            });
+            return nextTokens;
+        });
+    }, []);
+
+    const requestRefresh = useCallback((source = 'manual', detail = '', {
+        refreshBindings = false,
+        stages = STAGE_KEYS,
+        switchToWorking = false,
+    } = {}) => {
+        if (!currentCompany?.id) {
+            return;
+        }
+
+        noteRefresh(source, detail);
+
+        if (switchToWorking) {
+            setTabIndex(WORKING_TAB_INDEX);
+        }
+
+        if (refreshBindings) {
+            setBindingsRefreshToken(currentValue => currentValue + 1);
+            return;
+        }
+
+        bumpStageRefreshTokens(stages);
+    }, [bumpStageRefreshTokens, currentCompany?.id, noteRefresh]);
+
+    const handleStageSnapshot = useCallback((stage, snapshot = {}) => {
+        const nextItems = Array.isArray(snapshot.items) ? snapshot.items : [];
+        const nextTotal = Number(snapshot.total || 0);
+        const nextLoaded = Boolean(snapshot.loaded);
+
+        setOrders(currentOrders => {
+            const nextOrders = {
+                ...currentOrders,
+                [stage]: nextItems,
+            };
+            ordersRef.current = nextOrders;
+            return nextOrders;
+        });
+
+        setTotals(currentTotals => ({
+            ...currentTotals,
+            [stage]: nextTotal,
+        }));
+
+        setLoaded(currentLoaded => ({
+            ...currentLoaded,
+            [stage]: nextLoaded,
+        }));
+
+        if (nextLoaded) {
+            hasHydratedStatusesRef.current = true;
+        }
+    }, []);
+
+    const handleInSnapshot = useCallback(
+        snapshot => handleStageSnapshot('status_in', snapshot),
+        [handleStageSnapshot],
+    );
+
+    const handleWorkingSnapshot = useCallback(
+        snapshot => handleStageSnapshot('status_working', snapshot),
+        [handleStageSnapshot],
+    );
+
+    const handleOutSnapshot = useCallback(
+        snapshot => handleStageSnapshot('status_out', snapshot),
+        [handleStageSnapshot],
+    );
+
+    const applyLocalQueueTransition = useCallback((updatedQueueItem, fromStage, toStage) => {
+        const queueItemId = parseEntityId(updatedQueueItem?.id || updatedQueueItem?.['@id']);
+        if (!queueItemId) {
+            return;
+        }
+
+        const currentQueueState = ordersRef.current || createEmptyOrders();
+        const previousQueueItem = STAGE_KEYS
+            .flatMap(stage => currentQueueState?.[stage] || [])
+            .find(item => parseEntityId(item?.id || item?.['@id']) === queueItemId);
+
+        const nextQueueItem = previousQueueItem
+            ? {
+                ...previousQueueItem,
+                ...updatedQueueItem,
+                order_product: updatedQueueItem?.order_product || previousQueueItem?.order_product,
+                queue: updatedQueueItem?.queue || previousQueueItem?.queue,
+                status: updatedQueueItem?.status || previousQueueItem?.status,
+            }
+            : updatedQueueItem;
+
+        const nextQueueState = {
+            status_in: (currentQueueState.status_in || []).filter(
+                item => parseEntityId(item?.id || item?.['@id']) !== queueItemId,
+            ),
+            status_working: (currentQueueState.status_working || []).filter(
+                item => parseEntityId(item?.id || item?.['@id']) !== queueItemId,
+            ),
+            status_out: (currentQueueState.status_out || []).filter(
+                item => parseEntityId(item?.id || item?.['@id']) !== queueItemId,
+            ),
+        };
+
+        if (toStage && Array.isArray(nextQueueState[toStage])) {
+            nextQueueState[toStage] = [
+                nextQueueItem,
+                ...nextQueueState[toStage],
+            ];
+        }
+
+        ordersRef.current = nextQueueState;
+        setOrders(nextQueueState);
+        setTotals(currentTotals => {
+            const nextTotals = { ...currentTotals };
+
+            if (fromStage && Object.prototype.hasOwnProperty.call(nextTotals, fromStage)) {
+                nextTotals[fromStage] = Math.max(0, Number(nextTotals[fromStage] || 0) - 1);
+            }
+
+            if (toStage && Object.prototype.hasOwnProperty.call(nextTotals, toStage)) {
+                nextTotals[toStage] = Number(nextTotals[toStage] || 0) + 1;
+            }
+
+            return nextTotals;
+        });
+
+        setTabIndex(WORKING_TAB_INDEX);
+        bumpStageRefreshTokens([fromStage, toStage].filter(Boolean));
+    }, [bumpStageRefreshTokens]);
+
+    useEffect(() => {
+        applyLocalQueueTransitionRef.current = applyLocalQueueTransition;
+    }, [applyLocalQueueTransition]);
+
+    const saveQueueItem = useCallback(
+        payload => orderProductQueueActions.save(payload),
+        [orderProductQueueActions],
+    );
+
     const getResponsiveItemsPerPage = () => 6;
 
-    // 🔥 AUTO START (mantido)
     useEffect(() => {
         const autoStart = async () => {
-            const itensPerPage = getResponsiveItemsPerPage();
+            const itemsPerPage = getResponsiveItemsPerPage();
 
             if (isSaving) return;
-            if (!loaded.status_working) return;
-            if (!loaded.status_in) return;
-            if (!statusWorking?.['@id']) return;
+            if (!loaded.status_working || !loaded.status_in) return;
+            if (!queueBindings.statusWorking?.['@id']) return;
             if (!orders.status_in.length) return;
-            if (totals.status_working >= itensPerPage) return;
+            if (totals.status_working >= itemsPerPage) return;
             if (totals.status_in === 0) return;
 
             const pendingAutoStarts = autoStartingIdsRef.current;
             const visibleInIds = new Set(
-                (Array.isArray(orders.status_in) ? orders.status_in : [])
+                orders.status_in
                     .map(order => Number(order?.id || 0))
-                    .filter(Boolean)
+                    .filter(Boolean),
             );
+
             pendingAutoStarts.forEach(id => {
                 if (!visibleInIds.has(id)) {
                     pendingAutoStarts.delete(id);
                 }
             });
 
-            const needed = itensPerPage - totals.status_working;
+            const needed = itemsPerPage - totals.status_working;
             const ordersToStart = orders.status_in
                 .filter(order => {
                     const orderId = Number(order?.id || 0);
@@ -254,329 +470,72 @@ const DisplayProducts = ({ display = {} }) => {
 
             for (const order of ordersToStart) {
                 const orderId = Number(order?.id || 0);
+
                 try {
-                    const updatedQueueItem = await actions.save({
+                    const updatedQueueItem = await orderProductQueueActions.save({
                         id: order.id,
-                        status: statusWorking['@id'],
+                        status: queueBindings.statusWorking['@id'],
                     });
-                    applyLocalQueueTransitionRef.current(updatedQueueItem, 'status_in', 'status_working');
-                    if (orderId > 0) {
-                        pendingAutoStarts.delete(orderId);
-                    }
-                } catch (e) {
-                    if (orderId > 0) {
-                        pendingAutoStarts.delete(orderId);
-                    }
+
+                    applyLocalQueueTransitionRef.current(
+                        updatedQueueItem,
+                        'status_in',
+                        'status_working',
+                    );
+                    pendingAutoStarts.delete(orderId);
+                } catch (error) {
+                    pendingAutoStarts.delete(orderId);
                 }
             }
         };
 
         autoStart();
-    }, [actions, isSaving, loaded.status_in, loaded.status_working, orders.status_in, statusWorking, totals.status_in, totals.status_working]);
-
-    // 🔥 REQUEST SEM FLICKER
-    const noteRefresh = useCallback((source, detail = '') => {
-        const updatedAt = new Date().toISOString();
-        setRefreshDebug({
-            lastAt: updatedAt,
-            lastSource: source || 'manual',
-            lastDetail: detail || '',
-        });
-        runtimeDebugActions.setFooterEntry({
-            key: 'screen-refresh',
-            order: 20,
-            updatedAt,
-            lines: [
-                `ultimo refresh: ${formatDebugClock(updatedAt)} | origem: ${source || 'manual'}${detail ? ` (${detail})` : ''}`,
-            ],
-        });
-    }, [runtimeDebugActions]);
-
-    useEffect(() => {
-        return () => {
-            runtimeDebugActions.clearFooterEntry('screen-refresh');
-            if (socketRefreshTimeoutRef.current) {
-                clearTimeout(socketRefreshTimeoutRef.current);
-                socketRefreshTimeoutRef.current = null;
-            }
-        };
-    }, [runtimeDebugActions]);
-
-    const applyQueueSnapshot = useCallback((nextQueueState, { markLoaded = false } = {}) => {
-        const normalizedQueueState = {
-            status_in: Array.isArray(nextQueueState?.status_in) ? nextQueueState.status_in : [],
-            status_working: Array.isArray(nextQueueState?.status_working) ? nextQueueState.status_working : [],
-            status_out: Array.isArray(nextQueueState?.status_out) ? nextQueueState.status_out : [],
-        };
-
-        ordersRef.current = normalizedQueueState;
-        setOrders(normalizedQueueState);
-        setTotals({
-            status_in: normalizedQueueState.status_in.length,
-            status_working: normalizedQueueState.status_working.length,
-            status_out: normalizedQueueState.status_out.length,
-        });
-
-        if (markLoaded) {
-            setLoaded({
-                status_in: true,
-                status_working: true,
-                status_out: true,
-            });
-        }
-    }, []);
-
-    const applyLocalQueueTransition = useCallback((updatedQueueItem, fromStage, toStage) => {
-        const queueItemId = parseEntityId(updatedQueueItem?.id || updatedQueueItem?.['@id']);
-        if (!queueItemId) {
-            return;
-        }
-
-        const currentQueueState = ordersRef.current || {
-            status_in: [],
-            status_working: [],
-            status_out: [],
-        };
-
-        const previousQueueItem = [
-            ...(Array.isArray(currentQueueState.status_in) ? currentQueueState.status_in : []),
-            ...(Array.isArray(currentQueueState.status_working) ? currentQueueState.status_working : []),
-            ...(Array.isArray(currentQueueState.status_out) ? currentQueueState.status_out : []),
-        ].find(item => parseEntityId(item?.id || item?.['@id']) === queueItemId);
-
-        const nextQueueItem = previousQueueItem
-            ? {
-                ...previousQueueItem,
-                ...updatedQueueItem,
-                order_product: updatedQueueItem?.order_product || previousQueueItem?.order_product,
-                queue: updatedQueueItem?.queue || previousQueueItem?.queue,
-                status: updatedQueueItem?.status || previousQueueItem?.status,
-            }
-            : updatedQueueItem;
-
-        const nextQueueState = {
-            status_in: (Array.isArray(currentQueueState.status_in) ? currentQueueState.status_in : []).filter(
-                item => parseEntityId(item?.id || item?.['@id']) !== queueItemId
-            ),
-            status_working: (Array.isArray(currentQueueState.status_working) ? currentQueueState.status_working : []).filter(
-                item => parseEntityId(item?.id || item?.['@id']) !== queueItemId
-            ),
-            status_out: (Array.isArray(currentQueueState.status_out) ? currentQueueState.status_out : []).filter(
-                item => parseEntityId(item?.id || item?.['@id']) !== queueItemId
-            ),
-        };
-
-        const normalizedOriginStage = normalizeText(fromStage);
-        const normalizedTargetStage = normalizeText(toStage);
-        if (normalizedOriginStage && !normalizedTargetStage) {
-            applyQueueSnapshot(nextQueueState);
-            return;
-        }
-
-        if (
-            normalizedTargetStage &&
-            Array.isArray(nextQueueState[normalizedTargetStage])
-        ) {
-            nextQueueState[normalizedTargetStage] = [
-                nextQueueItem,
-                ...nextQueueState[normalizedTargetStage],
-            ];
-        }
-
-        applyQueueSnapshot(nextQueueState);
-    }, [applyQueueSnapshot]);
-
-    useEffect(() => {
-        applyLocalQueueTransitionRef.current = applyLocalQueueTransition;
-    }, [applyLocalQueueTransition]);
-
-    const resolveQueueBindings = useCallback(async (forceRefresh = false) => {
-        if (!currentCompany?.id || !displayId) {
-            return {
-                queueIds: [],
-                inIds: [],
-                workingIds: [],
-                outIds: [],
-                statusIn: null,
-                statusWorking: null,
-                statusOut: null,
-            };
-        }
-
-        if (!forceRefresh && queueBindingsRef.current.queueIds.length > 0) {
-            return queueBindingsRef.current;
-        }
-
-        const result = await displayQueueActions.getItems({ display: displayId });
-        const inIds = [];
-        const workingIds = [];
-        const outIds = [];
-        const queueIds = [];
-
-        let statusIn = null;
-        let statusWorking = null;
-        let statusOut = null;
-
-        (Array.isArray(result) ? result : []).forEach(item => {
-            if (item?.queue?.id) {
-                queueIds.push(item.queue.id);
-            }
-
-            if (item?.queue?.status_in) {
-                inIds.push(item.queue.status_in.id);
-                statusIn = statusIn || item.queue.status_in;
-            }
-            if (item?.queue?.status_working) {
-                workingIds.push(item.queue.status_working.id);
-                statusWorking = statusWorking || item.queue.status_working;
-            }
-            if (item?.queue?.status_out) {
-                outIds.push(item.queue.status_out.id);
-                statusOut = statusOut || item.queue.status_out;
-            }
-        });
-
-        const nextBindings = {
-            queueIds: [...new Set(queueIds.filter(Boolean))],
-            inIds: [...new Set(inIds.filter(Boolean))],
-            workingIds: [...new Set(workingIds.filter(Boolean))],
-            outIds: [...new Set(outIds.filter(Boolean))],
-            statusIn,
-            statusWorking,
-            statusOut,
-        };
-
-        queueBindingsRef.current = nextBindings;
-        return nextBindings;
-    }, [currentCompany?.id, displayId, displayQueueActions]);
-
-    const loadDisplayQueues = useCallback(async (source = 'manual', detail = '') => {
-        const refreshSources = new Set(
-            String(detail || '')
-                .split('+')
-                .map(entry => normalizeText(entry))
-                .filter(Boolean)
-        );
-        const queueBindings = await resolveQueueBindings(
-            !queueBindingsRef.current.queueIds.length ||
-            source === 'focus' ||
-            source === 'manual' ||
-            refreshSources.has('queues') ||
-            refreshSources.has('display_queues')
-        );
-
-        const [inOrders, workingOrders, outOrders] = await Promise.all([
-            fetchDisplayQueueItems({
-                statusIds: queueBindings.inIds,
-                queueIds: queueBindings.queueIds,
-                providerId: currentCompany?.id,
-            }),
-            fetchDisplayQueueItems({
-                statusIds: queueBindings.workingIds,
-                queueIds: queueBindings.queueIds,
-                providerId: currentCompany?.id,
-            }),
-            fetchDisplayQueueItems({
-                statusIds: queueBindings.outIds,
-                queueIds: queueBindings.queueIds,
-                providerId: currentCompany?.id,
-            }),
-        ]);
-
-        applyQueueSnapshot({
-            status_in: inOrders,
-            status_working: workingOrders,
-            status_out: outOrders,
-        }, { markLoaded: true });
-
-        setStatusIn(queueBindings.statusIn);
-        setStatusWorking(queueBindings.statusWorking);
-        setStatusOut(queueBindings.statusOut);
-        noteRefresh(source, detail);
-    }, [applyQueueSnapshot, currentCompany?.id, noteRefresh, resolveQueueBindings]);
-
-    const onRequest = useCallback(async (source = 'manual', detail = '') => {
-        if (!currentCompany?.id || !displayId) {
-            return;
-        }
-
-        requestQueueRef.current = { source, detail };
-        if (requestInFlightRef.current) {
-            return;
-        }
-
-        requestInFlightRef.current = true;
-        try {
-            while (requestQueueRef.current) {
-                const nextRequest = requestQueueRef.current;
-                requestQueueRef.current = null;
-
-                try {
-                    await loadDisplayQueues(
-                        nextRequest?.source || 'manual',
-                        nextRequest?.detail || ''
-                    );
-                } catch (e) {
-                    // O proximo evento do socket pode reidratar a tela.
-                }
-            }
-        } finally {
-            requestInFlightRef.current = false;
-        }
-    }, [currentCompany?.id, displayId, loadDisplayQueues]);
+    }, [
+        isSaving,
+        loaded.status_in,
+        loaded.status_working,
+        orderProductQueueActions,
+        orders.status_in,
+        queueBindings.statusWorking,
+        totals.status_in,
+        totals.status_working,
+    ]);
 
     const hasQueueRefreshMessage = useMemo(
         () =>
             (Array.isArray(queueMessages) ? queueMessages : []).some(message =>
-                isMessageForCompany(message, currentCompany?.id)
+                isMessageForCompany(message, currentCompany?.id),
             ),
-        [currentCompany?.id, queueMessages]
+        [currentCompany?.id, queueMessages],
     );
 
     const hasDisplayQueueRefreshMessage = useMemo(
         () =>
             (Array.isArray(displayQueueMessages) ? displayQueueMessages : []).some(message =>
-                isMessageForCompany(message, currentCompany?.id)
+                isMessageForCompany(message, currentCompany?.id),
             ),
-        [currentCompany?.id, displayQueueMessages]
+        [currentCompany?.id, displayQueueMessages],
     );
 
     const hasOrderRefreshMessage = useMemo(
         () =>
             (Array.isArray(orderMessages) ? orderMessages : []).some(message =>
-                isMessageForCompany(message, currentCompany?.id)
+                isMessageForCompany(message, currentCompany?.id),
             ),
-        [currentCompany?.id, orderMessages]
+        [currentCompany?.id, orderMessages],
     );
 
     const hasOrderProductQueueRefreshMessage = useMemo(
         () =>
             (Array.isArray(orderProductQueueMessages) ? orderProductQueueMessages : []).some(message =>
-                isMessageForCompany(message, currentCompany?.id)
+                isMessageForCompany(message, currentCompany?.id),
             ),
-        [currentCompany?.id, orderProductQueueMessages]
-    );
-
-    const printButtonProps = useMemo(
-        () => ({
-            store: 'order_products_queue',
-            printerSelection: {
-                enabled: true,
-                context: 'display',
-                display,
-                displayId: display?.id,
-            },
-        }),
-        [display]
-    );
-
-    const saveQueueItem = useCallback(
-        payload => actions.save(payload),
-        [actions]
+        [currentCompany?.id, orderProductQueueMessages],
     );
 
     useEffect(() => {
         if (
+            !hasHydratedStatusesRef.current ||
             isSaving ||
             (!hasQueueRefreshMessage &&
                 !hasOrderRefreshMessage &&
@@ -589,7 +548,10 @@ const DisplayProducts = ({ display = {} }) => {
         queuesActions.setMessages(removeConsumedMessages(queueMessages, currentCompany?.id));
         ordersActions.setMessages(removeConsumedMessages(orderMessages, currentCompany?.id));
         displayQueueActions.setMessages(removeConsumedMessages(displayQueueMessages, currentCompany?.id));
-        actions.setMessages(removeConsumedMessages(orderProductQueueMessages, currentCompany?.id));
+        orderProductQueueActions.setMessages(
+            removeConsumedMessages(orderProductQueueMessages, currentCompany?.id),
+        );
+
         const refreshSources = [
             hasQueueRefreshMessage ? 'queues' : '',
             hasOrderRefreshMessage ? 'orders' : '',
@@ -603,121 +565,186 @@ const DisplayProducts = ({ display = {} }) => {
 
         socketRefreshTimeoutRef.current = setTimeout(() => {
             socketRefreshTimeoutRef.current = null;
-            onRequest('socket', refreshSources.join('+'));
+            requestRefresh('socket', refreshSources.join('+'), {
+                refreshBindings:
+                    refreshSources.includes('queues') ||
+                    refreshSources.includes('display_queues'),
+                switchToWorking: true,
+            });
         }, 220);
     }, [
-        actions,
         currentCompany?.id,
         displayQueueActions,
         displayQueueMessages,
-        hasOrderRefreshMessage,
-        hasQueueRefreshMessage,
         hasDisplayQueueRefreshMessage,
         hasOrderProductQueueRefreshMessage,
+        hasOrderRefreshMessage,
+        hasQueueRefreshMessage,
         isSaving,
-        onRequest,
         orderMessages,
-        ordersActions,
+        orderProductQueueActions,
         orderProductQueueMessages,
+        ordersActions,
         queueMessages,
         queuesActions,
+        requestRefresh,
     ]);
 
-    // 🔥 PRIMEIRA CARGA
     useEffect(() => {
         const wasConnected = previousSocketConnectedRef.current;
         previousSocketConnectedRef.current = websocketConnected;
 
-        if (websocketConnected && !wasConnected && currentCompany?.id) {
-            onRequest('socket', 'reconnected-sync');
+        if (
+            websocketConnected &&
+            !wasConnected &&
+            currentCompany?.id &&
+            hasHydratedStatusesRef.current
+        ) {
+            requestRefresh('socket', 'reconnected-sync', {
+                refreshBindings: true,
+                switchToWorking: true,
+            });
         }
-    }, [currentCompany?.id, onRequest, websocketConnected]);
+    }, [currentCompany?.id, requestRefresh, websocketConnected]);
 
     useFocusEffect(
         useCallback(() => {
-            if (!currentCompany?.id) return undefined;
-            onRequest('focus', 'screen-focus');
+            if (!currentCompany?.id || !hasHydratedStatusesRef.current) {
+                return undefined;
+            }
+
+            requestRefresh('focus', 'screen-focus');
             return undefined;
-        }, [currentCompany?.id, onRequest])
+        }, [currentCompany?.id, requestRefresh]),
+    );
+
+    const printButtonProps = useMemo(
+        () => ({
+            store: 'order_products_queue',
+            printerSelection: {
+                enabled: true,
+                context: 'display',
+                display,
+                displayId: display?.id,
+            },
+        }),
+        [display],
     );
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* HEADER */}
-            <View style={styles.summaryCard}>
-                <View style={styles.summaryStatsRow}>
-                    <TouchableOpacity
-                        style={styles.summaryStatPill}
-                        onPress={() => setModalType('in')}
-                    >
-                        <Text style={styles.summaryStatLabel}>Fila</Text>
-                        <Text style={styles.summaryStatValue}>{totals.status_in}</Text>
-                    </TouchableOpacity>
+            <View style={styles.tabsContainer}>
+                <DateShortcutFilter
+                    value={dateFilterKey}
+                    onChange={setDateFilterKey}
+                    ppcColorsOverride={ppcColors}
+                />
 
-                    <View style={styles.summaryStatPill}>
-                        <Text style={styles.summaryStatLabel}>Prep</Text>
-                        <Text style={styles.summaryStatValue}>{totals.status_working}</Text>
+                <View style={styles.tabsCard}>
+                    <View style={styles.tabBar}>
+                        {TAB_ROUTES.map((tabRoute, index) => {
+                            const focused = tabIndex === index;
+
+                            return (
+                                <TouchableOpacity
+                                    key={tabRoute.key}
+                                    activeOpacity={0.85}
+                                    style={styles.tabButton}
+                                    onPress={() => setTabIndex(index)}
+                                >
+                                    <View style={styles.tabLabelWrap}>
+                                        <Text
+                                            style={[
+                                                styles.tabLabelTitle,
+                                                focused ? styles.tabLabelTitleActive : null,
+                                            ]}
+                                        >
+                                            {tabRoute.title}
+                                        </Text>
+                                        <Text
+                                            style={[
+                                                styles.tabLabelCount,
+                                                focused ? styles.tabLabelCountActive : null,
+                                            ]}
+                                        >
+                                            {totals[tabRoute.key] || 0}
+                                        </Text>
+                                    </View>
+                                    <View
+                                        style={[
+                                            styles.tabIndicator,
+                                            focused ? styles.tabIndicatorActive : null,
+                                        ]}
+                                    />
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
 
-                    <TouchableOpacity
-                        style={styles.summaryStatPill}
-                        onPress={() => setModalType('out')}
+                    <View style={styles.sceneContainer}>
+                    <View
+                        style={[
+                            styles.scenePanel,
+                            tabIndex === 0 ? styles.sceneVisible : styles.sceneHidden,
+                        ]}
                     >
-                        <Text style={styles.summaryStatLabel}>Pronto</Text>
-                        <Text style={styles.summaryStatValue}>{totals.status_out}</Text>
-                    </TouchableOpacity>
+                        <InOut
+                            companyId={currentCompany?.id}
+                            queueBindings={queueBindings}
+                            dateRange={dateRange}
+                            stageKey="status_in"
+                            refreshToken={statusRefreshTokens.status_in}
+                            onSnapshotChange={handleInSnapshot}
+                            status_working={queueBindings.statusWorking}
+                            saveQueueItem={saveQueueItem}
+                            onTransition={applyLocalQueueTransition}
+                            printButtonProps={printButtonProps}
+                            ppcColorsOverride={ppcColors}
+                        />
+                    </View>
+
+                    <View
+                        style={[
+                            styles.scenePanel,
+                            tabIndex === WORKING_TAB_INDEX ? styles.sceneVisible : styles.sceneHidden,
+                        ]}
+                    >
+                        <Working
+                            companyId={currentCompany?.id}
+                            queueBindings={queueBindings}
+                            dateRange={dateRange}
+                            refreshToken={statusRefreshTokens.status_working}
+                            onSnapshotChange={handleWorkingSnapshot}
+                            status_out={queueBindings.statusOut}
+                            saveQueueItem={saveQueueItem}
+                            onTransition={applyLocalQueueTransition}
+                            printButtonProps={printButtonProps}
+                            ppcColorsOverride={ppcColors}
+                        />
+                    </View>
+
+                    <View
+                        style={[
+                            styles.scenePanel,
+                            tabIndex === 2 ? styles.sceneVisible : styles.sceneHidden,
+                        ]}
+                    >
+                        <InOut
+                            companyId={currentCompany?.id}
+                            queueBindings={queueBindings}
+                            dateRange={dateRange}
+                            stageKey="status_out"
+                            refreshToken={statusRefreshTokens.status_out}
+                            onSnapshotChange={handleOutSnapshot}
+                            saveQueueItem={saveQueueItem}
+                            onTransition={applyLocalQueueTransition}
+                            printButtonProps={printButtonProps}
+                            ppcColorsOverride={ppcColors}
+                        />
+                    </View>
+                    </View>
                 </View>
             </View>
-
-            {/* WORKING */}
-            <ScrollView contentContainerStyle={styles.content}>
-                {loaded.status_working && (
-                    <Working
-                        orders={orders.status_working}
-                        total={totals.status_working}
-                        status_working={statusWorking}
-                        status_out={statusOut}
-                        saveQueueItem={saveQueueItem}
-                        onTransition={applyLocalQueueTransition}
-                        printButtonProps={printButtonProps}
-                        ppcColorsOverride={ppcColors}
-                    />
-                )}
-            </ScrollView>
-
-            {/* MODAL */}
-            <Modal visible={!!modalType} animationType="slide">
-                <SafeAreaView style={styles.modalContainer}>
-                    <TouchableOpacity onPress={() => setModalType(null)}>
-                        <Text style={styles.closeButton}>Fechar</Text>
-                    </TouchableOpacity>
-
-                    {modalType === 'in' && (
-                        <InOut
-                            orders={orders.status_in}
-                            total={totals.status_in}
-                            status_in={statusIn}
-                            status_working={statusWorking}
-                            saveQueueItem={saveQueueItem}
-                            onTransition={applyLocalQueueTransition}
-                            printButtonProps={printButtonProps}
-                            ppcColorsOverride={ppcColors}
-                        />
-                    )}
-
-                    {modalType === 'out' && (
-                        <InOut
-                            orders={orders.status_out}
-                            total={totals.status_out}
-                            status_in={statusOut}
-                            saveQueueItem={saveQueueItem}
-                            onTransition={applyLocalQueueTransition}
-                            printButtonProps={printButtonProps}
-                            ppcColorsOverride={ppcColors}
-                        />
-                    )}
-                </SafeAreaView>
-            </Modal>
 
             <RealtimeDebugBar
                 companyId={currentCompany?.id}
@@ -728,56 +755,5 @@ const DisplayProducts = ({ display = {} }) => {
         </SafeAreaView>
     );
 };
-
-const createStyles = (ppcColors) =>
-    StyleSheet.create({
-        container: {
-            flex: 1,
-            backgroundColor: ppcColors.appBg,
-        },
-        summaryCard: {
-            margin: 12,
-            padding: 10,
-            borderRadius: 18,
-            borderWidth: 1,
-            borderColor: ppcColors.borderSoft,
-            backgroundColor: ppcColors.cardBg,
-        },
-        summaryStatsRow: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-        },
-        summaryStatPill: {
-            flex: 1,
-            marginHorizontal: 3,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: ppcColors.border,
-            backgroundColor: ppcColors.cardBgSoft,
-            paddingVertical: 10,
-            alignItems: 'center',
-        },
-        summaryStatLabel: {
-            fontSize: 11,
-            fontWeight: '700',
-        },
-        summaryStatValue: {
-            fontSize: 22,
-            fontWeight: '900',
-        },
-        content: {
-            padding: 10,
-        },
-        modalContainer: {
-            flex: 1,
-            padding: 10,
-            backgroundColor: ppcColors.appBg,
-        },
-        closeButton: {
-            fontSize: 18,
-            fontWeight: 'bold',
-            marginBottom: 10,
-        },
-    });
 
 export default DisplayProducts;
