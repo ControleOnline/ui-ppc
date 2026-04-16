@@ -24,6 +24,15 @@ const formatDisplayTime = value => {
 const resolveMarketplaceTitle = marketplaceLabel =>
     marketplaceLabel ? `Pedido ${marketplaceLabel}` : 'Pedido delivery';
 
+const formatMarketplaceCode = value => {
+    const normalized = String(value || '').trim();
+    if (!normalized) {
+        return '';
+    }
+
+    return normalized.startsWith('#') ? normalized : `#${normalized}`;
+};
+
 const InOut = ({
     orders = [],
     total = 0,
@@ -97,7 +106,7 @@ const InOut = ({
                                             )}
                                         </Text>
                                         <Text style={styles.marketplaceCode}>
-                                            {orderSummary.marketplaceOrderCode}
+                                            {formatMarketplaceCode(orderSummary.marketplaceOrderCode)}
                                         </Text>
                                     </View>
                                 )}

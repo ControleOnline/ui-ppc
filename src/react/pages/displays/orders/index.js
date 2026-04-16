@@ -20,6 +20,7 @@ import {
   getOrderChannelLabel,
   getOrderChannelLogo,
 } from '@assets/ppc/channels'
+import { buildFood99OrderSummary } from '@controleonline/ui-orders/src/react/services/food99OrderSummary'
 import { resolveDisplayedOrderStatus } from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
@@ -202,6 +203,14 @@ const getExternalOrderRef = order => {
   const preferred = entries.find(item => isChannelContext(item?.context))
   const fallback = entries[0]
   return normalizeText(preferred?.value || fallback?.value)
+}
+
+const getProductionOrderRef = order => {
+  const remoteOrderSummary = buildFood99OrderSummary(order)
+  return normalizeText(
+    remoteOrderSummary?.identifiers?.orderIndex ||
+      getExternalOrderRef(order),
+  )
 }
 
 const resolveOrderDateValue = order =>
@@ -779,8 +788,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       const waitingMinutes = getWaitingMinutes(orderDateValue)
       const channelLogo = getOrderChannelLogo(order)
       const channelLabel = String(getOrderChannelLabel(order) || 'SHOP').toUpperCase()
-      const externalRef = truncateMiddle(getExternalOrderRef(order))
-      const channelDisplay = externalRef ? `${channelLabel} (${externalRef})` : channelLabel
+      const productionOrderRef = truncateMiddle(getProductionOrderRef(order))
+      const orderTitleText = productionOrderRef
+        ? `${channelLabel} #${productionOrderRef}`
+        : `Pedido #${order?.id}`
+      const channelDisplay = order?.id && productionOrderRef
+        ? `Interno #${order.id}`
+        : channelLabel
       const products = normalizedItem?.products || getOrderProductsPreview(order, compactMode ? 3 : 5)
       const price = Number(order?.price || 0)
 
@@ -823,7 +837,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 </View>
 
                 <View style={styles.orderTitleWrap}>
-                  <Text style={[styles.orderTitle, compactMode && styles.tvOrderTitle]}>Pedido #{order?.id}</Text>
+                  <Text style={[styles.orderTitle, compactMode && styles.tvOrderTitle]}>{orderTitleText}</Text>
                   <Text style={[styles.orderDate, compactMode && styles.tvOrderDate]}>{formatOrderDate(orderDateValue)}</Text>
                 </View>
               </View>

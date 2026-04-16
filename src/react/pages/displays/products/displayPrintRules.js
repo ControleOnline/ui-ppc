@@ -147,17 +147,21 @@ const resolveMarketplaceOrderCode = (order, remoteOrderSummary = null) => {
 
   if (app === 'ifood') {
     return normalizeText(
-      getMarketplaceField(order, ['ifood'], 'code') ||
-        getMarketplaceField(order, ['ifood'], 'id') ||
-        fallbackCode,
+      fallbackCode ||
+        getMarketplaceField(order, ['ifood'], 'displayId') ||
+        getMarketplaceField(order, ['ifood'], 'display_id') ||
+        getMarketplaceField(order, ['ifood'], 'code') ||
+        getMarketplaceField(order, ['ifood'], 'id'),
     );
   }
 
   if (['99', '99food', '99 food', 'food99'].includes(app)) {
     return normalizeText(
-      getMarketplaceField(order, ['99', '99food', 'food99'], 'code') ||
-        getMarketplaceField(order, ['99', '99food', 'food99'], 'id') ||
-        fallbackCode,
+      fallbackCode ||
+        getMarketplaceField(order, ['99', '99food', 'food99'], 'displayId') ||
+        getMarketplaceField(order, ['99', '99food', 'food99'], 'display_id') ||
+        getMarketplaceField(order, ['99', '99food', 'food99'], 'code') ||
+        getMarketplaceField(order, ['99', '99food', 'food99'], 'id'),
     );
   }
 
