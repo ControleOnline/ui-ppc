@@ -38,6 +38,14 @@ import {
   DISPLAY_MIN_COLUMNS_CONFIG_KEY,
 } from '@controleonline/ui-ppc/src/react/utils/forcedDisplay'
 const normalizeText = value => String(value || '').trim()
+const normalizeQuantity = value => {
+  const numericValue = Number(value || 0)
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 1
+}
+const formatQuantityPrefix = value => {
+  const quantity = normalizeQuantity(value)
+  return quantity >= 2 ? `${quantity}x ` : ''
+}
 const getOrderProductCategoryLabel = item =>
   normalizeText(
     item?.product?.category?.name ||
@@ -329,7 +337,7 @@ const estimateTvProductUnits = (product, charsPerLine = 28) => {
 
     ;(Array.isArray(items) ? items : []).forEach(child => {
       units += estimateTextUnits(
-        `${Number(child?.quantity || 1)}x ${normalizeText(child?.name)}`,
+        `${formatQuantityPrefix(child?.quantity)}${normalizeText(child?.name)}`.trim(),
         charsPerLine,
       )
     })
@@ -912,7 +920,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                   >
                     <View style={styles.productRow}>
                       <View style={[styles.qtyPill, compactMode && styles.tvQtyPill]}>
-                        <Text style={[styles.qtyPillText, compactMode && styles.tvQtyPillText]}>{product.quantity}x</Text>
+                        <Text style={[styles.qtyPillText, compactMode && styles.tvQtyPillText]}>
+                          {`${normalizeQuantity(product.quantity)}x`}
+                        </Text>
                       </View>
 
                       <View style={{ flex: 1 }}>
@@ -943,7 +953,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                         {items.map(child => (
                           <View key={child.id} style={[styles.groupItem, { marginLeft: 12 }]}>
                             <Text style={[styles.groupItemText, compactMode && styles.tvGroupItemText]}>
-                              {child.quantity}x {child.name}
+                              {`${formatQuantityPrefix(child.quantity)}${child.name}`.trim()}
                             </Text>
                           </View>
                         ))}

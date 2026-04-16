@@ -3,6 +3,14 @@ import { View, Text } from 'react-native'
 import Formatter from '@controleonline/ui-common/src/utils/formatter'
 
 const normalizeText = value => String(value || '').trim()
+const normalizeQuantity = value => {
+    const numericValue = Number(value || 0)
+    return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 1
+}
+const formatQuantityPrefix = value => {
+    const quantity = normalizeQuantity(value)
+    return quantity >= 2 ? `${quantity}x ` : ''
+}
 
 const toEntityId = value => {
     if (!value) return ''
@@ -355,8 +363,8 @@ const OrderProducts = ({ order, styles, showDetails = false }) => {
                                 {isRootZero ? (
                                     <Text style={{ color: 'red', fontWeight: 'bold' }}>REMOVER </Text>
                                 ) : null}
-                                {card.quantity > 1 && !isRootZero ? (
-                                    <Text style={styles.qtyText}>{card.quantity}x </Text>
+                                {!isRootZero ? (
+                                    <Text style={styles.qtyText}>{normalizeQuantity(card.quantity)}x </Text>
                                 ) : null}
                                 {card.name || `Item #${index + 1}`}
                             </Text>
@@ -390,40 +398,44 @@ const OrderProducts = ({ order, styles, showDetails = false }) => {
                                                 </View>
                                             )}
 
-                                            {group.items.map(child => (
-                                                <View key={child.id} style={styles.groupItem}>
-                                                    <View style={styles.groupItemRow}>
-                                                        <Text style={styles.groupItemText}>
-                                                            <Text style={[styles.statusMarker, { color: child.isZero ? 'red' : child.itemColor }]}>* </Text>
-                                                            {child.isZero ? (
-                                                                <Text style={{ color: 'red', fontWeight: 'bold' }}>REMOVER </Text>
-                                                            ) : null}
-                                                            {!child.isZero ? (
-                                                                <Text style={styles.qtyText}>{Number(child.quantity || 0) || 1}x </Text>
-                                                            ) : null}
-                                                            {child.name}
-                                                        </Text>
+                                            {group.items.map(child => {
+                                                const childQuantityPrefix = formatQuantityPrefix(child.quantity)
 
-                                                        {showDetails && child.totalPrice > 0 && (
-                                                            <Text style={styles.groupItemPriceText}>
-                                                                {Formatter.formatMoney(child.totalPrice)}
+                                                return (
+                                                    <View key={child.id} style={styles.groupItem}>
+                                                        <View style={styles.groupItemRow}>
+                                                            <Text style={styles.groupItemText}>
+                                                                <Text style={[styles.statusMarker, { color: child.isZero ? 'red' : child.itemColor }]}>* </Text>
+                                                                {child.isZero ? (
+                                                                    <Text style={{ color: 'red', fontWeight: 'bold' }}>REMOVER </Text>
+                                                                ) : null}
+                                                                {!child.isZero && childQuantityPrefix ? (
+                                                                    <Text style={styles.qtyText}>{childQuantityPrefix}</Text>
+                                                                ) : null}
+                                                                {child.name}
+                                                            </Text>
+
+                                                            {showDetails && child.totalPrice > 0 && (
+                                                                <Text style={styles.groupItemPriceText}>
+                                                                    {Formatter.formatMoney(child.totalPrice)}
+                                                                </Text>
+                                                            )}
+                                                        </View>
+
+                                                        {showDetails && !!child.description && (
+                                                            <Text style={styles.groupItemMetaText}>
+                                                                {child.description}
+                                                            </Text>
+                                                        )}
+
+                                                        {showDetails && !!child.observation && (
+                                                            <Text style={styles.groupItemMetaText}>
+                                                                Obs: {child.observation}
                                                             </Text>
                                                         )}
                                                     </View>
-
-                                                    {showDetails && !!child.description && (
-                                                        <Text style={styles.groupItemMetaText}>
-                                                            {child.description}
-                                                        </Text>
-                                                    )}
-
-                                                    {showDetails && !!child.observation && (
-                                                        <Text style={styles.groupItemMetaText}>
-                                                            Obs: {child.observation}
-                                                        </Text>
-                                                    )}
-                                                </View>
-                                            ))}
+                                                )
+                                            })}
                                         </View>
                                     ))}
                                 </View>
