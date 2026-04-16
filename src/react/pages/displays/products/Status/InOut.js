@@ -146,10 +146,9 @@ const InOut = ({
                                         <PrintButton
                                             {...printButtonProps}
                                             job={{
-                                                type: 'order-product',
-                                                orderProductId:
-                                                    orderProduct?.id || orderProduct?.['@id'],
-                                                orderProductQueueIds: [order?.id],
+                                                type: 'order-product-queue',
+                                                orderProductQueueId:
+                                                    order?.id || order?.['@id'],
                                             }}
                                             label="Imprimir"
                                             iconColor={ppcColors.textPrimary}
