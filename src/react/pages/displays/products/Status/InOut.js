@@ -48,6 +48,7 @@ const InOut = ({
     dateRange = null,
     refreshToken = 0,
     onSnapshotChange = null,
+    totalOverride = null,
     status_working = null,
     saveQueueItem = null,
     onTransition = null,
@@ -73,6 +74,8 @@ const InOut = ({
         refreshToken,
         onSnapshotChange,
     });
+    const displayTotal =
+        typeof totalOverride === 'number' ? totalOverride : total;
 
     const canStart = status_working?.['@id'] && typeof saveQueueItem === 'function';
 
@@ -222,7 +225,7 @@ const InOut = ({
                 <View style={styles.stageHeader}>
                     <Text style={styles.stageTitle}>{status?.status || 'Status'}</Text>
                     <View style={styles.totalPill}>
-                        <Text style={styles.totalPillText}>{total}</Text>
+                        <Text style={styles.totalPillText}>{displayTotal}</Text>
                     </View>
                 </View>
 

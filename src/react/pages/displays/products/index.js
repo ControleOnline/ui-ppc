@@ -3,11 +3,14 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { useStore } from '@store';
-import DateShortcutFilter from './DateShortcutFilter';
 import InOut from './Status/InOut';
 import Working from './Status/Working';
 import createStyles from './index.styles';
-import { DEFAULT_DATE_FILTER_KEY, getDateRange } from './dateFilterUtils';
+import DateShortcutFilter from '@controleonline/ui-common/src/react/components/filters/DateShortcutFilter';
+import {
+    DEFAULT_DATE_FILTER_KEY,
+    getDateRange,
+} from '@controleonline/ui-common/src/react/utils/dateRangeFilter';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar';
 
@@ -18,6 +21,7 @@ const TAB_ROUTES = [
     { key: 'status_working', title: 'Prep' },
     { key: 'status_out', title: 'Pronto' },
 ];
+const WORKING_TARGET_ITEMS = 6;
 
 const createEmptyOrders = () => ({
     status_in: [],
@@ -135,8 +139,10 @@ const DisplayProducts = ({ display = {} }) => {
     const [totals, setTotals] = useState(createEmptyCounters);
     const [loaded, setLoaded] = useState(createEmptyLoaded);
     const [dateFilterKey, setDateFilterKey] = useState(DEFAULT_DATE_FILTER_KEY);
+    const [customDateRange, setCustomDateRange] = useState({ from: '', to: '' });
     const [statusRefreshTokens, setStatusRefreshTokens] = useState(createEmptyCounters);
     const [bindingsRefreshToken, setBindingsRefreshToken] = useState(0);
+    const [autoStartingCount, setAutoStartingCount] = useState(0);
     const [refreshDebug, setRefreshDebug] = useState({
         lastAt: null,
         lastSource: 'boot',
@@ -156,9 +162,11 @@ const DisplayProducts = ({ display = {} }) => {
         setTotals(createEmptyCounters());
         setLoaded(createEmptyLoaded());
         setDateFilterKey(DEFAULT_DATE_FILTER_KEY);
+        setCustomDateRange({ from: '', to: '' });
         setQueueBindings(createEmptyBindings());
         setStatusRefreshTokens(createEmptyCounters());
         setBindingsRefreshToken(0);
+        setAutoStartingCount(0);
         setTabIndex(WORKING_TAB_INDEX);
         autoStartingIdsRef.current = new Set();
         hasHydratedStatusesRef.current = false;
@@ -170,9 +178,28 @@ const DisplayProducts = ({ display = {} }) => {
     }, [currentCompany?.id, displayId]);
 
     const dateRange = useMemo(
-        () => getDateRange(dateFilterKey),
-        [dateFilterKey],
+        () => getDateRange(dateFilterKey, customDateRange),
+        [customDateRange, dateFilterKey],
     );
+    const displayedTotals = useMemo(() => {
+        const reservedAutoStarts = Number(autoStartingCount || 0);
+
+        return {
+            ...totals,
+            status_in: Math.max(0, Number(totals.status_in || 0) - reservedAutoStarts),
+            status_working: Number(totals.status_working || 0) + reservedAutoStarts,
+        };
+    }, [autoStartingCount, totals]);
+
+    const syncAutoStartingIds = useCallback(updater => {
+        const nextIds = new Set(autoStartingIdsRef.current || new Set());
+
+        updater(nextIds);
+
+        autoStartingIdsRef.current = nextIds;
+        setAutoStartingCount(nextIds.size);
+        return nextIds;
+    }, []);
 
     const noteRefresh = useCallback((source, detail = '') => {
         const updatedAt = new Date().toISOString();
@@ -425,33 +452,40 @@ const DisplayProducts = ({ display = {} }) => {
         [orderProductQueueActions],
     );
 
-    const getResponsiveItemsPerPage = () => 6;
-
     useEffect(() => {
         const autoStart = async () => {
-            const itemsPerPage = getResponsiveItemsPerPage();
-
             if (isSaving) return;
             if (!loaded.status_working || !loaded.status_in) return;
             if (!queueBindings.statusWorking?.['@id']) return;
             if (!orders.status_in.length) return;
-            if (totals.status_working >= itemsPerPage) return;
             if (totals.status_in === 0) return;
 
-            const pendingAutoStarts = autoStartingIdsRef.current;
+            let pendingAutoStarts = autoStartingIdsRef.current;
             const visibleInIds = new Set(
                 orders.status_in
                     .map(order => Number(order?.id || 0))
                     .filter(Boolean),
             );
 
-            pendingAutoStarts.forEach(id => {
-                if (!visibleInIds.has(id)) {
-                    pendingAutoStarts.delete(id);
-                }
+            pendingAutoStarts = syncAutoStartingIds(nextIds => {
+                nextIds.forEach(id => {
+                    if (!visibleInIds.has(id)) {
+                        nextIds.delete(id);
+                    }
+                });
             });
 
-            const needed = itemsPerPage - totals.status_working;
+            const effectiveWorkingTotal =
+                Number(totals.status_working || 0) + pendingAutoStarts.size;
+            const effectiveInTotal = Math.max(
+                0,
+                Number(totals.status_in || 0) - pendingAutoStarts.size,
+            );
+
+            if (effectiveWorkingTotal >= WORKING_TARGET_ITEMS) return;
+            if (effectiveInTotal === 0) return;
+
+            const needed = WORKING_TARGET_ITEMS - effectiveWorkingTotal;
             const ordersToStart = orders.status_in
                 .filter(order => {
                     const orderId = Number(order?.id || 0);
@@ -461,11 +495,13 @@ const DisplayProducts = ({ display = {} }) => {
 
             if (!ordersToStart.length) return;
 
-            ordersToStart.forEach(order => {
-                const orderId = Number(order?.id || 0);
-                if (orderId > 0) {
-                    pendingAutoStarts.add(orderId);
-                }
+            syncAutoStartingIds(nextIds => {
+                ordersToStart.forEach(order => {
+                    const orderId = Number(order?.id || 0);
+                    if (orderId > 0) {
+                        nextIds.add(orderId);
+                    }
+                });
             });
 
             for (const order of ordersToStart) {
@@ -482,21 +518,27 @@ const DisplayProducts = ({ display = {} }) => {
                         'status_in',
                         'status_working',
                     );
-                    pendingAutoStarts.delete(orderId);
+                    syncAutoStartingIds(nextIds => {
+                        nextIds.delete(orderId);
+                    });
                 } catch (error) {
-                    pendingAutoStarts.delete(orderId);
+                    syncAutoStartingIds(nextIds => {
+                        nextIds.delete(orderId);
+                    });
                 }
             }
         };
 
         autoStart();
     }, [
+        autoStartingCount,
         isSaving,
         loaded.status_in,
         loaded.status_working,
         orderProductQueueActions,
         orders.status_in,
         queueBindings.statusWorking,
+        syncAutoStartingIds,
         totals.status_in,
         totals.status_working,
     ]);
@@ -637,7 +679,9 @@ const DisplayProducts = ({ display = {} }) => {
                 <DateShortcutFilter
                     value={dateFilterKey}
                     onChange={setDateFilterKey}
-                    ppcColorsOverride={ppcColors}
+                    customRange={customDateRange}
+                    onCustomRangeChange={setCustomDateRange}
+                    colors={ppcColors}
                 />
 
                 <View style={styles.tabsCard}>
@@ -667,7 +711,7 @@ const DisplayProducts = ({ display = {} }) => {
                                                 focused ? styles.tabLabelCountActive : null,
                                             ]}
                                         >
-                                            {totals[tabRoute.key] || 0}
+                                            {displayedTotals[tabRoute.key] || 0}
                                         </Text>
                                     </View>
                                     <View
@@ -695,6 +739,7 @@ const DisplayProducts = ({ display = {} }) => {
                             stageKey="status_in"
                             refreshToken={statusRefreshTokens.status_in}
                             onSnapshotChange={handleInSnapshot}
+                            totalOverride={displayedTotals.status_in}
                             status_working={queueBindings.statusWorking}
                             saveQueueItem={saveQueueItem}
                             onTransition={applyLocalQueueTransition}
@@ -715,6 +760,7 @@ const DisplayProducts = ({ display = {} }) => {
                             dateRange={dateRange}
                             refreshToken={statusRefreshTokens.status_working}
                             onSnapshotChange={handleWorkingSnapshot}
+                            totalOverride={displayedTotals.status_working}
                             status_out={queueBindings.statusOut}
                             saveQueueItem={saveQueueItem}
                             onTransition={applyLocalQueueTransition}
@@ -736,6 +782,7 @@ const DisplayProducts = ({ display = {} }) => {
                             stageKey="status_out"
                             refreshToken={statusRefreshTokens.status_out}
                             onSnapshotChange={handleOutSnapshot}
+                            totalOverride={displayedTotals.status_out}
                             saveQueueItem={saveQueueItem}
                             onTransition={applyLocalQueueTransition}
                             printButtonProps={printButtonProps}

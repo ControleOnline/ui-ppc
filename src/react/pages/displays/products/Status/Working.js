@@ -48,6 +48,7 @@ const Working = ({
     dateRange = null,
     refreshToken = 0,
     onSnapshotChange = null,
+    totalOverride = null,
     status_out = null,
     saveQueueItem = null,
     onTransition = null,
@@ -73,6 +74,8 @@ const Working = ({
         refreshToken,
         onSnapshotChange,
     });
+    const displayTotal =
+        typeof totalOverride === 'number' ? totalOverride : total;
 
     const finalize = async order => {
         if (!status_out?.['@id'] || typeof saveQueueItem !== 'function') {
@@ -224,7 +227,7 @@ const Working = ({
                 <View style={styles.stageHeader}>
                     <Text style={styles.stageTitle}>{statusWorking?.status || 'Status'}</Text>
                     <View style={styles.totalPill}>
-                        <Text style={styles.totalPillText}>{total}</Text>
+                        <Text style={styles.totalPillText}>{displayTotal}</Text>
                     </View>
                 </View>
 

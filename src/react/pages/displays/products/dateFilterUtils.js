@@ -1,49 +1,10 @@
 const pad2 = value => String(value).padStart(2, '0');
+const DATE_INPUT_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 const formatDateToApi = date =>
     `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
 
-const formatTranslationKey = key => {
-    if (!key) {
-        return '';
-    }
-
-    return String(key)
-        .replace(/([a-z])([A-Z])/g, '$1_$2')
-        .replace(/_/g, ' ')
-        .replace(/-/g, ' ')
-        .replace(/^\w/, character => character.toUpperCase());
-};
-
-const resolveOrderLabel = (key, fallback) => {
-    const translated = global.t?.t('orders', 'label', key);
-    const normalizedTranslated =
-        typeof translated === 'string' ? translated.trim() : '';
-    const normalizedFallback =
-        typeof fallback === 'string' ? fallback.trim() : '';
-    const formattedKey = formatTranslationKey(key);
-
-    if (
-        normalizedTranslated &&
-        normalizedTranslated !== key &&
-        normalizedTranslated !== formattedKey
-    ) {
-        return normalizedTranslated;
-    }
-
-    if (normalizedFallback) {
-        global.t?.findMessage?.('orders', 'label', key, normalizedFallback);
-        global.t?.persistMissingTranslate?.(
-            'orders',
-            'label',
-            key,
-            normalizedFallback,
-        );
-        return normalizedFallback;
-    }
-
-    return formattedKey;
-};
+const resolveOrderLabel = key => global.t?.t('orders', 'label', key);
 
 const createDayStart = date =>
     new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
@@ -53,7 +14,37 @@ const createDayEnd = date =>
 
 const formatDateLabel = date => date.toLocaleDateString('pt-BR');
 
-const resolveDateObjectsRange = (dateFilterKey, baseDate = new Date()) => {
+export const parseDateInput = value => {
+    const normalizedValue = String(value || '').trim();
+
+    if (!DATE_INPUT_PATTERN.test(normalizedValue)) {
+        return null;
+    }
+
+    const [year, month, day] = normalizedValue.split('-').map(Number);
+    const parsedDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
+
+export const validateCustomDateRange = (fromInput, toInput) => {
+    const fromValue = String(fromInput || '').trim();
+    const toValue = String(toInput || '').trim();
+    const fromDate = fromValue ? parseDateInput(fromValue) : null;
+    const toDate = toValue ? parseDateInput(toValue) : null;
+
+    if ((fromValue && !fromDate) || (toValue && !toDate)) {
+        return global.t?.t('orders', 'validation', 'invalid_date_format');
+    }
+
+    if (fromDate && toDate && fromDate > toDate) {
+        return global.t?.t('orders', 'validation', 'invalid_date_range');
+    }
+
+    return '';
+};
+
+const resolveDateObjectsRange = (dateFilterKey, customRange = null, baseDate = new Date()) => {
     const now = new Date(baseDate);
 
     if (dateFilterKey === 'today') {
@@ -102,6 +93,24 @@ const resolveDateObjectsRange = (dateFilterKey, baseDate = new Date()) => {
         };
     }
 
+    if (dateFilterKey === 'custom') {
+        const afterDate = parseDateInput(customRange?.from);
+        const beforeDate = parseDateInput(customRange?.to);
+
+        if (afterDate) {
+            afterDate.setHours(0, 0, 0, 0);
+        }
+
+        if (beforeDate) {
+            beforeDate.setHours(23, 59, 59, 999);
+        }
+
+        return {
+            afterDate,
+            beforeDate,
+        };
+    }
+
     return {
         afterDate: null,
         beforeDate: null,
@@ -112,29 +121,45 @@ export const DEFAULT_DATE_FILTER_KEY = 'today';
 
 export const resolveDateFilterOptions = () => [
     {
+        key: 'all',
+        label: resolveOrderLabel('period_all'),
+    },
+    {
         key: 'today',
-        label: resolveOrderLabel('period_today', 'Today'),
+        label: resolveOrderLabel('period_today'),
     },
     {
         key: '7d',
-        label: resolveOrderLabel('period_7d', '7 days'),
+        label: resolveOrderLabel('period_7d'),
     },
     {
         key: '30d',
-        label: resolveOrderLabel('period_30d', '30 days'),
+        label: resolveOrderLabel('period_30d'),
     },
     {
         key: 'this_month',
-        label: resolveOrderLabel('period_this_month', 'This month'),
+        label: resolveOrderLabel('period_this_month'),
     },
     {
         key: 'last_month',
-        label: resolveOrderLabel('period_last_month', 'Last month'),
+        label: resolveOrderLabel('period_last_month'),
+    },
+    {
+        key: 'custom',
+        label: resolveOrderLabel('period_custom'),
     },
 ];
 
-export const getDateRange = (dateFilterKey, baseDate = new Date()) => {
-    const { afterDate, beforeDate } = resolveDateObjectsRange(dateFilterKey, baseDate);
+export const getDateRange = (
+    dateFilterKey,
+    customRange = null,
+    baseDate = new Date(),
+) => {
+    const { afterDate, beforeDate } = resolveDateObjectsRange(
+        dateFilterKey,
+        customRange,
+        baseDate,
+    );
 
     return {
         after: afterDate ? formatDateToApi(afterDate) : null,
@@ -142,11 +167,19 @@ export const getDateRange = (dateFilterKey, baseDate = new Date()) => {
     };
 };
 
-export const resolveDateRangeSummary = (dateFilterKey, baseDate = new Date()) => {
-    const { afterDate, beforeDate } = resolveDateObjectsRange(dateFilterKey, baseDate);
+export const resolveDateRangeSummary = (
+    dateFilterKey,
+    customRange = null,
+    baseDate = new Date(),
+) => {
+    const { afterDate, beforeDate } = resolveDateObjectsRange(
+        dateFilterKey,
+        customRange,
+        baseDate,
+    );
 
     if (!afterDate || !beforeDate) {
-        return '';
+        return afterDate ? formatDateLabel(afterDate) : beforeDate ? formatDateLabel(beforeDate) : '';
     }
 
     const afterLabel = formatDateLabel(afterDate);
@@ -160,7 +193,7 @@ export const resolveDateRangeSummary = (dateFilterKey, baseDate = new Date()) =>
 };
 
 export const resolveDateFilterTitle = () =>
-    resolveOrderLabel('period', 'Period');
+    resolveOrderLabel('period');
 
 export const resolveDateFilterCurrentLabel = () =>
-    resolveOrderLabel('current_date', 'Current date');
+    resolveOrderLabel('current_date');
