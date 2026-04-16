@@ -15,6 +15,21 @@ const STAGE_STATUS_ENTITY_KEY = {
     status_out: 'statusOut',
 };
 
+const STAGE_ORDER_PARAMS = {
+    status_in: {
+        'order[registerTime]': 'ASC',
+        'order[id]': 'ASC',
+    },
+    status_working: {
+        'order[updateTime]': 'ASC',
+        'order[id]': 'ASC',
+    },
+    status_out: {
+        'order[updateTime]': 'DESC',
+        'order[id]': 'DESC',
+    },
+};
+
 const getResponseItems = response => {
     if (Array.isArray(response?.member)) {
         return response.member;
@@ -94,6 +109,10 @@ export const useDisplayQueueStatus = ({
         const key = STAGE_STATUS_ENTITY_KEY[stageKey];
         return key ? queueBindings?.[key] || null : null;
     }, [queueBindings, stageKey]);
+    const orderParams = useMemo(
+        () => STAGE_ORDER_PARAMS[stageKey] || STAGE_ORDER_PARAMS.status_in,
+        [stageKey],
+    );
 
     const resetSnapshot = useCallback((markLoaded = false) => {
         requestIdRef.current += 1;
@@ -132,6 +151,7 @@ export const useDisplayQueueStatus = ({
                     status: statusIds,
                     itemsPerPage,
                     page,
+                    ...orderParams,
                     ...(dateRange?.after ? { 'registerTime[after]': dateRange.after } : {}),
                     ...(dateRange?.before ? { 'registerTime[before]': dateRange.before } : {}),
                     'order_product.order.provider': companyId,
@@ -173,7 +193,7 @@ export const useDisplayQueueStatus = ({
                 setLoadingMore(false);
             }
         }
-    }, [companyId, dateRange?.after, dateRange?.before, enabled, itemsPerPage, queueIds, resetSnapshot, statusIds]);
+    }, [companyId, dateRange?.after, dateRange?.before, enabled, itemsPerPage, orderParams, queueIds, resetSnapshot, statusIds]);
 
     const reload = useCallback(() => loadPage(1), [loadPage]);
 

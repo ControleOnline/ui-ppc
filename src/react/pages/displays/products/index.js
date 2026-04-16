@@ -22,6 +22,8 @@ const TAB_ROUTES = [
     { key: 'status_out', title: 'Pronto' },
 ];
 const WORKING_TARGET_ITEMS = 6;
+const displayDateFilterCache = new Map();
+const createEmptyCustomDateRange = () => ({ from: '', to: '' });
 
 const createEmptyOrders = () => ({
     status_in: [],
@@ -139,7 +141,7 @@ const DisplayProducts = ({ display = {} }) => {
     const [totals, setTotals] = useState(createEmptyCounters);
     const [loaded, setLoaded] = useState(createEmptyLoaded);
     const [dateFilterKey, setDateFilterKey] = useState(DEFAULT_DATE_FILTER_KEY);
-    const [customDateRange, setCustomDateRange] = useState({ from: '', to: '' });
+    const [customDateRange, setCustomDateRange] = useState(createEmptyCustomDateRange);
     const [statusRefreshTokens, setStatusRefreshTokens] = useState(createEmptyCounters);
     const [bindingsRefreshToken, setBindingsRefreshToken] = useState(0);
     const [autoStartingCount, setAutoStartingCount] = useState(0);
@@ -155,14 +157,20 @@ const DisplayProducts = ({ display = {} }) => {
     const applyLocalQueueTransitionRef = useRef(() => {});
     const socketRefreshTimeoutRef = useRef(null);
     const hasHydratedStatusesRef = useRef(false);
+    const filterCacheKey = useMemo(
+        () => (
+            currentCompany?.id && displayId
+                ? `display-products:${currentCompany.id}:${displayId}`
+                : ''
+        ),
+        [currentCompany?.id, displayId],
+    );
 
     useEffect(() => {
         ordersRef.current = createEmptyOrders();
         setOrders(createEmptyOrders());
         setTotals(createEmptyCounters());
         setLoaded(createEmptyLoaded());
-        setDateFilterKey(DEFAULT_DATE_FILTER_KEY);
-        setCustomDateRange({ from: '', to: '' });
         setQueueBindings(createEmptyBindings());
         setStatusRefreshTokens(createEmptyCounters());
         setBindingsRefreshToken(0);
@@ -175,7 +183,34 @@ const DisplayProducts = ({ display = {} }) => {
             clearTimeout(socketRefreshTimeoutRef.current);
             socketRefreshTimeoutRef.current = null;
         }
-    }, [currentCompany?.id, displayId]);
+
+        if (!filterCacheKey) {
+            setDateFilterKey(DEFAULT_DATE_FILTER_KEY);
+            setCustomDateRange(createEmptyCustomDateRange());
+            return;
+        }
+
+        const cachedFilter = displayDateFilterCache.get(filterCacheKey);
+
+        setDateFilterKey(cachedFilter?.dateFilterKey || DEFAULT_DATE_FILTER_KEY);
+        setCustomDateRange(
+            cachedFilter?.customDateRange || createEmptyCustomDateRange(),
+        );
+    }, [filterCacheKey]);
+
+    useEffect(() => {
+        if (!filterCacheKey) {
+            return;
+        }
+
+        displayDateFilterCache.set(filterCacheKey, {
+            dateFilterKey,
+            customDateRange: {
+                from: String(customDateRange?.from || ''),
+                to: String(customDateRange?.to || ''),
+            },
+        });
+    }, [customDateRange?.from, customDateRange?.to, dateFilterKey, filterCacheKey]);
 
     const dateRange = useMemo(
         () => getDateRange(dateFilterKey, customDateRange),
