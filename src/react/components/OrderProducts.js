@@ -2,11 +2,20 @@ import React, { useMemo } from 'react'
 import { View, Text } from 'react-native'
 import Formatter from '@controleonline/ui-common/src/utils/formatter'
 
+import {
+    inlineStyle_364_42,
+    inlineStyle_385_38,
+    inlineStyle_392_38,
+    inlineStyle_410_74,
+} from './OrderProducts.styles';
+
 const normalizeText = value => String(value || '').trim()
+
 const normalizeQuantity = value => {
     const numericValue = Number(value || 0)
     return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 1
 }
+
 const formatQuantityPrefix = value => {
     const quantity = normalizeQuantity(value)
     return quantity >= 2 ? `${quantity}x ` : ''
@@ -361,7 +370,7 @@ const OrderProducts = ({ order, styles, showDetails = false }) => {
                             <Text style={styles.text} numberOfLines={2}>
                                 <Text style={[styles.statusMarker, { color: isRootZero ? 'red' : itemColor }]}>* </Text>
                                 {isRootZero ? (
-                                    <Text style={{ color: 'red', fontWeight: 'bold' }}>REMOVER </Text>
+                                    <Text style={inlineStyle_364_42}>REMOVER </Text>
                                 ) : null}
                                 {!isRootZero ? (
                                     <Text style={styles.qtyText}>{normalizeQuantity(card.quantity)}x </Text>
@@ -382,14 +391,14 @@ const OrderProducts = ({ order, styles, showDetails = false }) => {
                             )}
 
                             {showDetails && card.unitPrice > 0 && (
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                                <View style={inlineStyle_385_38}>
                                     <Text style={styles.subText}>{Formatter.formatMoney(card.unitPrice)} / un</Text>
                                     <Text style={styles.subText}>{Formatter.formatMoney(card.totalPrice || 0)}</Text>
                                 </View>
                             )}
 
                             {card.groups.length > 0 && (
-                                <View style={{ marginTop: 6 }}>
+                                <View style={inlineStyle_392_38}>
                                     {card.groups.map(group => (
                                         <View key={`${card.key}-${group.label}`} style={styles.groupWrap}>
                                             {!!group.label && (
@@ -407,7 +416,7 @@ const OrderProducts = ({ order, styles, showDetails = false }) => {
                                                             <Text style={styles.groupItemText}>
                                                                 <Text style={[styles.statusMarker, { color: child.isZero ? 'red' : child.itemColor }]}>* </Text>
                                                                 {child.isZero ? (
-                                                                    <Text style={{ color: 'red', fontWeight: 'bold' }}>REMOVER </Text>
+                                                                    <Text style={inlineStyle_410_74}>REMOVER </Text>
                                                                 ) : null}
                                                                 {!child.isZero && childQuantityPrefix ? (
                                                                     <Text style={styles.qtyText}>{childQuantityPrefix}</Text>
@@ -421,20 +430,18 @@ const OrderProducts = ({ order, styles, showDetails = false }) => {
                                                                 </Text>
                                                             )}
                                                         </View>
-
                                                         {showDetails && !!child.description && (
                                                             <Text style={styles.groupItemMetaText}>
                                                                 {child.description}
                                                             </Text>
                                                         )}
-
                                                         {showDetails && !!child.observation && (
                                                             <Text style={styles.groupItemMetaText}>
                                                                 Obs: {child.observation}
                                                             </Text>
                                                         )}
                                                     </View>
-                                                )
+                                                );
                                             })}
                                         </View>
                                     ))}
@@ -442,10 +449,10 @@ const OrderProducts = ({ order, styles, showDetails = false }) => {
                             )}
                         </View>
                     </View>
-                )
+                );
             })}
         </>
-    )
+    );
 }
 
 export default OrderProducts

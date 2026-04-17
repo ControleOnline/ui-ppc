@@ -1,5 +1,5 @@
-﻿import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Pressable, ScrollView, TouchableOpacity } from 'react-native';
 import { Text, RadioButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -7,6 +7,8 @@ import { useStore } from '@store';
 import { env } from '@env';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
+import createStyles from './QueueBlock.styles';
+import { inlineStyle_131_8 } from './QueueBlock.styles';
 
 export default function QueueBlock({
   queue,
@@ -117,17 +119,15 @@ export default function QueueBlock({
           </Pressable>
         )}
       </View>
-
       <View style={styles.statusPillsRow}>
         {renderStatus(queue.status_in, 'in')}
         {renderStatus(queue.status_working, 'working')}
         {renderStatus(queue.status_out, 'out')}
       </View>
-
       <AnimatedModal
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
-        style={{ justifyContent: 'flex-end' }}
+        style={inlineStyle_131_8}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -192,188 +192,3 @@ export default function QueueBlock({
     </View>
   );
 }
-
-const createStyles = (ppcColors) =>
-  StyleSheet.create({
-    queueBlock: { alignItems: 'center', marginTop: 2, width: '100%' },
-    titleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8,
-      justifyContent: 'center',
-    },
-    queueTitle: {
-      backgroundColor: ppcColors.accent,
-      color: ppcColors.pillTextDark,
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderRadius: 999,
-      fontSize: 12,
-      fontWeight: '900',
-      textTransform: 'uppercase',
-      letterSpacing: 0.3,
-    },
-    addButton: {
-      width: 24,
-      height: 24,
-      borderRadius: 999,
-      backgroundColor: ppcColors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: 6,
-    },
-    statusPillsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexWrap: 'wrap',
-      width: '100%',
-    },
-    statusPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderRadius: 999,
-      borderWidth: 1,
-      borderColor: ppcColors.border,
-      backgroundColor: ppcColors.cardBgSoft,
-      paddingHorizontal: 9,
-      paddingVertical: 4,
-      marginHorizontal: 3,
-      marginBottom: 6,
-      minWidth: 84,
-      justifyContent: 'center',
-    },
-    statusDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 99,
-      marginRight: 7,
-    },
-    statusText: {
-      fontSize: 12,
-      color: ppcColors.textSecondary,
-      textAlign: 'center',
-      fontWeight: '800',
-      textTransform: 'capitalize',
-    },
-    editButton: {
-      marginLeft: 6,
-      width: 15,
-      height: 15,
-      borderRadius: 999,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: ppcColors.border,
-    },
-    addIcon: { fontSize: 14, color: ppcColors.textDark, fontWeight: '900', lineHeight: 14 },
-    modalContainer: {
-      backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      maxHeight: '90%',
-      width: '100%',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -4 },
-      shadowOpacity: 0.1,
-      shadowRadius: 12,
-      elevation: 10,
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 24,
-      paddingVertical: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: ppcColors.border,
-    },
-    modalTitle: { fontSize: 20, fontWeight: '800', color: ppcColors.textPrimary },
-    headerCloseButton: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: ppcColors.cardBgSoft,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    statusList: {
-      maxHeight: 320,
-      marginHorizontal: 24,
-      marginVertical: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: ppcColors.border,
-      backgroundColor: ppcColors.cardBgSoft,
-      paddingHorizontal: 6,
-      paddingVertical: 4,
-    },
-    radioItemWrap: {
-      marginVertical: 4,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: 'transparent',
-      backgroundColor: ppcColors.cardBg,
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingLeft: 10,
-    },
-    radioItemWrapSelected: {
-      borderColor: ppcColors.accent,
-      backgroundColor: ppcColors.cardBgSoft,
-    },
-    modalStatusDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 99,
-      marginRight: 4,
-    },
-    radioItem: {
-      flex: 1,
-      paddingLeft: 0,
-    },
-    radioLabel: {
-      color: ppcColors.textPrimary,
-      fontWeight: '700',
-      fontSize: 14,
-    },
-    loadingText: {
-      color: ppcColors.textSecondary,
-      fontWeight: '600',
-      fontSize: 13,
-      paddingHorizontal: 10,
-      paddingVertical: 12,
-    },
-    modalFooter: {
-      flexDirection: 'row',
-      padding: 20,
-      gap: 12,
-      borderTopWidth: 1,
-      borderTopColor: ppcColors.border,
-    },
-    cancelButton: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: ppcColors.textSecondary,
-      alignItems: 'center',
-    },
-    cancelButtonText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: ppcColors.textSecondary,
-    },
-    saveButton: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: 12,
-      backgroundColor: ppcColors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    saveButtonText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: ppcColors.pillTextDark,
-    },
-  });

@@ -1,0 +1,367 @@
+import { StyleSheet } from 'react-native';
+
+const createStyles = (ppcColors) =>
+  StyleSheet.create({
+  cardPressable: { flex: 1 },
+  cardPressed: { opacity: 0.96, transform: [{ scale: 0.992 }] },
+  displayCard: {
+    flex: 1,
+    minHeight: 224,
+    borderRadius: 22,
+    backgroundColor: ppcColors.cardBg,
+    borderWidth: 1,
+    borderColor: ppcColors.borderSoft,
+    overflow: 'hidden',
+  },
+  typeAccent: {
+    height: 1,
+    width: '100%',
+  },
+  cardGlow: {
+    position: 'absolute',
+    width: 156,
+    height: 156,
+    borderRadius: 999,
+    top: -54,
+    right: -44,
+    backgroundColor: ppcColors.border,
+    opacity: 0.18,
+  },
+  cardContent: {
+    flex: 1,
+    alignItems: 'stretch',
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 14,
+    minHeight: 236,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginBottom: 8,
+  },
+  iconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: ppcColors.border,
+    backgroundColor: ppcColors.cardBgSoft,
+    marginRight: 10,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    flex: 1,
+  },
+  cardActions: {
+    marginLeft: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editIcon: {
+    backgroundColor: ppcColors.panelBg,
+    borderWidth: 1,
+    borderColor: ppcColors.border,
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  displayTitle: {
+    fontWeight: '900',
+    color: ppcColors.textPrimary,
+    textAlign: 'left',
+  },
+  typePill: {
+    backgroundColor: ppcColors.panelBg,
+    borderWidth: 1,
+    borderColor: ppcColors.border,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  displayType: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  queuesWrap: {
+    marginTop: 8,
+    width: '100%',
+    justifyContent: 'flex-start',
+    flexGrow: 1,
+  },
+  footerRow: {
+    marginTop: 'auto',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: ppcColors.border,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  footerSpacer: {
+    flex: 1,
+  },
+  feedbackWrap: {
+    width: '100%',
+    minHeight: 14,
+  },
+  linkQueueButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: ppcColors.accent,
+    backgroundColor: ppcColors.panelBg,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  linkQueueButtonDisabled: {
+    opacity: 0.7,
+  },
+  linkQueueButtonText: {
+    color: ppcColors.accent,
+    fontWeight: '800',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  unlinkQueueButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: ppcColors.danger,
+    backgroundColor: ppcColors.dangerBg,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  footerActionIcon: {
+    marginRight: 6,
+  },
+  unlinkQueueButtonText: {
+    color: ppcColors.dangerText,
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 0.2,
+  },
+  linkQueueErrorText: {
+    marginTop: 8,
+    color: ppcColors.dangerText,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  modalContainer: {
+    backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: ppcColors.border,
+  },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: ppcColors.textPrimary },
+  headerCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: ppcColors.cardBgSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBody: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  modalLabel: { fontSize: 14, fontWeight: '700', marginTop: 12, color: ppcColors.textSecondary },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: ppcColors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    color: ppcColors.textPrimary,
+    backgroundColor: ppcColors.cardBgSoft,
+  },
+  createQueueDivider: {
+    height: 1,
+    backgroundColor: ppcColors.border,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  linkModalList: {
+    maxHeight: 300,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
+  linkModalListContent: {
+    paddingBottom: 8,
+  },
+  linkModalItemWrap: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: ppcColors.cardBgSoft,
+    marginBottom: 8,
+  },
+  linkModalItemWrapSelected: {
+    borderColor: ppcColors.accent,
+    backgroundColor: ppcColors.cardBg,
+  },
+  linkModalRadioItem: {
+    minHeight: 42,
+  },
+  linkModalRadioLabel: {
+    color: ppcColors.textPrimary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  linkModalHintText: {
+    color: ppcColors.textSecondary,
+    fontWeight: '600',
+    fontSize: 13,
+    paddingVertical: 10,
+  },
+  radioItemWrap: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: ppcColors.cardBgSoft,
+  },
+  radioItemWrapSelected: {
+    borderColor: ppcColors.accent,
+    backgroundColor: ppcColors.cardBg,
+  },
+  radioItem: {
+    minHeight: 42,
+  },
+  radioLabel: {
+    color: ppcColors.textPrimary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  confirmModalMessage: {
+    marginHorizontal: 24,
+    marginTop: 16,
+    color: ppcColors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    padding: 20,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: ppcColors.border,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ppcColors.textSecondary,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: ppcColors.textSecondary,
+  },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: ppcColors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: ppcColors.pillTextDark,
+  },
+  dangerButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: ppcColors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  outlineButton: {
+    marginTop: 10,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ppcColors.accent,
+    alignItems: 'center',
+  },
+  outlineButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: ppcColors.accent,
+  },
+  dangerOutlineButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ppcColors.danger,
+    backgroundColor: ppcColors.dangerBg,
+    alignItems: 'center',
+  },
+  dangerOutlineButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: ppcColors.dangerText,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+});
+
+export default createStyles;
+
+export const inlineStyle_778_8 = {
+  justifyContent: 'flex-end',
+};
+
+export const inlineStyle_878_10 = {
+  justifyContent: 'flex-end',
+};
+
+export const inlineStyle_964_8 = {
+  justifyContent: 'flex-end',
+};
+
+export const inlineStyle_1004_8 = {
+  justifyContent: 'flex-end',
+};
+

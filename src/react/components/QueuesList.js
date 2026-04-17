@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import QueueBlock from './QueueBlock';
+import styles from './QueuesList.styles';
 
 export default function QueuesList({
   queues,
@@ -42,12 +43,3 @@ export default function QueuesList({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  queuesWrapper: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 2,
-  },
-});

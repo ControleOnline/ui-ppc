@@ -1,6 +1,7 @@
 // DisplayCard.js
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Pressable, StyleSheet, View, TextInput, Text, TouchableOpacity, ScrollView } from 'react-native';
+
+import { Pressable, View, TextInput, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Card, Text as PaperText, RadioButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -11,6 +12,14 @@ import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import { withOpacity } from '@controleonline/../../src/styles/branding';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
+import createStyles from './DisplayCard.styles';
+
+import {
+  inlineStyle_778_8,
+  inlineStyle_878_10,
+  inlineStyle_964_8,
+  inlineStyle_1004_8,
+} from './DisplayCard.styles';
 
 const iconByType = {
   products: 'silverware-fork-knife',
@@ -60,14 +69,13 @@ const parseEntityId = (value) => {
 };
 
 const extractDisplayId = parseEntityId;
-
 const LOCAL_LINKS_KEY = 'ppc_display_queue_links_v1';
 
 const readLocalLinks = () => {
   try {
     const raw = globalThis?.localStorage?.getItem(LOCAL_LINKS_KEY);
     return raw ? JSON.parse(raw) : {};
-  } catch (e) {
+  } catch {
     return {};
   }
 };
@@ -75,7 +83,7 @@ const readLocalLinks = () => {
 const writeLocalLinks = (links) => {
   try {
     globalThis?.localStorage?.setItem(LOCAL_LINKS_KEY, JSON.stringify(links || {}));
-  } catch (e) {
+  } catch {
     // noop
   }
 };
@@ -504,7 +512,7 @@ export default function DisplayCard({
       let statuses = [];
       try {
         statuses = await statusStore.actions.getItems({ context: 'display' });
-      } catch (e) {
+      } catch {
         statuses = [];
       }
 
@@ -770,11 +778,10 @@ export default function DisplayCard({
           </Card.Content>
         </Card>
       </Pressable>
-
       <AnimatedModal
         visible={linkModalVisible}
         onRequestClose={() => setLinkModalVisible(false)}
-        style={{ justifyContent: 'flex-end' }}
+        style={inlineStyle_778_8}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -869,12 +876,11 @@ export default function DisplayCard({
           </View>
         </View>
       </AnimatedModal>
-
       {env.APP_TYPE === 'MANAGER' && (
         <AnimatedModal
           visible={modalVisible}
           onRequestClose={() => setModalVisible(false)}
-          style={{ justifyContent: 'flex-end' }}
+          style={inlineStyle_878_10}
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
@@ -956,11 +962,10 @@ export default function DisplayCard({
           </View>
         </AnimatedModal>
       )}
-
       <AnimatedModal
         visible={confirmDeleteVisible}
         onRequestClose={() => setConfirmDeleteVisible(false)}
-        style={{ justifyContent: 'flex-end' }}
+        style={inlineStyle_964_8}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -996,11 +1001,10 @@ export default function DisplayCard({
           </View>
         </View>
       </AnimatedModal>
-
       <AnimatedModal
         visible={confirmUnlinkVisible}
         onRequestClose={() => setConfirmUnlinkVisible(false)}
-        style={{ justifyContent: 'flex-end' }}
+        style={inlineStyle_1004_8}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -1039,350 +1043,3 @@ export default function DisplayCard({
     </>
   );
 }
-
-const createStyles = (ppcColors) =>
-  StyleSheet.create({
-  cardPressable: { flex: 1 },
-  cardPressed: { opacity: 0.96, transform: [{ scale: 0.992 }] },
-  displayCard: {
-    flex: 1,
-    minHeight: 224,
-    borderRadius: 22,
-    backgroundColor: ppcColors.cardBg,
-    borderWidth: 1,
-    borderColor: ppcColors.borderSoft,
-    overflow: 'hidden',
-  },
-  typeAccent: {
-    height: 1,
-    width: '100%',
-  },
-  cardGlow: {
-    position: 'absolute',
-    width: 156,
-    height: 156,
-    borderRadius: 999,
-    top: -54,
-    right: -44,
-    backgroundColor: ppcColors.border,
-    opacity: 0.18,
-  },
-  cardContent: {
-    flex: 1,
-    alignItems: 'stretch',
-    paddingTop: 12,
-    paddingBottom: 12,
-    paddingHorizontal: 14,
-    minHeight: 236,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginBottom: 8,
-  },
-  iconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: ppcColors.border,
-    backgroundColor: ppcColors.cardBgSoft,
-    marginRight: 10,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    flex: 1,
-  },
-  cardActions: {
-    marginLeft: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  editIcon: {
-    backgroundColor: ppcColors.panelBg,
-    borderWidth: 1,
-    borderColor: ppcColors.border,
-    width: 22,
-    height: 22,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  displayTitle: {
-    fontWeight: '900',
-    color: ppcColors.textPrimary,
-    textAlign: 'left',
-  },
-  typePill: {
-    backgroundColor: ppcColors.panelBg,
-    borderWidth: 1,
-    borderColor: ppcColors.border,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  displayType: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-  queuesWrap: {
-    marginTop: 8,
-    width: '100%',
-    justifyContent: 'flex-start',
-    flexGrow: 1,
-  },
-  footerRow: {
-    marginTop: 'auto',
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: ppcColors.border,
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  footerSpacer: {
-    flex: 1,
-  },
-  feedbackWrap: {
-    width: '100%',
-    minHeight: 14,
-  },
-  linkQueueButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: ppcColors.accent,
-    backgroundColor: ppcColors.panelBg,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  linkQueueButtonDisabled: {
-    opacity: 0.7,
-  },
-  linkQueueButtonText: {
-    color: ppcColors.accent,
-    fontWeight: '800',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  unlinkQueueButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: ppcColors.danger,
-    backgroundColor: ppcColors.dangerBg,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  footerActionIcon: {
-    marginRight: 6,
-  },
-  unlinkQueueButtonText: {
-    color: ppcColors.dangerText,
-    fontWeight: '800',
-    fontSize: 11,
-    letterSpacing: 0.2,
-  },
-  linkQueueErrorText: {
-    marginTop: 8,
-    color: ppcColors.dangerText,
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-    paddingHorizontal: 8,
-  },
-  modalContainer: {
-    backgroundColor: ppcColors.modalBg || ppcColors.cardBg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: ppcColors.border,
-  },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: ppcColors.textPrimary },
-  headerCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: ppcColors.cardBgSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalBody: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-  },
-  modalLabel: { fontSize: 14, fontWeight: '700', marginTop: 12, color: ppcColors.textSecondary },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: ppcColors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 8,
-    color: ppcColors.textPrimary,
-    backgroundColor: ppcColors.cardBgSoft,
-  },
-  createQueueDivider: {
-    height: 1,
-    backgroundColor: ppcColors.border,
-    marginTop: 16,
-    marginBottom: 4,
-  },
-  linkModalList: {
-    maxHeight: 300,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-  },
-  linkModalListContent: {
-    paddingBottom: 8,
-  },
-  linkModalItemWrap: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    backgroundColor: ppcColors.cardBgSoft,
-    marginBottom: 8,
-  },
-  linkModalItemWrapSelected: {
-    borderColor: ppcColors.accent,
-    backgroundColor: ppcColors.cardBg,
-  },
-  linkModalRadioItem: {
-    minHeight: 42,
-  },
-  linkModalRadioLabel: {
-    color: ppcColors.textPrimary,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  linkModalHintText: {
-    color: ppcColors.textSecondary,
-    fontWeight: '600',
-    fontSize: 13,
-    paddingVertical: 10,
-  },
-  radioItemWrap: {
-    marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    backgroundColor: ppcColors.cardBgSoft,
-  },
-  radioItemWrapSelected: {
-    borderColor: ppcColors.accent,
-    backgroundColor: ppcColors.cardBg,
-  },
-  radioItem: {
-    minHeight: 42,
-  },
-  radioLabel: {
-    color: ppcColors.textPrimary,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  confirmModalMessage: {
-    marginHorizontal: 24,
-    marginTop: 16,
-    color: ppcColors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    padding: 20,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: ppcColors.border,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: ppcColors.textSecondary,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: ppcColors.textSecondary,
-  },
-  saveButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: ppcColors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: ppcColors.pillTextDark,
-  },
-  dangerButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: ppcColors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dangerButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  outlineButton: {
-    marginTop: 10,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: ppcColors.accent,
-    alignItems: 'center',
-  },
-  outlineButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: ppcColors.accent,
-  },
-  dangerOutlineButton: {
-    marginTop: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: ppcColors.danger,
-    backgroundColor: ppcColors.dangerBg,
-    alignItems: 'center',
-  },
-  dangerOutlineButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: ppcColors.dangerText,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-});

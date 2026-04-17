@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
-import { BackHandler, View, Text, StyleSheet } from 'react-native';
+import { BackHandler, View, Text } from 'react-native';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import ProductsDisplay from './products';
 import OrdersDisplay from './orders';
 import { useStore } from '@store';
 import { api } from '@controleonline/ui-common/src/api';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
+import createStyles from './DisplayDetails.styles';
 import {
     buildForcedDisplayParams,
     doesDeviceConfigBelongToRuntime,
@@ -171,52 +172,6 @@ const DisplayDetails = () => {
     );
 };
 
-const createStyles = (ppcColors) =>
-    StyleSheet.create({
-        loadingWrap: {
-            flex: 1,
-            backgroundColor: ppcColors.appBg,
-            paddingHorizontal: 12,
-            paddingTop: 10,
-        },
-        loadingCard: {
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: ppcColors.border,
-            backgroundColor: ppcColors.cardBg,
-            padding: 14,
-            gap: 10,
-        },
-        skeletonLine: {
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: ppcColors.border,
-            backgroundColor: ppcColors.cardBgSoft,
-            height: 12,
-        },
-        skeletonTitle: {
-            width: '54%',
-            height: 15,
-        },
-        skeletonRow: {
-            width: '100%',
-        },
-        skeletonButton: {
-            width: '42%',
-            height: 28,
-        },
-        fallbackTitle: {
-            color: ppcColors.textPrimary,
-            fontSize: 18,
-            lineHeight: 22,
-            fontWeight: '900',
-        },
-        fallbackText: {
-            color: ppcColors.textSecondary,
-            fontSize: 13,
-            lineHeight: 19,
-            fontWeight: '600',
-        },
-    });
+
 
 export default DisplayDetails;
