@@ -8,3 +8,6 @@
 
 ## Quando usar
 - Prompts sobre PPC, KDS, displays, filas de producao, queue, ordem de preparo e telas de exibicao.
+
+## Regras
+- A tela de displays de pedidos deve renderizar apenas pedidos operacionais de venda (`orderType = sale`). Pedidos `cart` pertencem ao fluxo de rascunho/carrinho e nao devem aparecer no display.

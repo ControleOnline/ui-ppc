@@ -154,7 +154,23 @@ const getOrderRealStatus = order => {
   ).toLowerCase()
 }
 
-const isDisplayVisibleOrder = order => getOrderRealStatus(order) === 'open'
+const getOrderType = order => {
+  const candidates = [
+    order?.orderType,
+    order?.order_type,
+    order?.type,
+    order?.order?.orderType,
+    order?.order?.order_type,
+    order?.order?.type,
+  ]
+
+  return normalizeText(
+    candidates.find(value => normalizeText(value)),
+  ).toLowerCase()
+}
+
+const isDisplayVisibleOrder = order =>
+  getOrderRealStatus(order) === 'open' && getOrderType(order) === 'sale'
 
 const parseEntityId = value => {
   if (!value) return null
@@ -633,6 +649,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     actions
       .ordersQueue({
         status: { realStatus: ['open'] },
+        orderType: 'sale',
         provider: currentCompany.id,
         itemsPerPage: 50,
       })
