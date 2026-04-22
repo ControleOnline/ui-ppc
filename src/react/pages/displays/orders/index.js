@@ -35,6 +35,7 @@ import {
 } from '@controleonline/ui-ppc/src/react/utils/forcedDisplay'
 
 import { inlineStyle_916_28 } from './index.styles';
+const { isDisplayVisibleOrder } = require('./orderVisibility')
 const normalizeText = value => String(value || '').trim()
 
 const normalizeQuantity = value => {
@@ -136,30 +137,6 @@ const resolveDisplayDeviceConfig = ({
     ) || matchingConfigs[0]
   )
 }
-
-const getOrderRealStatus = order => {
-  const candidates = [
-    order?.status?.realStatus,
-    order?.status?.real_status,
-    order?.realStatus,
-    order?.real_status,
-    order?.order?.status?.realStatus,
-    order?.order?.status?.real_status,
-    order?.order?.realStatus,
-    order?.order?.real_status,
-  ]
-
-  return normalizeText(
-    candidates.find(value => normalizeText(value)),
-  ).toLowerCase()
-}
-
-const getOrderType = order => {
-  return normalizeText(order?.orderType).toLowerCase()
-}
-
-const isDisplayVisibleOrder = order =>
-  getOrderRealStatus(order) === 'open' && getOrderType(order) === 'sale'
 
 const parseEntityId = value => {
   if (!value) return null
