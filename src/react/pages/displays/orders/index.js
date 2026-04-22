@@ -155,18 +155,7 @@ const getOrderRealStatus = order => {
 }
 
 const getOrderType = order => {
-  const candidates = [
-    order?.orderType,
-    order?.order_type,
-    order?.type,
-    order?.order?.orderType,
-    order?.order?.order_type,
-    order?.order?.type,
-  ]
-
-  return normalizeText(
-    candidates.find(value => normalizeText(value)),
-  ).toLowerCase()
+  return normalizeText(order?.orderType).toLowerCase()
 }
 
 const isDisplayVisibleOrder = order =>
