@@ -231,9 +231,20 @@ const createStyles = ppcColors =>
       lineHeight: 20,
       fontWeight: '900',
     },
+    orderTitleSecondary: {
+      marginTop: 1,
+      color: withOpacity(ppcColors.textSecondary, 0.9),
+      fontSize: 10,
+      lineHeight: 13,
+      fontWeight: '800',
+    },
     tvOrderTitle: {
       fontSize: 13,
       lineHeight: 16,
+    },
+    tvOrderTitleSecondary: {
+      fontSize: 9,
+      lineHeight: 12,
     },
     orderDate: {
       marginTop: 1,
@@ -342,9 +353,78 @@ const createStyles = ppcColors =>
       borderColor: ppcColors.border,
       overflow: 'hidden',
       backgroundColor: ppcColors.cardBgSoft,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      gap: 6,
     },
     tvProductsWrap: {
       marginTop: 8,
+    },
+    orderProductItemRow: {
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      backgroundColor: ppcColors.cardBg,
+      paddingHorizontal: 8,
+      paddingVertical: 7,
+      marginBottom: 6,
+    },
+    orderProductItemMainRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    orderProductItemContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    orderProductMetaWrap: {
+      marginTop: 4,
+      gap: 3,
+    },
+    orderProductQueueBadge: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderRadius: 999,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      gap: 5,
+    },
+    orderProductQueueBadgeDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 999,
+    },
+    orderProductQueueBadgeText: {
+      fontSize: 9,
+      fontWeight: '900',
+    },
+    orderProductPriceRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    orderProductText: {
+      color: ppcColors.textPrimary,
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: '800',
+    },
+    orderProductSubText: {
+      color: withOpacity(ppcColors.textSecondary, 0.86),
+      fontSize: 10,
+      lineHeight: 13,
+      fontWeight: '600',
+    },
+    orderProductQtyText: {
+      color: ppcColors.accentInfo,
+      fontWeight: '900',
+    },
+    orderProductStatusMarker: {
+      fontWeight: '900',
     },
     productRow: {
       flexDirection: 'row',
@@ -528,6 +608,32 @@ const createStyles = ppcColors =>
       paddingVertical: 2,
       paddingLeft: 4,
     },
+    orderProductGroupItemRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    orderProductGroupItemContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    orderProductGroupItemMetaWrap: {
+      marginTop: 3,
+      gap: 2,
+    },
+    orderProductGroupItemMetaText: {
+      fontSize: 10,
+      lineHeight: 13,
+      color: withOpacity(ppcColors.textSecondary, 0.86),
+      fontWeight: '600',
+    },
+    orderProductGroupItemPriceText: {
+      fontSize: 10,
+      lineHeight: 13,
+      color: withOpacity(ppcColors.textSecondary, 0.86),
+      fontWeight: '700',
+    },
 
     groupItemText: {
       fontSize: 12,
@@ -636,4 +742,3 @@ export default createStyles
 export const inlineStyle_916_28 = {
   flex: 1,
 };
-

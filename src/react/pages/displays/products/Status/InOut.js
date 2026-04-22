@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { FlatList, View } from 'react-native';
 import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton';
+import OrderIdentityLabel from '@controleonline/ui-orders/src/react/components/OrderIdentityLabel';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import useDisplayQueueStatus from '../hooks/useDisplayQueueStatus';
 import createStyles from './status.styles';
@@ -27,18 +28,6 @@ const formatDisplayDateTime = value => {
     });
 
     return `${formattedDate} ${formattedTime}`;
-};
-
-const resolveMarketplaceTitle = marketplaceLabel =>
-    marketplaceLabel ? `Pedido ${marketplaceLabel}` : 'Pedido delivery';
-
-const formatMarketplaceCode = value => {
-    const normalized = String(value || '').trim();
-    if (!normalized) {
-        return '';
-    }
-
-    return normalized.startsWith('#') ? normalized : `#${normalized}`;
 };
 
 const InOut = ({
@@ -105,24 +94,20 @@ const InOut = ({
             <Card key={order.id} style={styles.orderCard}>
                 <Card.Content style={styles.orderContent}>
                     <View style={styles.ticketTopRow}>
-                        <Text style={styles.internalOrderCode}>
-                            Pedido #{orderSummary.internalOrderCode || '-'}
-                        </Text>
+                        <OrderIdentityLabel
+                            order={orderEntity}
+                            containerStyle={{flex: 1, minWidth: 0}}
+                            primaryTextStyle={
+                                orderSummary.marketplaceOrderCode
+                                    ? styles.marketplaceCode
+                                    : styles.internalOrderCode
+                            }
+                            secondaryTextStyle={styles.internalOrderCode}
+                        />
                         <Text style={styles.orderMeta}>
                             Pedido em {formatDisplayDateTime(order.registerTime)}
                         </Text>
                     </View>
-
-                    {!!orderSummary.marketplaceOrderCode && (
-                        <View style={styles.marketplaceHighlight}>
-                            <Text style={styles.marketplaceLabel}>
-                                {resolveMarketplaceTitle(orderSummary.marketplaceLabel)}
-                            </Text>
-                            <Text style={styles.marketplaceCode}>
-                                {formatMarketplaceCode(orderSummary.marketplaceOrderCode)}
-                            </Text>
-                        </View>
-                    )}
 
                     {!!orderSummary.clientName && (
                         <Text style={styles.clientName}>

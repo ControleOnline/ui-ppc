@@ -12,8 +12,9 @@ import {
   getOrderChannelLogo,
 } from '@assets/ppc/channels'
 
-import { buildFood99OrderSummary } from '@controleonline/ui-orders/src/react/services/food99OrderSummary'
+import OrderIdentityLabel from '@controleonline/ui-orders/src/react/components/OrderIdentityLabel'
 import { resolveDisplayedOrderStatus } from '@controleonline/ui-orders/src/react/components/OrderHeader'
+import OrderProducts from '@controleonline/ui-orders/src/react/components/OrderProducts'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
 import { DISPLAY_DEVICE_TYPE } from '@controleonline/ui-common/src/react/utils/printerDevices'
@@ -34,7 +35,6 @@ import {
   DISPLAY_MIN_COLUMNS_CONFIG_KEY,
 } from '@controleonline/ui-ppc/src/react/utils/forcedDisplay'
 
-import { inlineStyle_916_28 } from './index.styles';
 const { isDisplayVisibleOrder } = require('./orderVisibility')
 const normalizeText = value => String(value || '').trim()
 
@@ -172,51 +172,8 @@ const removeConsumedMessages = (messages, companyId) =>
     message => !isMessageForCompany(message, companyId),
   )
 
-const extractExtraEntries = extraData => {
-  if (!Array.isArray(extraData)) return []
-  return extraData
-    .filter(
-      item =>
-        item?.value &&
-        item?.extra_fields?.name === 'code',
-    )
-    .map(item => ({
-      context: item?.extra_fields?.context,
-      value: item?.value,
-    }))
-}
-
-const isChannelContext = context =>
-  /ifood|food99|99|instagram|insta|keeta|whats|messenger|facebook/i.test(
-    String(context || ''),
-  )
-
-const getExternalOrderRef = order => {
-  const entries = extractExtraEntries(order?.extraData)
-  const preferred = entries.find(item => isChannelContext(item?.context))
-  const fallback = entries[0]
-  return normalizeText(preferred?.value || fallback?.value)
-}
-
-const getProductionOrderRef = order => {
-  const remoteOrderSummary = buildFood99OrderSummary(order)
-  return normalizeText(
-    remoteOrderSummary?.identifiers?.orderIndex ||
-      getExternalOrderRef(order),
-  )
-}
-
 const resolveOrderDateValue = order =>
   normalizeText(order?.alterDate || order?.alter_date || order?.orderDate)
-
-const truncateMiddle = (value, maxLength = 28, head = 12, tail = 8) => {
-  const normalized = normalizeText(value)
-  if (!normalized || normalized.length <= maxLength) {
-    return normalized
-  }
-
-  return `${normalized.slice(0, head)}...${normalized.slice(-tail)}`
-}
 
 const getWaitingMinutes = orderDate => {
   if (!orderDate) return 0
@@ -583,6 +540,30 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   }, [configuredMinColumns, effectiveWidth, tvLayout?.columns, useTvPagedLayout])
 
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
+  const orderProductsStyles = useMemo(() => ({
+    itemRow: styles.orderProductItemRow,
+    itemMainRow: styles.orderProductItemMainRow,
+    itemContent: styles.orderProductItemContent,
+    metaWrap: styles.orderProductMetaWrap,
+    queueBadge: styles.orderProductQueueBadge,
+    queueBadgeDot: styles.orderProductQueueBadgeDot,
+    queueBadgeText: styles.orderProductQueueBadgeText,
+    priceRow: styles.orderProductPriceRow,
+    text: styles.orderProductText,
+    subText: styles.orderProductSubText,
+    qtyText: styles.orderProductQtyText,
+    statusMarker: styles.orderProductStatusMarker,
+    groupWrap: styles.groupWrap,
+    groupTitlePill: styles.groupTitlePill,
+    groupTitle: styles.groupTitle,
+    groupItem: styles.groupItem,
+    groupItemMainRow: styles.orderProductGroupItemRow,
+    groupItemContent: styles.orderProductGroupItemContent,
+    groupItemMetaWrap: styles.orderProductGroupItemMetaWrap,
+    groupItemText: styles.groupItemText,
+    groupItemMetaText: styles.orderProductGroupItemMetaText,
+    groupItemPriceText: styles.orderProductGroupItemPriceText,
+  }), [styles])
   const showSkeleton = isLoading && (!Array.isArray(orders) || orders.length === 0)
 
   const noteRefresh = useCallback((source, detail = '') => {
@@ -777,14 +758,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       const waitingMinutes = getWaitingMinutes(orderDateValue)
       const channelLogo = getOrderChannelLogo(order)
       const channelLabel = String(getOrderChannelLabel(order) || 'SHOP').toUpperCase()
-      const productionOrderRef = truncateMiddle(getProductionOrderRef(order))
-      const orderTitleText = productionOrderRef
-        ? `${channelLabel} #${productionOrderRef}`
-        : `Pedido #${order?.id}`
-      const channelDisplay = order?.id && productionOrderRef
-        ? `Interno #${order.id}`
-        : channelLabel
-      const products = normalizedItem?.products || getOrderProductsPreview(order, compactMode ? 3 : 5)
+      const channelDisplay = channelLabel
       const price = Number(order?.price || 0)
 
       return (
@@ -826,7 +800,14 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 </View>
 
                 <View style={styles.orderTitleWrap}>
-                  <Text style={[styles.orderTitle, compactMode && styles.tvOrderTitle]}>{orderTitleText}</Text>
+                  <OrderIdentityLabel
+                    order={order}
+                    primaryTextStyle={[styles.orderTitle, compactMode && styles.tvOrderTitle]}
+                    secondaryTextStyle={[
+                      styles.orderTitleSecondary,
+                      compactMode && styles.tvOrderTitleSecondary,
+                    ]}
+                  />
                   <Text style={[styles.orderDate, compactMode && styles.tvOrderDate]}>{formatOrderDate(orderDateValue)}</Text>
                 </View>
               </View>
@@ -889,59 +870,14 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               </View>
             </View>
 
-            {products.length > 0 && (
+            {Array.isArray(order?.orderProducts) && order.orderProducts.length > 0 && (
               <View style={[styles.productsWrap, compactMode && styles.tvProductsWrap]}>
-                {products.map((product, index) => (
-                  <View
-                    key={String(product.id)}
-                    style={[
-                      styles.productBlock,
-                      index < products.length - 1 && styles.productRowDivider,
-                    ]}
-                  >
-                    <View style={styles.productRow}>
-                      <View style={[styles.qtyPill, compactMode && styles.tvQtyPill]}>
-                        <Text style={[styles.qtyPillText, compactMode && styles.tvQtyPillText]}>
-                          {`${normalizeQuantity(product.quantity)}x`}
-                        </Text>
-                      </View>
-
-                      <View style={inlineStyle_916_28}>
-                        <Text
-                          style={[styles.productName, compactMode && styles.tvProductName]}
-                          numberOfLines={compactMode ? 2 : 1}
-                        >
-                          {product.name}
-                        </Text>
-
-                        {!!product.description && (
-                          <Text
-                            style={[styles.productDescription, compactMode && styles.tvProductDescription]}
-                            numberOfLines={compactMode ? 2 : 1}
-                          >
-                            {product.description}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-
-                    {Object.entries(product.groups || {}).map(([groupName, items]) => (
-                      <View key={groupName} style={styles.groupWrap}>
-                        <View style={[styles.groupTitlePill, compactMode && styles.tvGroupTitlePill]}>
-                          <Text style={[styles.groupTitle, compactMode && styles.tvGroupTitle]}>{groupName}</Text>
-                        </View>
-
-                        {items.map(child => (
-                          <View key={child.id} style={[styles.groupItem, { marginLeft: 12 }]}>
-                            <Text style={[styles.groupItemText, compactMode && styles.tvGroupItemText]}>
-                              {`${formatQuantityPrefix(child.quantity)}${child.name}`.trim()}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    ))}
-                  </View>
-                ))}
+                <OrderProducts
+                  order={order}
+                  styles={orderProductsStyles}
+                  showDetails
+                  maxCards={compactMode ? 3 : 5}
+                />
               </View>
             )}
             </View>
@@ -966,7 +902,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         </View>
       );
     },
-    [display?.displayType, display?.id, displayId, navigation, ppcColors, route.params?.displayType, styles, tvMode, useTvPagedLayout],
+    [display?.displayType, display?.id, displayId, navigation, orderProductsStyles, ppcColors, route.params?.displayType, styles, tvMode, useTvPagedLayout],
   )
 
   return (

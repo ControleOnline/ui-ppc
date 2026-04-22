@@ -1,4 +1,5 @@
 import {buildFood99OrderSummary} from '@controleonline/ui-orders/src/react/services/food99OrderSummary';
+import {resolveOrderIdentity} from '@controleonline/ui-orders/src/react/utils/orderIdentity';
 
 const normalizeText = value => String(value ?? '').trim();
 
@@ -179,11 +180,14 @@ const resolveClientName = (order, remoteOrderSummary = null) =>
 
 export const resolveDisplayTicketSummary = order => {
   const remoteOrderSummary = buildFood99OrderSummary(order) || null;
+  const identity = resolveOrderIdentity(order, remoteOrderSummary);
 
   return {
-    internalOrderCode: normalizeText(order?.id),
-    marketplaceLabel: resolveMarketplaceAppLabel(order),
-    marketplaceOrderCode: resolveMarketplaceOrderCode(order, remoteOrderSummary),
+    internalOrderCode: identity.internalId,
+    marketplaceLabel: identity.externalLabel || resolveMarketplaceAppLabel(order),
+    marketplaceOrderCode:
+      identity.externalId || resolveMarketplaceOrderCode(order, remoteOrderSummary),
+    identity,
     clientName: resolveClientName(order, remoteOrderSummary),
   };
 };
