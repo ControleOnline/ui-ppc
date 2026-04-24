@@ -1,4 +1,5 @@
 const {
+  getOrderStatus,
   getOrderType,
   isDisplayVisibleOrder,
 } = require('../../../../../react/pages/displays/orders/orderVisibility')
@@ -9,6 +10,10 @@ describe('orderVisibility', () => {
     expect(getOrderType({ orderType: 'sale' })).toBe('sale')
   })
 
+  it('reads the canonical order status field', () => {
+    expect(getOrderStatus({ status: { status: 'ready' } })).toBe('ready')
+  })
+
   it('does not infer order type from alias fields', () => {
     expect(getOrderType({ order_type: 'sale' })).toBe('')
     expect(getOrderType({ type: 'sale' })).toBe('')
@@ -17,13 +22,40 @@ describe('orderVisibility', () => {
     expect(getOrderType({ order: { type: 'sale' } })).toBe('')
   })
 
-  it('shows only open sale orders', () => {
+  it('shows open sale orders', () => {
     expect(
       isDisplayVisibleOrder({
         status: { realStatus: 'open' },
         orderType: 'sale',
       }),
     ).toBe(true)
+  })
+
+  it('shows ready sale orders for packaging', () => {
+    expect(
+      isDisplayVisibleOrder({
+        status: { realStatus: 'pending', status: 'ready' },
+        orderType: 'sale',
+      }),
+    ).toBe(true)
+  })
+
+  it('hides sale orders already in route', () => {
+    expect(
+      isDisplayVisibleOrder({
+        status: { realStatus: 'pending', status: 'way' },
+        orderType: 'sale',
+      }),
+    ).toBe(false)
+  })
+
+  it('hides closed sale orders', () => {
+    expect(
+      isDisplayVisibleOrder({
+        status: { realStatus: 'closed', status: 'closed' },
+        orderType: 'sale',
+      }),
+    ).toBe(false)
   })
 
   it('hides orders when sale exists only in fallback fields', () => {

@@ -20,11 +20,30 @@ const getOrderRealStatus = order => {
 const getOrderType = order =>
   normalizeText(order?.orderType).toLowerCase()
 
-const isDisplayVisibleOrder = order =>
-  getOrderRealStatus(order) === 'open' && getOrderType(order) === 'sale'
+const getOrderStatus = order => {
+  const candidates = [
+    order?.status?.status,
+    order?.order?.status?.status,
+  ]
+
+  return normalizeText(
+    candidates.find(value => normalizeText(value)),
+  ).toLowerCase()
+}
+
+const isDisplayVisibleOrder = order => {
+  const realStatus = getOrderRealStatus(order)
+  const status = getOrderStatus(order)
+
+  return getOrderType(order) === 'sale' && (
+    realStatus === 'open' ||
+    (realStatus === 'pending' && status === 'ready')
+  )
+}
 
 module.exports = {
   getOrderRealStatus,
+  getOrderStatus,
   getOrderType,
   isDisplayVisibleOrder,
 }

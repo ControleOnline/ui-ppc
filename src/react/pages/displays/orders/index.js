@@ -427,7 +427,7 @@ const resolveTvLayoutMetrics = ({
   }
 }
 
-// Display exibe apenas pedidos ativos (realStatus === 'open')
+// Display exibe pedidos em produção e prontos para finalização.
 
 
 const Orders = ({ display = {}, isTvDisplay = false }) => {
@@ -595,7 +595,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     setVisibleCount(50)
     actions
       .ordersQueue({
-        status: { realStatus: ['open'] },
+        status: { realStatus: ['open', 'pending'] },
         orderType: 'sale',
         provider: currentCompany.id,
         itemsPerPage: 50,
