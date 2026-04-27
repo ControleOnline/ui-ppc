@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dimensions, FlatList, Image, Pressable, Text, View, useWindowDimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
@@ -29,6 +29,14 @@ import PrintButton from '@controleonline/ui-orders/src/react/components/PrintBut
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
 import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
 import createStyles from './index.styles'
+import DisplayConferenceAutoPrintDispatcher from './DisplayConferenceAutoPrintDispatcher'
+import {
+  appendPendingConferenceAutoPrintJob,
+  buildConferenceAutoPrintMessageFingerprint,
+  isConferenceOrderPrinted,
+  isRelevantConferenceAutoPrintMessage,
+  removePendingConferenceAutoPrintJob,
+} from './conferenceAutoPrint'
 
 import {
   DISPLAY_DEVICE_LINK_CONFIG_KEY,
@@ -99,6 +107,7 @@ const TV_MIN_CARD_WIDTH = 300
 const TV_MIN_CARD_HEIGHT = 240
 const TV_BASE_PAGE_ROTATION_MS = 9000
 const TV_MAX_PAGE_ROTATION_MS = 22000
+const MAX_PROCESSED_CONFERENCE_PRINT_EVENTS = 200
 
 const resolveDisplayDeviceConfig = ({
   deviceConfigs = [],
@@ -466,6 +475,8 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     lastSource: 'boot',
     lastDetail: 'startup',
   })
+  const [pendingConferenceAutoPrintOrderIds, setPendingConferenceAutoPrintOrderIds] = useState([])
+  const processedConferencePrintEventsRef = useRef(new Map())
   const tvMode =
     Boolean(isTvDisplay) || String(display?.displayType || '').toLowerCase() === 'tv'
   const useTvPagedLayout = false
@@ -589,6 +600,20 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     }
   }, [runtimeDebugActions])
 
+  const markProcessedConferencePrintKeys = useCallback(keys => {
+    keys.forEach(key => {
+      processedConferencePrintEventsRef.current.set(key, Date.now())
+
+      if (
+        processedConferencePrintEventsRef.current.size >
+        MAX_PROCESSED_CONFERENCE_PRINT_EVENTS
+      ) {
+        const oldestKey = processedConferencePrintEventsRef.current.keys().next().value
+        processedConferencePrintEventsRef.current.delete(oldestKey)
+      }
+    })
+  }, [])
+
   const fetchOrders = useCallback((source = 'manual', detail = '') => {
     if (!displayId || !currentCompany?.id) return
 
@@ -619,6 +644,11 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         return safeATime - safeBTime
       })
   }, [orders])
+
+  useEffect(() => {
+    processedConferencePrintEventsRef.current.clear()
+    setPendingConferenceAutoPrintOrderIds([])
+  }, [currentCompany?.id, selectedDisplayId])
 
   const listCount = sortedOrders.length
 
@@ -674,6 +704,54 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       ),
     [currentCompany?.id, ordersMessages],
   )
+
+  useEffect(() => {
+    const incomingMessages = (Array.isArray(ordersMessages) ? ordersMessages : [])
+      .filter(message =>
+        isMessageForCompany(message, currentCompany?.id) &&
+        isRelevantConferenceAutoPrintMessage(message),
+      )
+
+    if (incomingMessages.length === 0) {
+      return
+    }
+
+    const unseenMessages = incomingMessages
+      .map(message => ({
+        fingerprint: buildConferenceAutoPrintMessageFingerprint(message),
+        orderId: parseEntityId(message?.order),
+      }))
+      .filter(entry => entry.fingerprint && entry.orderId)
+      .filter(
+        entry => !processedConferencePrintEventsRef.current.has(entry.fingerprint),
+      )
+
+    if (unseenMessages.length === 0) {
+      return
+    }
+
+    markProcessedConferencePrintKeys(
+      unseenMessages.map(entry => entry.fingerprint),
+    )
+
+    setPendingConferenceAutoPrintOrderIds(currentJobs => {
+      let nextJobs = Array.isArray(currentJobs) ? [...currentJobs] : []
+
+      unseenMessages.forEach(entry => {
+        const matchedOrder = sortedOrders.find(
+          order => parseEntityId(order?.id) === entry.orderId,
+        )
+
+        if (matchedOrder && isConferenceOrderPrinted(matchedOrder)) {
+          return
+        }
+
+        nextJobs = appendPendingConferenceAutoPrintJob(nextJobs, entry.orderId)
+      })
+
+      return nextJobs
+    })
+  }, [currentCompany?.id, markProcessedConferencePrintKeys, ordersMessages, sortedOrders])
 
   useEffect(() => {
     if (!hasQueueRefreshMessage && !hasOrderRefreshMessage) {
@@ -907,6 +985,19 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      {pendingConferenceAutoPrintOrderIds.length > 0 ? (
+        <DisplayConferenceAutoPrintDispatcher
+          display={display}
+          displayId={selectedDisplayId || display?.id || displayId}
+          orderIds={pendingConferenceAutoPrintOrderIds}
+          onJobSettled={orderId => {
+            setPendingConferenceAutoPrintOrderIds(currentJobs =>
+              removePendingConferenceAutoPrintJob(currentJobs, orderId),
+            )
+          }}
+        />
+      ) : null}
+
       {!tvMode && (
         <>
           <View
