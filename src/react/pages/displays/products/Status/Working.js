@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
 import OrderProductComponents from './../../OrderProductComponents';
@@ -30,6 +30,9 @@ const formatDisplayDateTime = value => {
 
     return `${formattedDate} ${formattedTime}`;
 };
+
+const getQueueItemKey = item =>
+    String(item?.id || item?.['@id'] || '').trim();
 
 const Working = ({
     companyId = null,
@@ -65,19 +68,39 @@ const Working = ({
     });
     const displayTotal =
         typeof totalOverride === 'number' ? totalOverride : total;
+    const [movingIds, setMovingIds] = useState(() => new Set());
+    const visibleOrders = useMemo(
+        () => orders.filter(order => !movingIds.has(getQueueItemKey(order))),
+        [movingIds, orders],
+    );
 
     const finalize = async order => {
         if (!status_out?.['@id'] || typeof saveQueueItem !== 'function') {
             return;
         }
 
-        const updatedQueueItem = await saveQueueItem({
-            id: order.id,
-            status: status_out['@id'],
-        });
+        const queueItemKey = getQueueItemKey(order);
+        if (queueItemKey) {
+            setMovingIds(currentIds => new Set([...currentIds, queueItemKey]));
+        }
 
-        if (typeof onTransition === 'function') {
-            onTransition(updatedQueueItem, 'status_working', 'status_out');
+        try {
+            const updatedQueueItem = await saveQueueItem({
+                id: order.id,
+                status: status_out['@id'],
+            });
+
+            if (typeof onTransition === 'function') {
+                onTransition(updatedQueueItem, 'status_working', 'status_out');
+            }
+        } catch (error) {
+            if (queueItemKey) {
+                setMovingIds(currentIds => {
+                    const nextIds = new Set(currentIds);
+                    nextIds.delete(queueItemKey);
+                    return nextIds;
+                });
+            }
         }
     };
 
@@ -87,6 +110,7 @@ const Working = ({
         const orderSummary = resolveDisplayTicketSummary(orderEntity);
         const productDescription = resolveOrderProductDescription(orderProduct);
         const productComment = resolveOrderProductComment(orderProduct);
+        const isMoving = movingIds.has(getQueueItemKey(order));
 
         return (
             <Card key={order.id} style={styles.orderCard}>
@@ -164,7 +188,8 @@ const Working = ({
                             textColor={ppcColors.pillTextDark}
                             style={styles.actionButton}
                             labelStyle={styles.actionLabel}
-                            disabled={!status_out?.['@id'] || typeof saveQueueItem !== 'function'}
+                            loading={isMoving}
+                            disabled={isMoving || !status_out?.['@id'] || typeof saveQueueItem !== 'function'}
                             onPress={() => finalize(order)}
                         >
                             Finalizar
@@ -217,7 +242,7 @@ const Working = ({
                 </View>
 
                 <FlatList
-                    data={orders}
+                    data={visibleOrders}
                     keyExtractor={(item, index) =>
                         String(item?.id || item?.['@id'] || `status-working-${index}`)
                     }
