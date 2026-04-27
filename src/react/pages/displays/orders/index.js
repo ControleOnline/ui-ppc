@@ -551,30 +551,67 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   }, [configuredMinColumns, effectiveWidth, tvLayout?.columns, useTvPagedLayout])
 
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
+  const useCompactTvStyles = tvMode || useTvPagedLayout
   const orderProductsStyles = useMemo(() => ({
-    itemRow: styles.orderProductItemRow,
+    itemRow: [
+      styles.orderProductItemRow,
+      useCompactTvStyles && styles.tvOrderProductItemRow,
+    ],
     itemMainRow: styles.orderProductItemMainRow,
     itemContent: styles.orderProductItemContent,
-    metaWrap: styles.orderProductMetaWrap,
-    queueBadge: styles.orderProductQueueBadge,
-    queueBadgeDot: styles.orderProductQueueBadgeDot,
-    queueBadgeText: styles.orderProductQueueBadgeText,
+    metaWrap: [
+      styles.orderProductMetaWrap,
+      useCompactTvStyles && styles.tvOrderProductMetaWrap,
+    ],
+    queueBadge: [
+      styles.orderProductQueueBadge,
+      useCompactTvStyles && styles.tvOrderProductQueueBadge,
+    ],
+    queueBadgeDot: [
+      styles.orderProductQueueBadgeDot,
+      useCompactTvStyles && styles.tvOrderProductQueueBadgeDot,
+    ],
+    queueBadgeText: [
+      styles.orderProductQueueBadgeText,
+      useCompactTvStyles && styles.tvOrderProductQueueBadgeText,
+    ],
     priceRow: styles.orderProductPriceRow,
-    text: styles.orderProductText,
-    subText: styles.orderProductSubText,
+    text: [
+      styles.orderProductText,
+      useCompactTvStyles && styles.tvOrderProductText,
+    ],
+    subText: [
+      styles.orderProductSubText,
+      useCompactTvStyles && styles.tvOrderProductSubText,
+    ],
     qtyText: styles.orderProductQtyText,
     statusMarker: styles.orderProductStatusMarker,
-    groupWrap: styles.groupWrap,
-    groupTitlePill: styles.groupTitlePill,
-    groupTitle: styles.groupTitle,
-    groupItem: styles.groupItem,
+    groupWrap: [styles.groupWrap, useCompactTvStyles && styles.tvGroupWrap],
+    groupTitlePill: [
+      styles.groupTitlePill,
+      useCompactTvStyles && styles.tvGroupTitlePill,
+    ],
+    groupTitle: [styles.groupTitle, useCompactTvStyles && styles.tvGroupTitle],
+    groupItem: [styles.groupItem, useCompactTvStyles && styles.tvGroupItem],
     groupItemMainRow: styles.orderProductGroupItemRow,
     groupItemContent: styles.orderProductGroupItemContent,
-    groupItemMetaWrap: styles.orderProductGroupItemMetaWrap,
-    groupItemText: styles.groupItemText,
-    groupItemMetaText: styles.orderProductGroupItemMetaText,
-    groupItemPriceText: styles.orderProductGroupItemPriceText,
-  }), [styles])
+    groupItemMetaWrap: [
+      styles.orderProductGroupItemMetaWrap,
+      useCompactTvStyles && styles.tvOrderProductGroupItemMetaWrap,
+    ],
+    groupItemText: [
+      styles.groupItemText,
+      useCompactTvStyles && styles.tvGroupItemText,
+    ],
+    groupItemMetaText: [
+      styles.orderProductGroupItemMetaText,
+      useCompactTvStyles && styles.tvOrderProductGroupItemMetaText,
+    ],
+    groupItemPriceText: [
+      styles.orderProductGroupItemPriceText,
+      useCompactTvStyles && styles.tvOrderProductGroupItemPriceText,
+    ],
+  }), [styles, useCompactTvStyles])
   const showSkeleton = isLoading && (!Array.isArray(orders) || orders.length === 0)
 
   const noteRefresh = useCallback((source, detail = '') => {
@@ -819,7 +856,8 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
   const renderOrderCard = useCallback(
     (itemOrRenderInfo, cardStyle = null) => {
-      const compactMode = useTvPagedLayout
+      const compactMode = useCompactTvStyles
+      const shouldUseTvPagedCardFrame = useTvPagedLayout
       const normalizedItem =
         itemOrRenderInfo?.item &&
         !itemOrRenderInfo?.order &&
@@ -844,7 +882,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
           key={normalizedItem?.key || `order-card-${parseEntityId(order?.id) || segmentIndex}`}
           style={[
             styles.orderCard,
-            compactMode && styles.tvOrderCard,
+            shouldUseTvPagedCardFrame && styles.tvOrderCard,
             cardStyle,
           ]}
         >
@@ -861,17 +899,30 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               })
             }}
           >
-            <View style={[styles.orderAccentBar, { backgroundColor: statusVisual.textColor }]} />
+            <View
+              style={[
+                styles.orderAccentBar,
+                compactMode && styles.tvOrderAccentBar,
+                { backgroundColor: statusVisual.textColor },
+              ]}
+            />
             <View style={[styles.orderCardInner, compactMode && styles.tvOrderCardInner]}>
             <View style={[styles.orderTopRow, compactMode && styles.tvOrderTopRow]}>
               <View style={styles.orderIdentity}>
                 <View style={[styles.orderIconWrap, compactMode && styles.tvOrderIconWrap]}>
                   {channelLogo ? (
-                    <Image source={channelLogo} style={styles.orderChannelLogo} resizeMode="contain" />
+                    <Image
+                      source={channelLogo}
+                      style={[
+                        styles.orderChannelLogo,
+                        compactMode && styles.tvOrderChannelLogo,
+                      ]}
+                      resizeMode="contain"
+                    />
                   ) : (
                     <MaterialCommunityIcons
                       name="receipt-text"
-                      size={16}
+                      size={compactMode ? 12 : 16}
                       color={ppcColors.accentInfo}
                     />
                   )}
@@ -954,7 +1005,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                   order={order}
                   styles={orderProductsStyles}
                   showDetails
-                  maxCards={compactMode ? 3 : 5}
+                  maxCards={5}
                 />
               </View>
             )}
@@ -980,7 +1031,19 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         </View>
       );
     },
-    [display?.displayType, display?.id, displayId, navigation, orderProductsStyles, ppcColors, route.params?.displayType, styles, tvMode, useTvPagedLayout],
+    [
+      display?.displayType,
+      display?.id,
+      displayId,
+      navigation,
+      orderProductsStyles,
+      ppcColors,
+      route.params?.displayType,
+      styles,
+      tvMode,
+      useCompactTvStyles,
+      useTvPagedLayout,
+    ],
   )
 
   return (
@@ -1101,8 +1164,12 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
           numColumns={columns}
           keyExtractor={item => String(item.id)}
           renderItem={renderOrderCard}
-          columnWrapperStyle={columns > 1 ? styles.columnWrapper : null}
-          contentContainerStyle={styles.list}
+          columnWrapperStyle={
+            columns > 1
+              ? (tvMode ? styles.tvColumnWrapper : styles.columnWrapper)
+              : null
+          }
+          contentContainerStyle={tvMode ? styles.tvList : styles.list}
           onEndReached={() => {
             if (visibleCount < sortedOrders.length) setVisibleCount(v => v + 50)
           }}

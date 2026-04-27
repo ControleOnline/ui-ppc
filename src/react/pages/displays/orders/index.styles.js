@@ -129,8 +129,18 @@ const createStyles = ppcColors =>
       paddingTop: 8,
       gap: 10,
     },
+    tvList: {
+      paddingHorizontal: 6,
+      paddingBottom: 10,
+      paddingTop: 4,
+      gap: 6,
+    },
     columnWrapper: {
       gap: 8,
+      justifyContent: 'space-between',
+    },
+    tvColumnWrapper: {
+      gap: 6,
       justifyContent: 'space-between',
     },
     orderCard: {
@@ -148,6 +158,9 @@ const createStyles = ppcColors =>
     },
     orderAccentBar: {
       height: 3,
+    },
+    tvOrderAccentBar: {
+      height: 2,
     },
     orderCardInner: {
       padding: 10,
@@ -182,7 +195,7 @@ const createStyles = ppcColors =>
       letterSpacing: 0.3,
     },
     tvOrderCardInner: {
-      padding: 8,
+      padding: 6,
       flex: 1,
     },
     orderTopRow: {
@@ -192,7 +205,7 @@ const createStyles = ppcColors =>
       gap: 8,
     },
     tvOrderTopRow: {
-      gap: 6,
+      gap: 4,
     },
     orderIdentity: {
       flexDirection: 'row',
@@ -212,14 +225,18 @@ const createStyles = ppcColors =>
       marginRight: 10,
     },
     tvOrderIconWrap: {
-      width: 22,
-      height: 22,
-      marginRight: 8,
+      width: 16,
+      height: 16,
+      marginRight: 5,
     },
     orderChannelLogo: {
       width: 16,
       height: 16,
       borderRadius: 999,
+    },
+    tvOrderChannelLogo: {
+      width: 10,
+      height: 10,
     },
     orderTitleWrap: {
       flex: 1,
@@ -239,12 +256,12 @@ const createStyles = ppcColors =>
       fontWeight: '800',
     },
     tvOrderTitle: {
-      fontSize: 13,
-      lineHeight: 16,
+      fontSize: 10,
+      lineHeight: 12,
     },
     tvOrderTitleSecondary: {
-      fontSize: 9,
-      lineHeight: 12,
+      fontSize: 7,
+      lineHeight: 9,
     },
     orderDate: {
       marginTop: 1,
@@ -253,7 +270,7 @@ const createStyles = ppcColors =>
       fontWeight: '600',
     },
     tvOrderDate: {
-      fontSize: 10,
+      fontSize: 8,
     },
     orderStatusBadge: {
       flexDirection: 'row',
@@ -264,8 +281,8 @@ const createStyles = ppcColors =>
       paddingVertical: 4,
     },
     tvOrderStatusBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 3,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
     },
     orderStatusDot: {
       width: 7,
@@ -280,7 +297,7 @@ const createStyles = ppcColors =>
       letterSpacing: 0.3,
     },
     tvOrderStatusText: {
-      fontSize: 9,
+      fontSize: 7,
     },
     orderStatusWrap: {
       alignItems: 'flex-end',
@@ -294,8 +311,8 @@ const createStyles = ppcColors =>
       gap: 10,
     },
     tvOrderMetaRow: {
-      marginTop: 8,
-      gap: 8,
+      marginTop: 6,
+      gap: 6,
     },
     waitingChip: {
       flexDirection: 'row',
@@ -309,9 +326,9 @@ const createStyles = ppcColors =>
       gap: 5,
     },
     tvWaitingChip: {
-      paddingHorizontal: 6,
-      paddingVertical: 4,
-      gap: 4,
+      paddingHorizontal: 5,
+      paddingVertical: 3,
+      gap: 3,
     },
     waitingText: {
       color: ppcColors.dangerText,
@@ -319,7 +336,7 @@ const createStyles = ppcColors =>
       fontWeight: '800',
     },
     tvWaitingText: {
-      fontSize: 11,
+      fontSize: 8,
     },
     amountWrap: {
       alignItems: 'flex-end',
@@ -333,7 +350,7 @@ const createStyles = ppcColors =>
       textAlign: 'right',
     },
     tvChannelMetaText: {
-      fontSize: 10,
+      fontSize: 8,
     },
     amountText: {
       marginTop: 1,
@@ -343,8 +360,8 @@ const createStyles = ppcColors =>
       fontWeight: '900',
     },
     tvAmountText: {
-      fontSize: 14,
-      lineHeight: 17,
+      fontSize: 10,
+      lineHeight: 12,
     },
     productsWrap: {
       marginTop: 10,
@@ -358,7 +375,39 @@ const createStyles = ppcColors =>
       gap: 6,
     },
     tvProductsWrap: {
-      marginTop: 8,
+      marginTop: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 6,
+      gap: 4,
+    },
+    tvOrderProductItemRow: {
+      paddingHorizontal: 6,
+      paddingVertical: 5,
+      marginBottom: 4,
+    },
+    tvOrderProductMetaWrap: {
+      marginTop: 3,
+      gap: 2,
+    },
+    tvOrderProductQueueBadge: {
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      gap: 4,
+    },
+    tvOrderProductQueueBadgeDot: {
+      width: 4,
+      height: 4,
+    },
+    tvOrderProductQueueBadgeText: {
+      fontSize: 7,
+    },
+    tvOrderProductText: {
+      fontSize: 9,
+      lineHeight: 11,
+    },
+    tvOrderProductSubText: {
+      fontSize: 8,
+      lineHeight: 10,
     },
     orderProductItemRow: {
       borderRadius: 10,
@@ -576,6 +625,10 @@ const createStyles = ppcColors =>
       marginTop: 6,
       paddingLeft: 10,
     },
+    tvGroupWrap: {
+      marginTop: 4,
+      paddingLeft: 8,
+    },
 
     groupTitlePill: {
       alignSelf: 'flex-start',
@@ -588,9 +641,9 @@ const createStyles = ppcColors =>
       marginBottom: 4,
     },
     tvGroupTitlePill: {
-      paddingHorizontal: 6,
+      paddingHorizontal: 5,
       paddingVertical: 1,
-      marginBottom: 3,
+      marginBottom: 2,
     },
 
     groupTitle: {
@@ -608,6 +661,10 @@ const createStyles = ppcColors =>
       paddingVertical: 2,
       paddingLeft: 4,
     },
+    tvGroupItem: {
+      paddingVertical: 1,
+      paddingLeft: 3,
+    },
     orderProductGroupItemRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -622,17 +679,29 @@ const createStyles = ppcColors =>
       marginTop: 3,
       gap: 2,
     },
+    tvOrderProductGroupItemMetaWrap: {
+      marginTop: 2,
+      gap: 1,
+    },
     orderProductGroupItemMetaText: {
       fontSize: 10,
       lineHeight: 13,
       color: withOpacity(ppcColors.textSecondary, 0.86),
       fontWeight: '600',
     },
+    tvOrderProductGroupItemMetaText: {
+      fontSize: 8,
+      lineHeight: 10,
+    },
     orderProductGroupItemPriceText: {
       fontSize: 10,
       lineHeight: 13,
       color: withOpacity(ppcColors.textSecondary, 0.86),
       fontWeight: '700',
+    },
+    tvOrderProductGroupItemPriceText: {
+      fontSize: 8,
+      lineHeight: 10,
     },
 
     groupItemText: {
@@ -720,6 +789,7 @@ const createStyles = ppcColors =>
       flex: 0,
       flexBasis: 'auto',
       marginBottom: 0,
+      borderRadius: 10,
     },
     tvSegmentBadge: {
       borderRadius: 999,
