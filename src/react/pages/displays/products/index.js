@@ -3,6 +3,16 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { useStore } from '@store';
+import {
+    DISPLAY_DEVICE_LINK_CONFIG_KEY,
+    resolvePrintDeviceConfig,
+} from '@controleonline/ui-common/src/react/print/selection';
+import {
+    PRINT_CONTEXT_DISPLAY,
+} from '@controleonline/ui-common/src/react/print/jobs';
+import {
+    parseConfigsObject,
+} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 import InOut from './Status/InOut';
 import Working from './Status/Working';
 import createStyles from './index.styles';
@@ -13,6 +23,13 @@ import {
 } from '@controleonline/ui-common/src/react/utils/dateRangeFilter';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar';
+import DisplayAutoPrintDispatcher from './DisplayAutoPrintDispatcher';
+import {
+    appendPendingAutoPrintJob,
+    isDisplayAutoPrintEnabled,
+    removePendingAutoPrintJob,
+    shouldAutoPrintTransition,
+} from './autoPrint';
 
 const STAGE_KEYS = ['status_in', 'status_working', 'status_out'];
 const WORKING_TAB_INDEX = 1;
@@ -111,6 +128,8 @@ const DisplayProducts = ({ display = {} }) => {
     const queuesStore = useStore('queues');
     const ordersStore = useStore('orders');
     const displayQueueStore = useStore('display_queues');
+    const deviceConfigStore = useStore('device_config');
+    const deviceStore = useStore('device');
     const websocketStore = useStore('websocket');
     const runtimeDebugStore = useStore('runtime_debug');
     const orderProductQueueStore = useStore('order_products_queue');
@@ -122,6 +141,11 @@ const DisplayProducts = ({ display = {} }) => {
     const { actions: queuesActions, getters: queuesGetters } = queuesStore;
     const { actions: ordersActions, getters: ordersGetters } = ordersStore;
     const { actions: displayQueueActions, getters: displayQueueGetters } = displayQueueStore;
+    const {
+        item: runtimeDeviceConfig,
+        items: companyDeviceConfigs = [],
+    } = deviceConfigStore.getters;
+    const { item: currentDevice } = deviceStore.getters;
     const runtimeDebugActions = runtimeDebugStore.actions;
     const orderProductQueueActions = orderProductQueueStore.actions;
     const {
@@ -145,6 +169,7 @@ const DisplayProducts = ({ display = {} }) => {
     const [statusRefreshTokens, setStatusRefreshTokens] = useState(createEmptyCounters);
     const [bindingsRefreshToken, setBindingsRefreshToken] = useState(0);
     const [autoStartingCount, setAutoStartingCount] = useState(0);
+    const [pendingAutoPrintJobIds, setPendingAutoPrintJobIds] = useState([]);
     const [refreshDebug, setRefreshDebug] = useState({
         lastAt: null,
         lastSource: 'boot',
@@ -175,6 +200,7 @@ const DisplayProducts = ({ display = {} }) => {
         setStatusRefreshTokens(createEmptyCounters());
         setBindingsRefreshToken(0);
         setAutoStartingCount(0);
+        setPendingAutoPrintJobIds([]);
         setTabIndex(WORKING_TAB_INDEX);
         autoStartingIdsRef.current = new Set();
         hasHydratedStatusesRef.current = false;
@@ -215,6 +241,97 @@ const DisplayProducts = ({ display = {} }) => {
     const dateRange = useMemo(
         () => getDateRange(dateFilterKey, customDateRange),
         [customDateRange, dateFilterKey],
+    );
+    const runtimeDisplayConfig = useMemo(() => {
+        if (!runtimeDeviceConfig) {
+            return null;
+        }
+
+        const runtimeConfigs = parseConfigsObject(runtimeDeviceConfig?.configs);
+        const runtimeDisplayId = parseEntityId(
+            runtimeConfigs?.[DISPLAY_DEVICE_LINK_CONFIG_KEY],
+        );
+        const currentDisplayId = parseEntityId(display?.id || displayId);
+        const runtimeDeviceId = parseEntityId(
+            runtimeDeviceConfig?.device?.device || runtimeDeviceConfig?.device?.id,
+        );
+        const currentRuntimeDeviceId = parseEntityId(
+            currentDevice?.id || currentDevice?.device,
+        );
+        const runtimeCompanyId = parseEntityId(
+            runtimeDeviceConfig?.people?.id || runtimeDeviceConfig?.people,
+        );
+        const currentCompanyId = parseEntityId(currentCompany?.id);
+        const runtimeType = String(
+            runtimeDeviceConfig?.type || runtimeDeviceConfig?.device?.type || '',
+        )
+            .trim()
+            .toUpperCase();
+
+        if (
+            currentDisplayId &&
+            runtimeDisplayId &&
+            currentDisplayId !== runtimeDisplayId
+        ) {
+            return null;
+        }
+
+        if (
+            currentRuntimeDeviceId &&
+            runtimeDeviceId &&
+            currentRuntimeDeviceId !== runtimeDeviceId
+        ) {
+            return null;
+        }
+
+        if (
+            currentCompanyId &&
+            runtimeCompanyId &&
+            currentCompanyId !== runtimeCompanyId
+        ) {
+            return null;
+        }
+
+        if (runtimeType && runtimeType !== 'DISPLAY') {
+            return null;
+        }
+
+        return {
+            ...runtimeDeviceConfig,
+            configs: runtimeConfigs,
+        };
+    }, [
+        currentCompany?.id,
+        currentDevice?.device,
+        currentDevice?.id,
+        display?.id,
+        displayId,
+        runtimeDeviceConfig,
+    ]);
+    const displayPrintConfig = useMemo(
+        () =>
+            resolvePrintDeviceConfig({
+                contextType: PRINT_CONTEXT_DISPLAY,
+                companyDeviceConfigs,
+                currentCompanyId: currentCompany?.id,
+                currentDeviceId: currentDevice?.id || currentDevice?.device,
+                displayId: display?.id || displayId,
+                runtimeDeviceConfig,
+            }) || runtimeDisplayConfig,
+        [
+            companyDeviceConfigs,
+            currentCompany?.id,
+            currentDevice?.device,
+            currentDevice?.id,
+            display?.id,
+            displayId,
+            runtimeDeviceConfig,
+            runtimeDisplayConfig,
+        ],
+    );
+    const displayAutoPrintEnabled = useMemo(
+        () => isDisplayAutoPrintEnabled(displayPrintConfig),
+        [displayPrintConfig],
     );
     const displayedTotals = useMemo(() => {
         const reservedAutoStarts = Number(autoStartingCount || 0);
@@ -482,10 +599,36 @@ const DisplayProducts = ({ display = {} }) => {
         applyLocalQueueTransitionRef.current = applyLocalQueueTransition;
     }, [applyLocalQueueTransition]);
 
+    const handleQueueTransition = useCallback((updatedQueueItem, fromStage, toStage) => {
+        applyLocalQueueTransition(updatedQueueItem, fromStage, toStage);
+
+        if (
+            shouldAutoPrintTransition({
+                autoPrintEnabled: displayAutoPrintEnabled,
+                fromStage,
+                toStage,
+            })
+        ) {
+            setPendingAutoPrintJobIds(currentJobs =>
+                appendPendingAutoPrintJob(currentJobs, updatedQueueItem),
+            );
+        }
+    }, [applyLocalQueueTransition, displayAutoPrintEnabled]);
+
+    useEffect(() => {
+        applyLocalQueueTransitionRef.current = handleQueueTransition;
+    }, [handleQueueTransition]);
+
     const saveQueueItem = useCallback(
         payload => orderProductQueueActions.save(payload),
         [orderProductQueueActions],
     );
+
+    const handleAutoPrintSettled = useCallback(queueItemId => {
+        setPendingAutoPrintJobIds(currentJobs =>
+            removePendingAutoPrintJob(currentJobs, queueItemId),
+        );
+    }, []);
 
     useEffect(() => {
         const autoStart = async () => {
@@ -556,7 +699,7 @@ const DisplayProducts = ({ display = {} }) => {
                     syncAutoStartingIds(nextIds => {
                         nextIds.delete(orderId);
                     });
-                } catch (error) {
+                } catch {
                     syncAutoStartingIds(nextIds => {
                         nextIds.delete(orderId);
                     });
@@ -777,7 +920,7 @@ const DisplayProducts = ({ display = {} }) => {
                             totalOverride={displayedTotals.status_in}
                             status_working={queueBindings.statusWorking}
                             saveQueueItem={saveQueueItem}
-                            onTransition={applyLocalQueueTransition}
+                            onTransition={handleQueueTransition}
                             printButtonProps={printButtonProps}
                             ppcColorsOverride={ppcColors}
                         />
@@ -798,7 +941,7 @@ const DisplayProducts = ({ display = {} }) => {
                             totalOverride={displayedTotals.status_working}
                             status_out={queueBindings.statusOut}
                             saveQueueItem={saveQueueItem}
-                            onTransition={applyLocalQueueTransition}
+                            onTransition={handleQueueTransition}
                             printButtonProps={printButtonProps}
                             ppcColorsOverride={ppcColors}
                         />
@@ -819,7 +962,7 @@ const DisplayProducts = ({ display = {} }) => {
                             onSnapshotChange={handleOutSnapshot}
                             totalOverride={displayedTotals.status_out}
                             saveQueueItem={saveQueueItem}
-                            onTransition={applyLocalQueueTransition}
+                            onTransition={handleQueueTransition}
                             printButtonProps={printButtonProps}
                             ppcColorsOverride={ppcColors}
                         />
@@ -827,6 +970,15 @@ const DisplayProducts = ({ display = {} }) => {
                     </View>
                 </View>
             </View>
+
+            {pendingAutoPrintJobIds.length > 0 ? (
+                <DisplayAutoPrintDispatcher
+                    display={display}
+                    displayId={display?.id || displayId}
+                    queueItemIds={pendingAutoPrintJobIds}
+                    onJobSettled={handleAutoPrintSettled}
+                />
+            ) : null}
 
             <RealtimeDebugBar
                 companyId={currentCompany?.id}
