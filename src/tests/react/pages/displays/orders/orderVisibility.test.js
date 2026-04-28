@@ -1,5 +1,4 @@
 const {
-  getOrderStatus,
   getOrderType,
   isDisplayVisibleOrder,
 } = require('../../../../../react/pages/displays/orders/orderVisibility')
@@ -8,10 +7,6 @@ const { describe, expect, it } = global
 describe('orderVisibility', () => {
   it('uses only the canonical orderType field', () => {
     expect(getOrderType({ orderType: 'sale' })).toBe('sale')
-  })
-
-  it('reads the canonical order status field', () => {
-    expect(getOrderStatus({ status: { status: 'ready' } })).toBe('ready')
   })
 
   it('does not infer order type from alias fields', () => {
@@ -31,13 +26,13 @@ describe('orderVisibility', () => {
     ).toBe(true)
   })
 
-  it('shows ready sale orders for packaging', () => {
+  it('hides pending sale orders even when local status is ready', () => {
     expect(
       isDisplayVisibleOrder({
         status: { realStatus: 'pending', status: 'ready' },
         orderType: 'sale',
       }),
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('hides sale orders already in route', () => {

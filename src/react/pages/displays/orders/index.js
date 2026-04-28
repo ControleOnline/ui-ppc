@@ -10,8 +10,9 @@ import {
   parseConfigsObject,
   resolveDisplaySize,
 } from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
-import OrderCardHeader from '@controleonline/ui-orders/src/react/components/OrderCardHeader'
-import { resolveDisplayedOrderStatus } from '@controleonline/ui-orders/src/react/components/OrderHeader'
+import OrderHeader, {
+  resolveDisplayedOrderStatus,
+} from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import OrderProducts from '@controleonline/ui-orders/src/react/components/OrderProducts'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
@@ -28,7 +29,6 @@ import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/Realti
 import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
 import createStyles from './index.styles'
 import DisplayConferenceAutoPrintDispatcher from './DisplayConferenceAutoPrintDispatcher'
-import OrderChannelIndicator from './OrderChannelIndicator'
 import TvAutoScrollView from './TvAutoScrollView'
 import {
   appendPendingConferenceAutoPrintJob,
@@ -189,24 +189,6 @@ const removeConsumedMessages = (messages, companyId) =>
 
 const resolveOrderDateValue = order =>
   normalizeText(order?.alterDate || order?.alter_date || order?.orderDate)
-
-const getWaitingMinutes = orderDate => {
-  if (!orderDate) return 0
-  const diff = Date.now() - new Date(orderDate).getTime()
-  return Math.max(0, Math.floor(diff / 60000))
-}
-
-const pad2 = value => String(value).padStart(2, '0')
-
-const formatOrderDate = dateValue => {
-  if (!dateValue) return '-'
-  const date = new Date(dateValue)
-  if (Number.isNaN(date.getTime())) return '-'
-
-  return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}, ${pad2(
-    date.getHours(),
-  )}:${pad2(date.getMinutes())}`
-}
 
 const estimateTextUnits = (value, charsPerLine = 28) => {
   const normalized = normalizeText(value)
@@ -384,7 +366,7 @@ const resolveTvLayoutMetrics = ({
   }
 }
 
-// Display exibe pedidos em produção e prontos para finalização.
+// Display exibe apenas pedidos em produção com workflow ainda aberto.
 
 
 const Orders = ({ display = {}, isTvDisplay = false }) => {
@@ -634,7 +616,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     setVisibleCount(50)
     actions
       .ordersQueue({
-        status: { realStatus: ['open', 'pending'] },
+        status: { realStatus: ['open'] },
         orderType: 'sale',
         provider: currentCompany.id,
         itemsPerPage: 50,
@@ -845,9 +827,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       const displayedOrderProducts = Array.isArray(normalizedItem?.products)
         ? normalizedItem.products
         : null
-      const orderDateValue = resolveOrderDateValue(order)
       const statusVisual = getStatusVisual(order, ppcColors)
-      const waitingMinutes = getWaitingMinutes(orderDateValue)
       const visibleOrderProducts = displayedOrderProducts || order?.orderProducts
       const hasVisibleProducts =
         Array.isArray(visibleOrderProducts) && visibleOrderProducts.length > 0
@@ -894,68 +874,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               ]}
             />
             <View style={[styles.orderCardInner, compactMode && styles.tvOrderCardInner]}>
-              <OrderCardHeader
-                order={order}
-                containerStyle={[styles.orderTopRow, compactMode && styles.tvOrderTopRow]}
-                leftSectionStyle={styles.orderIdentity}
-                leftContent={
-                  <OrderChannelIndicator
-                    order={order}
-                    iconWrapStyle={[styles.orderIconWrap, compactMode && styles.tvOrderIconWrap]}
-                    iconStyle={[
-                      styles.orderChannelLogo,
-                      compactMode && styles.tvOrderChannelLogo,
-                    ]}
-                    fallbackWrapStyle={[
-                      styles.orderChannelFallback,
-                      compactMode && styles.tvOrderChannelFallback,
-                    ]}
-                    fallbackTextStyle={[
-                      styles.orderChannelFallbackText,
-                      compactMode && styles.tvOrderChannelFallbackText,
-                    ]}
-                  />
-                }
-                titleWrapStyle={styles.orderTitleWrap}
-                primaryTextStyle={[styles.orderTitle, compactMode && styles.tvOrderTitle]}
-                secondaryTextStyle={[
-                  styles.orderTitleSecondary,
-                  compactMode && styles.tvOrderTitleSecondary,
-                ]}
-                dateTextStyle={[styles.orderDate, compactMode && styles.tvOrderDate]}
-                dateText={formatOrderDate(orderDateValue)}
-                rightSectionStyle={styles.orderStatusWrap}
-                status={{ label: statusVisual.label, color: statusVisual.textColor }}
-                statusBadgeStyle={[
-                  styles.orderStatusBadge,
-                  compactMode && styles.tvOrderStatusBadge,
-                  {
-                    borderColor: statusVisual.borderColor,
-                    backgroundColor: statusVisual.bgColor,
-                  },
-                ]}
-                statusDotStyle={[
-                  styles.orderStatusDot,
-                  { backgroundColor: statusVisual.textColor },
-                ]}
-                statusTextStyle={[
-                  styles.orderStatusText,
-                  compactMode && styles.tvOrderStatusText,
-                  { color: statusVisual.textColor },
-                ]}
-                rightContent={
-                  <View style={[styles.waitingChip, compactMode && styles.tvWaitingChip]}>
-                    <MaterialCommunityIcons
-                      name="clock-time-four-outline"
-                      size={compactMode ? 10 : 12}
-                      color={ppcColors.danger}
-                    />
-                    <Text style={[styles.waitingText, compactMode && styles.tvWaitingText]}>
-                      {waitingMinutes} min
-                    </Text>
-                  </View>
-                }
-              />
+              <OrderHeader order={order} isKds />
 
               {hasVisibleProducts && (
                 <View style={[styles.productsWrap, compactMode && styles.tvProductsWrap]}>
