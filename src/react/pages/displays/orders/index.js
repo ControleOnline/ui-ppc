@@ -5,7 +5,12 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useStore } from '@store'
 import Formatter from '@controleonline/ui-common/src/utils/formatter'
-import { parseConfigsObject } from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
+import {
+  DISPLAY_SIZE_DEFAULT,
+  isDisplaySideBreakEnabled,
+  parseConfigsObject,
+  resolveDisplaySize,
+} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
 
 import {
   getOrderChannelLabel,
@@ -101,6 +106,13 @@ const parsePositiveInteger = value => {
   const parsed = Number(normalized)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
+
+const resolveDisplayLayoutScale = sizeLevel =>
+  clamp(
+    1 + ((Number(sizeLevel || DISPLAY_SIZE_DEFAULT) - DISPLAY_SIZE_DEFAULT) * 0.09),
+    0.64,
+    1.45,
+  )
 
 const TV_LAYOUT_GAP = 8
 const TV_MIN_CARD_WIDTH = 300
