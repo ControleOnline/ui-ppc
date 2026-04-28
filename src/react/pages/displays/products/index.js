@@ -854,13 +854,15 @@ const DisplayProducts = ({ display = {} }) => {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.tabsContainer}>
-                <DateShortcutFilter
-                    value={dateFilterKey}
-                    onChange={setDateFilterKey}
-                    customRange={customDateRange}
-                    onCustomRangeChange={setCustomDateRange}
-                    colors={ppcColors}
-                />
+                <View style={styles.filterBar}>
+                    <DateShortcutFilter
+                        value={dateFilterKey}
+                        onChange={setDateFilterKey}
+                        customRange={customDateRange}
+                        onCustomRangeChange={setCustomDateRange}
+                        colors={ppcColors}
+                    />
+                </View>
 
                 <View style={styles.tabsCard}>
                     <View style={styles.tabBar}>

@@ -501,7 +501,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const processedConferencePrintEventsRef = useRef(new Map())
   const tvMode =
     Boolean(isTvDisplay) || String(display?.displayType || '').toLowerCase() === 'tv'
-  const useTvPagedLayout = false
 
   const effectiveWidth = useMemo(() => {
     const screenWidth = Number(Dimensions.get('screen')?.width || 0)
@@ -537,6 +536,28 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     ],
   )
 
+  const linkedDisplayConfigs = useMemo(
+    () => parseConfigsObject(linkedDisplayDeviceConfig?.configs),
+    [linkedDisplayDeviceConfig?.configs],
+  )
+
+  const displaySize = useMemo(
+    () => (tvMode ? resolveDisplaySize(linkedDisplayConfigs) : DISPLAY_SIZE_DEFAULT),
+    [linkedDisplayConfigs, tvMode],
+  )
+
+  const displaySideBreakEnabled = useMemo(
+    () => tvMode && isDisplaySideBreakEnabled(linkedDisplayConfigs),
+    [linkedDisplayConfigs, tvMode],
+  )
+
+  const tvLayoutScale = useMemo(
+    () => resolveDisplayLayoutScale(displaySize),
+    [displaySize],
+  )
+
+  const useTvPagedLayout = displaySideBreakEnabled
+
   const tvLayout = useMemo(() => {
     if (!useTvPagedLayout) return null
 
@@ -546,31 +567,30 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       summaryHeight,
       sectionHeight: sectionTitleHeight,
       footerHeight: tvMode ? debugBarHeight : 0,
+      sizeScale: tvLayoutScale,
     })
-  }, [debugBarHeight, effectiveHeight, effectiveWidth, sectionTitleHeight, summaryHeight, tvMode, useTvPagedLayout])
+  }, [
+    debugBarHeight,
+    effectiveHeight,
+    effectiveWidth,
+    sectionTitleHeight,
+    summaryHeight,
+    tvLayoutScale,
+    tvMode,
+    useTvPagedLayout,
+  ])
 
   const configuredMinColumns = useMemo(() => {
-    const configs = parseConfigsObject(linkedDisplayDeviceConfig?.configs)
-    return parsePositiveInteger(configs?.[DISPLAY_MIN_COLUMNS_CONFIG_KEY])
-  }, [linkedDisplayDeviceConfig?.configs])
+    return parsePositiveInteger(linkedDisplayConfigs?.[DISPLAY_MIN_COLUMNS_CONFIG_KEY])
+  }, [linkedDisplayConfigs])
 
   const columns = useMemo(() => {
     const responsiveColumns = useTvPagedLayout
       ? (tvLayout?.columns || 1)
-      : effectiveWidth > 1920
-        ? 6
-        : effectiveWidth >= 1600
-          ? 5
-          : effectiveWidth >= 1200
-            ? 4
-            : effectiveWidth >= 800
-              ? 3
-              : effectiveWidth >= 600
-                ? 2
-                : 1
+      : getTvBaseColumns(Math.round(effectiveWidth / tvLayoutScale))
 
     return Math.max(responsiveColumns, configuredMinColumns || 1)
-  }, [configuredMinColumns, effectiveWidth, tvLayout?.columns, useTvPagedLayout])
+  }, [configuredMinColumns, effectiveWidth, tvLayout?.columns, tvLayoutScale, useTvPagedLayout])
 
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
   const useCompactTvStyles = tvMode || useTvPagedLayout
@@ -888,6 +908,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
           : itemOrRenderInfo
 
       const order = normalizedItem?.order || normalizedItem
+      const displayedOrderProducts = Array.isArray(normalizedItem?.products)
+        ? normalizedItem.products
+        : null
       const segmentIndex = Number(normalizedItem?.segmentIndex || 0)
       const segmentCount = Number(normalizedItem?.segmentCount || 1)
       const isSplitSegment = segmentCount > 1
@@ -1021,13 +1044,15 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               </View>
             </View>
 
-            {Array.isArray(order?.orderProducts) && order.orderProducts.length > 0 && (
+            {Array.isArray(displayedOrderProducts || order?.orderProducts) &&
+            (displayedOrderProducts || order?.orderProducts).length > 0 && (
               <View style={[styles.productsWrap, compactMode && styles.tvProductsWrap]}>
                 <OrderProducts
                   order={order}
+                  orderProducts={displayedOrderProducts}
                   styles={orderProductsStyles}
                   showDetails
-                  maxCards={5}
+                  maxCards={useTvPagedLayout ? null : 5}
                 />
               </View>
             )}
@@ -1182,7 +1207,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       ) : (
         <FlatList
           data={(tvMode ? sortedOrders : sortedOrders.slice(0, visibleCount))}
-          key={`orders-cols-${columns}`}
+          key={`orders-cols-${columns}-size-${displaySize}`}
           numColumns={columns}
           keyExtractor={item => String(item.id)}
           renderItem={renderOrderCard}

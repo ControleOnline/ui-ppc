@@ -10,6 +10,11 @@ const createStyles = (ppcColors) =>
             flex: 1,
             backgroundColor: ppcColors.appBg,
         },
+        filterBar: {
+            paddingHorizontal: 10,
+            paddingTop: 8,
+            paddingBottom: 4,
+        },
         tabsCard: {
             flex: 1,
             backgroundColor: ppcColors.appBg,
