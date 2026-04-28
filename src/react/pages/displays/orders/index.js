@@ -374,17 +374,18 @@ const chunkItems = (items, size) => {
 }
 
 const getTvBaseColumns = width => {
-  if (width >= 3400) return 5
-  if (width >= 2560) return 4
-  if (width >= 1700) return 3
-  if (width >= 1100) return 2
+  if (width > 1920) return 6
+  if (width >= 1600) return 5
+  if (width >= 1200) return 4
+  if (width >= 800) return 3
+  if (width >= 600) return 2
   return 1
 }
 
 const getTvBaseRows = height => {
-  if (height >= 1700) return 4
-  if (height >= 1200) return 3
-  if (height >= 780) return 2
+  if (height >= 1600) return 4
+  if (height >= 1080) return 3
+  if (height >= 640) return 2
   return 1
 }
 
@@ -394,17 +395,26 @@ const resolveTvLayoutMetrics = ({
   summaryHeight,
   sectionHeight,
   footerHeight = 0,
+  sizeScale = 1,
 }) => {
   const contentWidth = Math.max(220, Math.round(width - 24))
   const availableHeight = Math.max(
     140,
     Math.round(height - summaryHeight - sectionHeight - footerHeight - 20),
   )
+  const minCardWidth = Math.max(
+    220,
+    Math.round(TV_MIN_CARD_WIDTH * Number(sizeScale || 1)),
+  )
+  const minCardHeight = Math.max(
+    180,
+    Math.round(TV_MIN_CARD_HEIGHT * Number(sizeScale || 1)),
+  )
 
   let columns = getTvBaseColumns(width)
   while (
     columns > 1 &&
-    Math.floor((contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / columns) < TV_MIN_CARD_WIDTH
+    Math.floor((contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / columns) < minCardWidth
   ) {
     columns -= 1
   }
@@ -412,7 +422,7 @@ const resolveTvLayoutMetrics = ({
   let rows = getTvBaseRows(height)
   while (
     rows > 1 &&
-    Math.floor((availableHeight - (TV_LAYOUT_GAP * (rows - 1))) / rows) < TV_MIN_CARD_HEIGHT
+    Math.floor((availableHeight - (TV_LAYOUT_GAP * (rows - 1))) / rows) < minCardHeight
   ) {
     rows -= 1
   }
