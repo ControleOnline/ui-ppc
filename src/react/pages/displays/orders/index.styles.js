@@ -152,9 +152,11 @@ const createStyles = ppcColors =>
       marginBottom: 8,
       maxWidth: '100%',
       overflow: 'hidden',
+      minHeight: 0,
     },
     orderCardPressable: {
       flex: 1,
+      minHeight: 0,
     },
     orderAccentBar: {
       height: 3,
@@ -164,6 +166,7 @@ const createStyles = ppcColors =>
     },
     orderCardInner: {
       padding: 10,
+      minHeight: 0,
     },
     orderActions: {
       paddingHorizontal: 10,
@@ -197,6 +200,7 @@ const createStyles = ppcColors =>
     tvOrderCardInner: {
       padding: 6,
       flex: 1,
+      minHeight: 0,
     },
     orderTopRow: {
       flexDirection: 'row',
@@ -237,6 +241,35 @@ const createStyles = ppcColors =>
     tvOrderChannelLogo: {
       width: 10,
       height: 10,
+    },
+    orderChannelFallback: {
+      maxWidth: 92,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      backgroundColor: ppcColors.panelBg,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      marginRight: 8,
+      justifyContent: 'center',
+    },
+    tvOrderChannelFallback: {
+      maxWidth: 64,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      marginRight: 5,
+    },
+    orderChannelFallbackText: {
+      color: withOpacity(ppcColors.textSecondary, 0.92),
+      fontSize: 10,
+      lineHeight: 12,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      textAlign: 'center',
+    },
+    tvOrderChannelFallbackText: {
+      fontSize: 7,
+      lineHeight: 9,
     },
     orderTitleWrap: {
       flex: 1,
@@ -370,12 +403,26 @@ const createStyles = ppcColors =>
       borderColor: ppcColors.border,
       overflow: 'hidden',
       backgroundColor: ppcColors.cardBgSoft,
+      minHeight: 0,
+    },
+    tvProductsWrap: {
+      marginTop: 6,
+      flex: 1,
+      minHeight: 0,
+    },
+    productsViewport: {
+      flex: 1,
+      minHeight: 0,
+    },
+    productsScrollContent: {
+      flexGrow: 1,
+    },
+    productsContent: {
       paddingHorizontal: 8,
       paddingVertical: 8,
       gap: 6,
     },
-    tvProductsWrap: {
-      marginTop: 6,
+    tvProductsContent: {
       paddingHorizontal: 6,
       paddingVertical: 6,
       gap: 4,
@@ -790,6 +837,7 @@ const createStyles = ppcColors =>
       flexBasis: 'auto',
       marginBottom: 0,
       borderRadius: 10,
+      minHeight: 0,
     },
     tvSegmentBadge: {
       borderRadius: 999,

@@ -1,25 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Dimensions, FlatList, Image, Pressable, Text, View, useWindowDimensions } from 'react-native'
+import { Dimensions, FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useStore } from '@store'
-import Formatter from '@controleonline/ui-common/src/utils/formatter'
 import {
   DISPLAY_SIZE_DEFAULT,
   isDisplaySideBreakEnabled,
   parseConfigsObject,
   resolveDisplaySize,
 } from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
-
-import {
-  getOrderChannelLabel,
-  getOrderChannelLogo,
-} from '@assets/ppc/channels'
-
-import OrderIdentityLabel from '@controleonline/ui-orders/src/react/components/OrderIdentityLabel'
 import { resolveDisplayedOrderStatus } from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import OrderProducts from '@controleonline/ui-orders/src/react/components/OrderProducts'
+import { resolveOrderIdentity } from '@controleonline/ui-orders/src/react/utils/orderIdentity'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
 import { DISPLAY_DEVICE_TYPE } from '@controleonline/ui-common/src/react/utils/printerDevices'
@@ -35,6 +28,8 @@ import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/Realti
 import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
 import createStyles from './index.styles'
 import DisplayConferenceAutoPrintDispatcher from './DisplayConferenceAutoPrintDispatcher'
+import OrderChannelIndicator from './OrderChannelIndicator'
+import TvAutoScrollView from './TvAutoScrollView'
 import {
   appendPendingConferenceAutoPrintJob,
   buildConferenceAutoPrintMessageFingerprint,
@@ -116,7 +111,6 @@ const resolveDisplayLayoutScale = sizeLevel =>
 
 const TV_LAYOUT_GAP = 8
 const TV_MIN_CARD_WIDTH = 300
-const TV_MIN_CARD_HEIGHT = 240
 const TV_BASE_PAGE_ROTATION_MS = 9000
 const TV_MAX_PAGE_ROTATION_MS = 22000
 const MAX_PROCESSED_CONFERENCE_PRINT_EVENTS = 200
@@ -304,62 +298,21 @@ const estimateTvProductUnits = (product, charsPerLine = 28) => {
   return Math.max(3, units)
 }
 
-const buildTvOrderSegments = (orders, maxUnitsPerCard, charsPerLine = 28) =>
-  (Array.isArray(orders) ? orders : []).flatMap(order => {
-    const products = getOrderProductsPreview(order, Number.POSITIVE_INFINITY)
+const estimateTvOrderUnits = (order, charsPerLine = 28) => {
+  const products = getOrderProductsPreview(order, Number.POSITIVE_INFINITY)
 
-    if (products.length === 0) {
-      return [{
-        key: `tv-order-${order?.id || Math.random()}-0`,
-        order,
-        products: [],
-        segmentIndex: 0,
-        segmentCount: 1,
-        totalUnits: 0,
-      }]
-    }
+  return products.reduce(
+    (totalUnits, product) => totalUnits + estimateTvProductUnits(product, charsPerLine),
+    0,
+  )
+}
 
-    const segments = []
-    let currentProducts = []
-    let currentUnits = 0
-
-    products.forEach(product => {
-      const productUnits = estimateTvProductUnits(product, charsPerLine)
-      const wouldOverflow =
-        currentProducts.length > 0 &&
-        currentUnits + productUnits > maxUnitsPerCard
-
-      if (wouldOverflow) {
-        segments.push({
-          order,
-          products: currentProducts,
-          totalUnits: currentUnits,
-        })
-        currentProducts = []
-        currentUnits = 0
-      }
-
-      currentProducts.push(product)
-      currentUnits += productUnits
-    })
-
-    if (currentProducts.length > 0) {
-      segments.push({
-        order,
-        products: currentProducts,
-        totalUnits: currentUnits,
-      })
-    }
-
-    return segments.map((segment, index) => ({
-      key: `tv-order-${order?.id || index}-${index}`,
-      order,
-      products: segment.products,
-      totalUnits: segment.totalUnits,
-      segmentIndex: index,
-      segmentCount: segments.length,
-    }))
-  })
+const buildTvPageItems = (orders, charsPerLine = 28) =>
+  (Array.isArray(orders) ? orders : []).map((order, index) => ({
+    key: `tv-order-${parseEntityId(order?.id) || index}`,
+    order,
+    totalUnits: estimateTvOrderUnits(order, charsPerLine),
+  }))
 
 const chunkItems = (items, size) => {
   const safeItems = Array.isArray(items) ? items : []
@@ -382,13 +335,6 @@ const getTvBaseColumns = width => {
   return 1
 }
 
-const getTvBaseRows = height => {
-  if (height >= 1600) return 4
-  if (height >= 1080) return 3
-  if (height >= 640) return 2
-  return 1
-}
-
 const resolveTvLayoutMetrics = ({
   width,
   height,
@@ -406,11 +352,6 @@ const resolveTvLayoutMetrics = ({
     220,
     Math.round(TV_MIN_CARD_WIDTH * Number(sizeScale || 1)),
   )
-  const minCardHeight = Math.max(
-    180,
-    Math.round(TV_MIN_CARD_HEIGHT * Number(sizeScale || 1)),
-  )
-
   let columns = getTvBaseColumns(width)
   while (
     columns > 1 &&
@@ -419,20 +360,12 @@ const resolveTvLayoutMetrics = ({
     columns -= 1
   }
 
-  let rows = getTvBaseRows(height)
-  while (
-    rows > 1 &&
-    Math.floor((availableHeight - (TV_LAYOUT_GAP * (rows - 1))) / rows) < minCardHeight
-  ) {
-    rows -= 1
-  }
+  const rows = 1
 
   const cardWidth = Math.floor(
     (contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / Math.max(1, columns),
   )
-  const cardHeight = Math.floor(
-    (availableHeight - (TV_LAYOUT_GAP * (rows - 1))) / Math.max(1, rows),
-  )
+  const cardHeight = availableHeight
   const fixedChromeHeight = cardHeight >= 520 ? 184 : cardHeight >= 380 ? 158 : 138
   const charsPerLine = clamp(
     Math.floor((cardWidth - 92) / 7),
@@ -591,6 +524,15 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
     return Math.max(responsiveColumns, configuredMinColumns || 1)
   }, [configuredMinColumns, effectiveWidth, tvLayout?.columns, tvLayoutScale, useTvPagedLayout])
+  const tvCardMaxHeight = useMemo(() => {
+    if (!tvMode) return null
+
+    if (useTvPagedLayout && tvLayout?.cardHeight) {
+      return tvLayout.cardHeight
+    }
+
+    return Math.max(220, Math.round(effectiveHeight - 12))
+  }, [effectiveHeight, tvLayout?.cardHeight, tvMode, useTvPagedLayout])
 
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
   const useCompactTvStyles = tvMode || useTvPagedLayout
@@ -731,12 +673,11 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
   const listCount = sortedOrders.length
 
-  const tvOrderSegments = useMemo(() => {
+  const tvPageItems = useMemo(() => {
     if (!useTvPagedLayout || !tvLayout) return []
 
-    return buildTvOrderSegments(
+    return buildTvPageItems(
       sortedOrders,
-      tvLayout.maxUnitsPerCard,
       tvLayout.charsPerLine,
     )
   }, [sortedOrders, tvLayout, useTvPagedLayout])
@@ -744,14 +685,14 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const tvPages = useMemo(() => {
     if (!useTvPagedLayout || !tvLayout) return []
 
-    return chunkItems(tvOrderSegments, tvLayout.cardsPerPage).map(items => ({
+    return chunkItems(tvPageItems, tvLayout.cardsPerPage).map(items => ({
       items,
       totalUnits: items.reduce(
         (total, segment) => total + Number(segment?.totalUnits || 0),
         0,
       ),
     }))
-  }, [tvLayout, tvOrderSegments, useTvPagedLayout])
+  }, [tvLayout, tvPageItems, useTvPagedLayout])
 
   const currentTvPage = useMemo(() => {
     if (!tvPages.length) return null
@@ -896,6 +837,23 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     return () => clearTimeout(timer)
   }, [tvPageRotationMs, tvPages.length, tvCurrentPage, useTvPagedLayout])
 
+  const resolveDisplayIdentity = useCallback(order => {
+    const identity = resolveOrderIdentity(order)
+    const orderLabel = global.t?.t('orders', 'title', 'order') || 'Pedido'
+
+    if (identity?.hasMarketplaceReference && identity?.externalId) {
+      return {
+        primaryText: `#${identity.externalId}`,
+        secondaryText: identity?.internalId ? `${orderLabel} #${identity.internalId}` : '',
+      }
+    }
+
+    return {
+      primaryText: identity?.primaryText || orderLabel,
+      secondaryText: identity?.secondaryText || '',
+    }
+  }, [])
+
   const renderOrderCard = useCallback(
     (itemOrRenderInfo, cardStyle = null) => {
       const compactMode = useCompactTvStyles
@@ -911,23 +869,32 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       const displayedOrderProducts = Array.isArray(normalizedItem?.products)
         ? normalizedItem.products
         : null
-      const segmentIndex = Number(normalizedItem?.segmentIndex || 0)
-      const segmentCount = Number(normalizedItem?.segmentCount || 1)
-      const isSplitSegment = segmentCount > 1
       const orderDateValue = resolveOrderDateValue(order)
+      const identity = resolveDisplayIdentity(order)
       const statusVisual = getStatusVisual(order, ppcColors)
       const waitingMinutes = getWaitingMinutes(orderDateValue)
-      const channelLogo = getOrderChannelLogo(order)
-      const channelLabel = String(getOrderChannelLabel(order) || 'SHOP').toUpperCase()
-      const channelDisplay = channelLabel
-      const price = Number(order?.price || 0)
+      const visibleOrderProducts = displayedOrderProducts || order?.orderProducts
+      const hasVisibleProducts =
+        Array.isArray(visibleOrderProducts) && visibleOrderProducts.length > 0
+      const productsContent = hasVisibleProducts ? (
+        <View style={[styles.productsContent, compactMode && styles.tvProductsContent]}>
+          <OrderProducts
+            order={order}
+            orderProducts={displayedOrderProducts}
+            styles={orderProductsStyles}
+            showDetails
+            maxCards={tvMode ? null : 5}
+          />
+        </View>
+      ) : null
 
       return (
         <View
-          key={normalizedItem?.key || `order-card-${parseEntityId(order?.id) || segmentIndex}`}
+          key={normalizedItem?.key || `order-card-${parseEntityId(order?.id) || 0}`}
           style={[
             styles.orderCard,
             shouldUseTvPagedCardFrame && styles.tvOrderCard,
+            tvMode && tvCardMaxHeight ? { maxHeight: tvCardMaxHeight } : null,
             cardStyle,
           ]}
         >
@@ -954,46 +921,42 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             <View style={[styles.orderCardInner, compactMode && styles.tvOrderCardInner]}>
             <View style={[styles.orderTopRow, compactMode && styles.tvOrderTopRow]}>
               <View style={styles.orderIdentity}>
-                <View style={[styles.orderIconWrap, compactMode && styles.tvOrderIconWrap]}>
-                  {channelLogo ? (
-                    <Image
-                      source={channelLogo}
-                      style={[
-                        styles.orderChannelLogo,
-                        compactMode && styles.tvOrderChannelLogo,
-                      ]}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <MaterialCommunityIcons
-                      name="receipt-text"
-                      size={compactMode ? 12 : 16}
-                      color={ppcColors.accentInfo}
-                    />
-                  )}
-                </View>
+                <OrderChannelIndicator
+                  order={order}
+                  iconWrapStyle={[styles.orderIconWrap, compactMode && styles.tvOrderIconWrap]}
+                  iconStyle={[
+                    styles.orderChannelLogo,
+                    compactMode && styles.tvOrderChannelLogo,
+                  ]}
+                  fallbackWrapStyle={[
+                    styles.orderChannelFallback,
+                    compactMode && styles.tvOrderChannelFallback,
+                  ]}
+                  fallbackTextStyle={[
+                    styles.orderChannelFallbackText,
+                    compactMode && styles.tvOrderChannelFallbackText,
+                  ]}
+                />
 
                 <View style={styles.orderTitleWrap}>
-                  <OrderIdentityLabel
-                    order={order}
-                    primaryTextStyle={[styles.orderTitle, compactMode && styles.tvOrderTitle]}
-                    secondaryTextStyle={[
-                      styles.orderTitleSecondary,
-                      compactMode && styles.tvOrderTitleSecondary,
-                    ]}
-                  />
+                  <Text style={[styles.orderTitle, compactMode && styles.tvOrderTitle]}>
+                    {identity.primaryText}
+                  </Text>
+                  {!!identity.secondaryText && (
+                    <Text
+                      style={[
+                        styles.orderTitleSecondary,
+                        compactMode && styles.tvOrderTitleSecondary,
+                      ]}
+                    >
+                      {identity.secondaryText}
+                    </Text>
+                  )}
                   <Text style={[styles.orderDate, compactMode && styles.tvOrderDate]}>{formatOrderDate(orderDateValue)}</Text>
                 </View>
               </View>
 
               <View style={styles.orderStatusWrap}>
-                {isSplitSegment && compactMode ? (
-                  <View style={styles.tvSegmentBadge}>
-                    <Text style={styles.tvSegmentBadgeText}>
-                      {segmentIndex + 1}/{segmentCount}
-                    </Text>
-                  </View>
-                ) : null}
                 <View
                   style={[
                     styles.orderStatusBadge,
@@ -1020,11 +983,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                     {statusVisual.label}
                   </Text>
                 </View>
-              </View>
-            </View>
-
-            <View style={[styles.orderMetaRow, compactMode && styles.tvOrderMetaRow]}>
-              <View style={[styles.waitingChip, compactMode && styles.tvWaitingChip]}>
+                <View style={[styles.waitingChip, compactMode && styles.tvWaitingChip]}>
                 <MaterialCommunityIcons
                   name="clock-time-four-outline"
                   size={compactMode ? 10 : 12}
@@ -1032,28 +991,20 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 />
                 <Text style={[styles.waitingText, compactMode && styles.tvWaitingText]}>{waitingMinutes} min</Text>
               </View>
-
-              <View style={styles.amountWrap}>
-                <Text
-                  style={[styles.channelMetaText, compactMode && styles.tvChannelMetaText]}
-                  numberOfLines={compactMode ? 2 : 1}
-                >
-                  {channelDisplay}
-                </Text>
-                <Text style={[styles.amountText, compactMode && styles.tvAmountText]}>{Formatter.formatMoney(price)}</Text>
               </View>
             </View>
 
-            {Array.isArray(displayedOrderProducts || order?.orderProducts) &&
-            (displayedOrderProducts || order?.orderProducts).length > 0 && (
+            {hasVisibleProducts && (
               <View style={[styles.productsWrap, compactMode && styles.tvProductsWrap]}>
-                <OrderProducts
-                  order={order}
-                  orderProducts={displayedOrderProducts}
-                  styles={orderProductsStyles}
-                  showDetails
-                  maxCards={useTvPagedLayout ? null : 5}
-                />
+                {tvMode ? (
+                  <TvAutoScrollView
+                    enabled={tvMode}
+                    style={styles.productsViewport}
+                    contentContainerStyle={styles.productsScrollContent}
+                  >
+                    {productsContent}
+                  </TvAutoScrollView>
+                ) : productsContent}
               </View>
             )}
             </View>
@@ -1086,8 +1037,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       orderProductsStyles,
       ppcColors,
       route.params?.displayType,
+      resolveDisplayIdentity,
       styles,
       tvMode,
+      tvCardMaxHeight,
       useCompactTvStyles,
       useTvPagedLayout,
     ],
