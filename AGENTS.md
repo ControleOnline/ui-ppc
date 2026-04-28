@@ -15,5 +15,5 @@
 - Displays e KDS devem aceitar o mesmo agrupamento de itens customizaveis usado em `ui-orders`, baseado nos vinculos `orderProduct`, `parentProduct` e `productGroup`. Nao manter regra paralela de encaixe de adicionais so para a operacao.
 - Cada item mostrado no display deve deixar claro o que precisa ser preparado e, quando existir fila, deve exibir a cor e o status da fila atual do item.
 - Em telas de preparo por produto, quantidades agrupadas precisam ser expandidas em linhas unitarias para leitura operacional. Exemplo: `3x misto quente` deve virar tres linhas `1x misto quente`.
-- Em pedidos integrados, o destaque visual do pedido na operacao deve priorizar o codigo que motoboy/retirada procura no balcao, como `pickup_code` ou `handover_code`, deixando hashes e ids tecnicos fora do destaque principal.
+- Em pedidos integrados, o destaque visual do pedido na operacao deve priorizar o numero operacional curto da integracao que chega em `extraData` ou no payload canonico, como `order_index`, `code` ou `displayId`. `pickup_code` e `handover_code` entram apenas como fallback quando esse numero principal nao existir.
 - Em displays por produto, a transicao `status_in -> status_working` deve disparar a impressao automatica no front quando o `DISPLAY` runtime estiver com `display-auto-print-product` ativo e com impressora resolvida.

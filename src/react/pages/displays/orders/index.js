@@ -366,16 +366,10 @@ const resolveTvLayoutMetrics = ({
     (contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / Math.max(1, columns),
   )
   const cardHeight = availableHeight
-  const fixedChromeHeight = cardHeight >= 520 ? 184 : cardHeight >= 380 ? 158 : 138
   const charsPerLine = clamp(
     Math.floor((cardWidth - 92) / 7),
     16,
     42,
-  )
-  const maxUnitsPerCard = clamp(
-    Math.floor((cardHeight - fixedChromeHeight) / 16),
-    3,
-    36,
   )
 
   return {
@@ -387,7 +381,6 @@ const resolveTvLayoutMetrics = ({
     availableHeight,
     cardsPerPage: Math.max(1, columns * rows),
     charsPerLine,
-    maxUnitsPerCard,
   }
 }
 
@@ -919,94 +912,104 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               ]}
             />
             <View style={[styles.orderCardInner, compactMode && styles.tvOrderCardInner]}>
-            <View style={[styles.orderTopRow, compactMode && styles.tvOrderTopRow]}>
-              <View style={styles.orderIdentity}>
-                <OrderChannelIndicator
-                  order={order}
-                  iconWrapStyle={[styles.orderIconWrap, compactMode && styles.tvOrderIconWrap]}
-                  iconStyle={[
-                    styles.orderChannelLogo,
-                    compactMode && styles.tvOrderChannelLogo,
-                  ]}
-                  fallbackWrapStyle={[
-                    styles.orderChannelFallback,
-                    compactMode && styles.tvOrderChannelFallback,
-                  ]}
-                  fallbackTextStyle={[
-                    styles.orderChannelFallbackText,
-                    compactMode && styles.tvOrderChannelFallbackText,
-                  ]}
-                />
-
-                <View style={styles.orderTitleWrap}>
-                  <Text style={[styles.orderTitle, compactMode && styles.tvOrderTitle]}>
-                    {identity.primaryText}
-                  </Text>
-                  {!!identity.secondaryText && (
-                    <Text
-                      style={[
-                        styles.orderTitleSecondary,
-                        compactMode && styles.tvOrderTitleSecondary,
-                      ]}
-                    >
-                      {identity.secondaryText}
-                    </Text>
-                  )}
-                  <Text style={[styles.orderDate, compactMode && styles.tvOrderDate]}>{formatOrderDate(orderDateValue)}</Text>
-                </View>
-              </View>
-
-              <View style={styles.orderStatusWrap}>
-                <View
-                  style={[
-                    styles.orderStatusBadge,
-                    compactMode && styles.tvOrderStatusBadge,
-                    {
-                      borderColor: statusVisual.borderColor,
-                      backgroundColor: statusVisual.bgColor,
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.orderStatusDot,
-                      { backgroundColor: statusVisual.textColor },
+              <View style={[styles.orderTopRow, compactMode && styles.tvOrderTopRow]}>
+                <View style={styles.orderIdentity}>
+                  <OrderChannelIndicator
+                    order={order}
+                    iconWrapStyle={[styles.orderIconWrap, compactMode && styles.tvOrderIconWrap]}
+                    iconStyle={[
+                      styles.orderChannelLogo,
+                      compactMode && styles.tvOrderChannelLogo,
+                    ]}
+                    fallbackWrapStyle={[
+                      styles.orderChannelFallback,
+                      compactMode && styles.tvOrderChannelFallback,
+                    ]}
+                    fallbackTextStyle={[
+                      styles.orderChannelFallbackText,
+                      compactMode && styles.tvOrderChannelFallbackText,
                     ]}
                   />
-                  <Text
+
+                  <View style={styles.orderTitleWrap}>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.orderTitle, compactMode && styles.tvOrderTitle]}
+                    >
+                      {identity.primaryText}
+                    </Text>
+                    {!!identity.secondaryText && (
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.orderTitleSecondary,
+                          compactMode && styles.tvOrderTitleSecondary,
+                        ]}
+                      >
+                        {identity.secondaryText}
+                      </Text>
+                    )}
+                    <Text
+                      style={[styles.orderDate, compactMode && styles.tvOrderDate]}
+                    >
+                      {formatOrderDate(orderDateValue)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.orderStatusWrap}>
+                  <View
                     style={[
-                      styles.orderStatusText,
-                      compactMode && styles.tvOrderStatusText,
-                      { color: statusVisual.textColor },
+                      styles.orderStatusBadge,
+                      compactMode && styles.tvOrderStatusBadge,
+                      {
+                        borderColor: statusVisual.borderColor,
+                        backgroundColor: statusVisual.bgColor,
+                      },
                     ]}
                   >
-                    {statusVisual.label}
-                  </Text>
+                    <View
+                      style={[
+                        styles.orderStatusDot,
+                        { backgroundColor: statusVisual.textColor },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.orderStatusText,
+                        compactMode && styles.tvOrderStatusText,
+                        { color: statusVisual.textColor },
+                      ]}
+                    >
+                      {statusVisual.label}
+                    </Text>
+                  </View>
+                  <View style={[styles.waitingChip, compactMode && styles.tvWaitingChip]}>
+                    <MaterialCommunityIcons
+                      name="clock-time-four-outline"
+                      size={compactMode ? 10 : 12}
+                      color={ppcColors.danger}
+                    />
+                    <Text style={[styles.waitingText, compactMode && styles.tvWaitingText]}>
+                      {waitingMinutes} min
+                    </Text>
+                  </View>
                 </View>
-                <View style={[styles.waitingChip, compactMode && styles.tvWaitingChip]}>
-                <MaterialCommunityIcons
-                  name="clock-time-four-outline"
-                  size={compactMode ? 10 : 12}
-                  color={ppcColors.danger}
-                />
-                <Text style={[styles.waitingText, compactMode && styles.tvWaitingText]}>{waitingMinutes} min</Text>
               </View>
-              </View>
-            </View>
 
-            {hasVisibleProducts && (
-              <View style={[styles.productsWrap, compactMode && styles.tvProductsWrap]}>
-                {tvMode ? (
-                  <TvAutoScrollView
-                    enabled={tvMode}
-                    style={styles.productsViewport}
-                    contentContainerStyle={styles.productsScrollContent}
-                  >
-                    {productsContent}
-                  </TvAutoScrollView>
-                ) : productsContent}
-              </View>
-            )}
+              {hasVisibleProducts && (
+                <View style={[styles.productsWrap, compactMode && styles.tvProductsWrap]}>
+                  {tvMode ? (
+                    <TvAutoScrollView
+                      enabled={tvMode}
+                      style={styles.productsViewport}
+                      contentContainerStyle={styles.productsScrollContent}
+                    >
+                      {productsContent}
+                    </TvAutoScrollView>
+                  ) : productsContent}
+                </View>
+              )}
             </View>
           </Pressable>
           {!tvMode && (
