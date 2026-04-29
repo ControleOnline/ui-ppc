@@ -111,6 +111,7 @@ const resolveDisplayLayoutScale = sizeLevel =>
 
 const TV_LAYOUT_GAP = 8
 const TV_MIN_CARD_WIDTH = 300
+const TV_SIDE_BREAK_MIN_COLUMNS = 4
 const TV_BASE_PAGE_ROTATION_MS = 9000
 const TV_MAX_PAGE_ROTATION_MS = 22000
 const MAX_PROCESSED_CONFERENCE_PRINT_EVENTS = 200
@@ -334,9 +335,12 @@ const resolveTvLayoutMetrics = ({
     220,
     Math.round(TV_MIN_CARD_WIDTH * Number(sizeScale || 1)),
   )
-  let columns = getTvBaseColumns(width)
+  let columns = Math.max(
+    TV_SIDE_BREAK_MIN_COLUMNS,
+    getTvBaseColumns(width),
+  )
   while (
-    columns > 1 &&
+    columns > TV_SIDE_BREAK_MIN_COLUMNS &&
     Math.floor((contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / columns) < minCardWidth
   ) {
     columns -= 1
