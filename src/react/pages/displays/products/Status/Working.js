@@ -9,8 +9,6 @@ import useDisplayQueueStatus from '../hooks/useDisplayQueueStatus';
 import createStyles from './status.styles';
 import {
     resolveDisplayTicketSummary,
-    resolveOrderProductComment,
-    resolveOrderProductDescription,
 } from '../displayPrintRules';
 
 const formatDisplayDateTime = value => {
@@ -93,7 +91,7 @@ const Working = ({
             if (typeof onTransition === 'function') {
                 onTransition(updatedQueueItem, 'status_working', 'status_out');
             }
-        } catch (error) {
+        } catch {
             if (queueItemKey) {
                 setMovingIds(currentIds => {
                     const nextIds = new Set(currentIds);
@@ -108,8 +106,6 @@ const Working = ({
         const orderProduct = order.order_product || {};
         const orderEntity = orderProduct.order || {};
         const orderSummary = resolveDisplayTicketSummary(orderEntity);
-        const productDescription = resolveOrderProductDescription(orderProduct);
-        const productComment = resolveOrderProductComment(orderProduct);
         const isMoving = movingIds.has(getQueueItemKey(order));
 
         return (
@@ -140,22 +136,6 @@ const Working = ({
                     {order.registerTime !== order.updateTime && (
                         <Text style={styles.orderMeta}>
                             Em preparo desde {formatDisplayDateTime(order.updateTime)}
-                        </Text>
-                    )}
-
-                    <Text style={styles.orderQty}>
-                        {orderProduct?.quantity} {orderProduct?.product?.product}(s)
-                    </Text>
-
-                    {!!productDescription && (
-                        <Text style={styles.detailLine}>
-                            {productDescription}
-                        </Text>
-                    )}
-
-                    {!!productComment && (
-                        <Text style={styles.detailLine}>
-                            OBS: {productComment}
                         </Text>
                     )}
                 </Card.Content>

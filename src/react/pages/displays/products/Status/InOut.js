@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { FlatList, View } from 'react-native';
 import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
+import OrderProductComponents from './../../OrderProductComponents';
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton';
 import OrderIdentityLabel from '@controleonline/ui-orders/src/react/components/OrderIdentityLabel';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
@@ -8,8 +9,6 @@ import useDisplayQueueStatus from '../hooks/useDisplayQueueStatus';
 import createStyles from './status.styles';
 import {
     resolveDisplayTicketSummary,
-    resolveOrderProductComment,
-    resolveOrderProductDescription,
 } from '../displayPrintRules';
 
 const formatDisplayDateTime = value => {
@@ -87,8 +86,6 @@ const InOut = ({
         const orderProduct = order.order_product || {};
         const orderEntity = orderProduct.order || {};
         const orderSummary = resolveDisplayTicketSummary(orderEntity);
-        const productDescription = resolveOrderProductDescription(orderProduct);
-        const productComment = resolveOrderProductComment(orderProduct);
 
         return (
             <Card key={order.id} style={styles.orderCard}>
@@ -120,23 +117,12 @@ const InOut = ({
                             Alterado em {formatDisplayDateTime(order.updateTime)}
                         </Text>
                     )}
-
-                    <Text style={styles.orderQty}>
-                        {orderProduct?.quantity} {orderProduct?.product?.product}(s)
-                    </Text>
-
-                    {!!productDescription && (
-                        <Text style={styles.detailLine}>
-                            DESC: {productDescription}
-                        </Text>
-                    )}
-
-                    {!!productComment && (
-                        <Text style={styles.detailLine}>
-                            OBS: {productComment}
-                        </Text>
-                    )}
                 </Card.Content>
+
+                <OrderProductComponents
+                    order_product={orderProduct}
+                    ppcColorsOverride={ppcColors}
+                />
 
                 {(canStart || printButtonProps) && (
                     <Card.Actions style={styles.actions}>
