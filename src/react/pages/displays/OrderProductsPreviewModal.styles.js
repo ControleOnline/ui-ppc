@@ -24,16 +24,6 @@ const createStyles = ppcColors =>
             backgroundColor: ppcColors.modalBg || ppcColors.appBg,
             overflow: 'hidden',
         },
-        eyebrow: {
-            marginBottom: 8,
-            paddingHorizontal: 14,
-            paddingTop: 10,
-            color: ppcColors.accent,
-            fontSize: 11,
-            fontWeight: '900',
-            letterSpacing: 0.8,
-            textTransform: 'uppercase',
-        },
         scroll: {
             flex: 1,
         },

@@ -45,12 +45,19 @@ const DisplayDetails = () => {
     const effectiveDisplayType = String(display?.displayType || routeDisplayType || '').toLowerCase();
     const isTvDisplay = effectiveDisplayType === 'tv';
     const shouldHideNavigation = isTvDisplay || isForcedDisplay;
+    const displayDetailsTitle = useMemo(
+        () => global.t?.t('configs', 'title', 'displayDetails') || 'Display',
+        [],
+    );
 
     useLayoutEffect(() => {
         navigation.setOptions({
             headerShown: !shouldHideNavigation,
             headerBackVisible: !isForcedDisplay,
             gestureEnabled: !isForcedDisplay,
+            title: displayDetailsTitle,
+            showCompanyFilter: !shouldHideNavigation,
+            companyFilterMode: 'icon',
         });
 
         if (
@@ -64,6 +71,7 @@ const DisplayDetails = () => {
         }
     }, [
         navigation,
+        displayDetailsTitle,
         isForcedDisplay,
         route.params?.forcedDisplay,
         route.params?.hideBottomToolBar,

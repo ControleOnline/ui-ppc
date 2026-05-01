@@ -4,31 +4,11 @@ import { ActivityIndicator, Card, Text } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import OrderProductComponents from './../../OrderProductComponents';
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton';
-import OrderIdentityLabel from '@controleonline/ui-orders/src/react/components/OrderIdentityLabel';
+import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import useDisplayQueueStatus from '../hooks/useDisplayQueueStatus';
+import buildDisplayOrderHeaderPayload from './orderHeaderPayload';
 import createStyles from './status.styles';
-import {
-    resolveDisplayTicketSummary,
-} from '../displayPrintRules';
-
-const formatDisplayDateTime = value => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return '--/-- --:--';
-    }
-
-    const formattedDate = date.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-    });
-    const formattedTime = date.toLocaleTimeString('pt-BR', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-    return `${formattedDate} ${formattedTime}`;
-};
 
 const getQueueItemKey = item =>
     String(item?.id || item?.['@id'] || '').trim();
@@ -108,7 +88,7 @@ const Working = ({
     const renderOrder = ({ item: order }) => {
         const orderProduct = order.order_product || {};
         const orderEntity = orderProduct.order || {};
-        const orderSummary = resolveDisplayTicketSummary(orderEntity);
+        const orderHeaderPayload = buildDisplayOrderHeaderPayload(orderEntity, order);
         const isMoving = movingIds.has(getQueueItemKey(order));
         const canPreviewOrder =
             typeof onPreviewOrder === 'function' &&
@@ -119,33 +99,7 @@ const Working = ({
         return (
             <Card key={order.id} style={styles.orderCard}>
                 <Card.Content style={styles.orderContent}>
-                    <View style={styles.ticketTopRow}>
-                        <OrderIdentityLabel
-                            order={orderEntity}
-                            containerStyle={{flex: 1, minWidth: 0}}
-                            primaryTextStyle={
-                                orderSummary.marketplaceOrderCode
-                                    ? styles.marketplaceCode
-                                    : styles.internalOrderCode
-                            }
-                            secondaryTextStyle={styles.internalOrderCode}
-                        />
-                        <Text style={styles.orderMeta}>
-                            Pedido em {formatDisplayDateTime(order.registerTime)}
-                        </Text>
-                    </View>
-
-                    {!!orderSummary.clientName && (
-                        <Text style={styles.clientName}>
-                            {orderSummary.clientName}
-                        </Text>
-                    )}
-
-                    {order.registerTime !== order.updateTime && (
-                        <Text style={styles.orderMeta}>
-                            Em preparo desde {formatDisplayDateTime(order.updateTime)}
-                        </Text>
-                    )}
+                    <OrderHeader order={orderHeaderPayload} isKds />
                 </Card.Content>
 
                 <OrderProductComponents
