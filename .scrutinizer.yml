@@ -1,0 +1,18 @@
+checks:
+  javascript: true
+
+build:
+  nodes:
+    analysis:
+      project_setup:
+        override: true
+      tests:
+        override:
+          - js-scrutinizer-run
+
+filter:
+  excluded_paths:
+    - "build/*"
+    - "coverage/*"
+    - "dist/*"
+    - "node_modules/*"
