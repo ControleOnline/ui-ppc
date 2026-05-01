@@ -310,7 +310,7 @@ const OrderProductComponents = ({ order_product, ppcColorsOverride = null }) => 
                 orderProducts={[resolvedOrderProduct]}
                 styles={productStyles}
                 showDetails
-                showPricing
+                showPricing={false}
                 showImages
             />
 

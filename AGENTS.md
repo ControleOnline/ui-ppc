@@ -12,6 +12,7 @@
 ## Regras
 - A tela de displays de pedidos deve renderizar apenas pedidos operacionais de venda (`orderType = sale`). Pedidos `cart` pertencem ao fluxo de rascunho/carrinho e nao devem aparecer no display.
 - A tela de displays de pedidos deve reaproveitar a mesma listagem de produtos usada em `ui-orders` para `OrderDetails` e `POS`. O card do pedido pode mudar, mas a leitura interna dos itens precisa ser a mesma.
+- Quando `ui-ppc` abrir popup/modal com detalhes de pedido, o topo deve reaproveitar o mesmo cabecalho canonico de `ui-orders` (`OrderHeader` e barra superior correspondente). A impressao do pedido ou do item entra na mesma barra padronizada de acoes, nunca em faixa paralela isolada.
 - Displays e KDS devem aceitar o mesmo agrupamento de itens customizaveis usado em `ui-orders`, baseado nos vinculos `orderProduct`, `parentProduct` e `productGroup`. Nao manter regra paralela de encaixe de adicionais so para a operacao.
 - Cada item mostrado no display deve deixar claro o que precisa ser preparado e, quando existir fila, deve exibir a cor e o status da fila atual do item.
 - Em telas de preparo por produto, quantidades agrupadas precisam ser expandidas em linhas unitarias para leitura operacional. Exemplo: `3x misto quente` deve virar tres linhas `1x misto quente`.

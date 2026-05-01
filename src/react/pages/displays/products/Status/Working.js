@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, View } from 'react-native';
-import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
+import { FlatList, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Card, Text } from 'react-native-paper';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import OrderProductComponents from './../../OrderProductComponents';
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton';
 import OrderIdentityLabel from '@controleonline/ui-orders/src/react/components/OrderIdentityLabel';
@@ -42,6 +43,7 @@ const Working = ({
     status_out = null,
     saveQueueItem = null,
     onTransition = null,
+    onPreviewOrder = null,
     printButtonProps = null,
     ppcColorsOverride = null,
 }) => {
@@ -67,13 +69,14 @@ const Working = ({
     const displayTotal =
         typeof totalOverride === 'number' ? totalOverride : total;
     const [movingIds, setMovingIds] = useState(() => new Set());
+    const canFinalize = status_out?.['@id'] && typeof saveQueueItem === 'function';
     const visibleOrders = useMemo(
         () => orders.filter(order => !movingIds.has(getQueueItemKey(order))),
         [movingIds, orders],
     );
 
     const finalize = async order => {
-        if (!status_out?.['@id'] || typeof saveQueueItem !== 'function') {
+        if (!canFinalize) {
             return;
         }
 
@@ -107,6 +110,11 @@ const Working = ({
         const orderEntity = orderProduct.order || {};
         const orderSummary = resolveDisplayTicketSummary(orderEntity);
         const isMoving = movingIds.has(getQueueItemKey(order));
+        const canPreviewOrder =
+            typeof onPreviewOrder === 'function' &&
+            Boolean(orderEntity?.id || orderEntity?.['@id']);
+        const shouldShowActions =
+            Boolean(printButtonProps) || canPreviewOrder || canFinalize;
 
         return (
             <Card key={order.id} style={styles.orderCard}>
@@ -145,35 +153,60 @@ const Working = ({
                     ppcColorsOverride={ppcColors}
                 />
 
-                {(status_out || printButtonProps) && (
+                {shouldShowActions && (
                     <Card.Actions style={styles.actions}>
-                        {printButtonProps ? (
-                            <PrintButton
-                                {...printButtonProps}
-                                job={{
-                                    type: 'order-product-queue',
-                                    orderProductQueueId: order?.id || order?.['@id'],
-                                }}
-                                label="Imprimir"
-                                iconColor={ppcColors.textPrimary}
-                                style={[
-                                    styles.actionButton,
-                                    styles.secondaryActionButton,
-                                ]}
-                            />
-                        ) : null}
-                        <Button
-                            mode="contained"
-                            buttonColor={ppcColors.accent}
-                            textColor={ppcColors.pillTextDark}
-                            style={styles.actionButton}
-                            labelStyle={styles.actionLabel}
-                            loading={isMoving}
-                            disabled={isMoving || !status_out?.['@id'] || typeof saveQueueItem !== 'function'}
+                        <View style={styles.actionTools}>
+                            {printButtonProps ? (
+                                <PrintButton
+                                    {...printButtonProps}
+                                    job={{
+                                        type: 'order-product-queue',
+                                        orderProductQueueId: order?.id || order?.['@id'],
+                                    }}
+                                    compact
+                                    layout={{ variant: 'icon' }}
+                                    iconColor={ppcColors.accentInfo}
+                                    compactButtonStyle={styles.actionIconButton}
+                                    compactSelectStyle={styles.actionIconButton}
+                                />
+                            ) : null}
+
+                            {canPreviewOrder ? (
+                                <TouchableOpacity
+                                    onPress={() => onPreviewOrder(orderEntity)}
+                                    style={styles.actionIconButton}
+                                >
+                                    <Icon
+                                        name="visibility"
+                                        size={19}
+                                        color={ppcColors.accentInfo}
+                                    />
+                                </TouchableOpacity>
+                            ) : null}
+                        </View>
+
+                        <TouchableOpacity
                             onPress={() => finalize(order)}
+                            disabled={isMoving || !canFinalize}
+                            style={[
+                                styles.actionPrimaryButton,
+                                styles.actionSuccessButton,
+                                (isMoving || !canFinalize)
+                                    ? styles.actionButtonDisabled
+                                    : null,
+                            ]}
                         >
-                            Finalizar
-                        </Button>
+                            {isMoving ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Icon name="check-circle" size={16} color="#FFFFFF" />
+                                    <Text style={[styles.actionPrimaryText, { color: '#FFFFFF' }]}>
+                                        Finalizar
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
                     </Card.Actions>
                 )}
             </Card>
