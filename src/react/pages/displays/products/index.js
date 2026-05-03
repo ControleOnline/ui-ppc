@@ -24,6 +24,7 @@ import {
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar';
 import DisplayAutoPrintDispatcher from './DisplayAutoPrintDispatcher';
+import OrderProductsPreviewModal from './../OrderProductsPreviewModal';
 import {
     appendPendingAutoPrintJob,
     isDisplayAutoPrintEnabled,
@@ -170,6 +171,7 @@ const DisplayProducts = ({ display = {} }) => {
     const [bindingsRefreshToken, setBindingsRefreshToken] = useState(0);
     const [autoStartingCount, setAutoStartingCount] = useState(0);
     const [pendingAutoPrintJobIds, setPendingAutoPrintJobIds] = useState([]);
+    const [previewOrder, setPreviewOrder] = useState(null);
     const [refreshDebug, setRefreshDebug] = useState({
         lastAt: null,
         lastSource: 'boot',
@@ -630,6 +632,18 @@ const DisplayProducts = ({ display = {} }) => {
         );
     }, []);
 
+    const openPreviewOrder = useCallback(order => {
+        if (!order) {
+            return;
+        }
+
+        setPreviewOrder(order);
+    }, []);
+
+    const closePreviewOrder = useCallback(() => {
+        setPreviewOrder(null);
+    }, []);
+
     useEffect(() => {
         const autoStart = async () => {
             if (isSaving) return;
@@ -923,6 +937,7 @@ const DisplayProducts = ({ display = {} }) => {
                             status_working={queueBindings.statusWorking}
                             saveQueueItem={saveQueueItem}
                             onTransition={handleQueueTransition}
+                            onPreviewOrder={openPreviewOrder}
                             printButtonProps={printButtonProps}
                             ppcColorsOverride={ppcColors}
                         />
@@ -944,6 +959,7 @@ const DisplayProducts = ({ display = {} }) => {
                             status_out={queueBindings.statusOut}
                             saveQueueItem={saveQueueItem}
                             onTransition={handleQueueTransition}
+                            onPreviewOrder={openPreviewOrder}
                             printButtonProps={printButtonProps}
                             ppcColorsOverride={ppcColors}
                         />
@@ -965,6 +981,7 @@ const DisplayProducts = ({ display = {} }) => {
                             totalOverride={displayedTotals.status_out}
                             saveQueueItem={saveQueueItem}
                             onTransition={handleQueueTransition}
+                            onPreviewOrder={openPreviewOrder}
                             printButtonProps={printButtonProps}
                             ppcColorsOverride={ppcColors}
                         />
@@ -981,6 +998,14 @@ const DisplayProducts = ({ display = {} }) => {
                     onJobSettled={handleAutoPrintSettled}
                 />
             ) : null}
+
+            <OrderProductsPreviewModal
+                visible={!!previewOrder}
+                order={previewOrder}
+                display={display}
+                onClose={closePreviewOrder}
+                ppcColorsOverride={ppcColors}
+            />
 
             <RealtimeDebugBar
                 companyId={currentCompany?.id}

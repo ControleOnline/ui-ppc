@@ -1,35 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, View } from 'react-native';
-import { ActivityIndicator, Button, Card, Text } from 'react-native-paper';
+import { FlatList, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Card, Text } from 'react-native-paper';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import OrderProductComponents from './../../OrderProductComponents';
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton';
-import OrderIdentityLabel from '@controleonline/ui-orders/src/react/components/OrderIdentityLabel';
+import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import useDisplayQueueStatus from '../hooks/useDisplayQueueStatus';
+import buildDisplayOrderHeaderPayload from './orderHeaderPayload';
 import createStyles from './status.styles';
-import {
-    resolveDisplayTicketSummary,
-    resolveOrderProductComment,
-    resolveOrderProductDescription,
-} from '../displayPrintRules';
-
-const formatDisplayDateTime = value => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return '--/-- --:--';
-    }
-
-    const formattedDate = date.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-    });
-    const formattedTime = date.toLocaleTimeString('pt-BR', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-    return `${formattedDate} ${formattedTime}`;
-};
 
 const getQueueItemKey = item =>
     String(item?.id || item?.['@id'] || '').trim();
@@ -44,6 +23,7 @@ const Working = ({
     status_out = null,
     saveQueueItem = null,
     onTransition = null,
+    onPreviewOrder = null,
     printButtonProps = null,
     ppcColorsOverride = null,
 }) => {
@@ -69,13 +49,14 @@ const Working = ({
     const displayTotal =
         typeof totalOverride === 'number' ? totalOverride : total;
     const [movingIds, setMovingIds] = useState(() => new Set());
+    const canFinalize = status_out?.['@id'] && typeof saveQueueItem === 'function';
     const visibleOrders = useMemo(
         () => orders.filter(order => !movingIds.has(getQueueItemKey(order))),
         [movingIds, orders],
     );
 
     const finalize = async order => {
-        if (!status_out?.['@id'] || typeof saveQueueItem !== 'function') {
+        if (!canFinalize) {
             return;
         }
 
@@ -93,7 +74,7 @@ const Working = ({
             if (typeof onTransition === 'function') {
                 onTransition(updatedQueueItem, 'status_working', 'status_out');
             }
-        } catch (error) {
+        } catch {
             if (queueItemKey) {
                 setMovingIds(currentIds => {
                     const nextIds = new Set(currentIds);
@@ -107,57 +88,18 @@ const Working = ({
     const renderOrder = ({ item: order }) => {
         const orderProduct = order.order_product || {};
         const orderEntity = orderProduct.order || {};
-        const orderSummary = resolveDisplayTicketSummary(orderEntity);
-        const productDescription = resolveOrderProductDescription(orderProduct);
-        const productComment = resolveOrderProductComment(orderProduct);
+        const orderHeaderPayload = buildDisplayOrderHeaderPayload(orderEntity, order);
         const isMoving = movingIds.has(getQueueItemKey(order));
+        const canPreviewOrder =
+            typeof onPreviewOrder === 'function' &&
+            Boolean(orderEntity?.id || orderEntity?.['@id']);
+        const shouldShowActions =
+            Boolean(printButtonProps) || canPreviewOrder || canFinalize;
 
         return (
             <Card key={order.id} style={styles.orderCard}>
                 <Card.Content style={styles.orderContent}>
-                    <View style={styles.ticketTopRow}>
-                        <OrderIdentityLabel
-                            order={orderEntity}
-                            containerStyle={{flex: 1, minWidth: 0}}
-                            primaryTextStyle={
-                                orderSummary.marketplaceOrderCode
-                                    ? styles.marketplaceCode
-                                    : styles.internalOrderCode
-                            }
-                            secondaryTextStyle={styles.internalOrderCode}
-                        />
-                        <Text style={styles.orderMeta}>
-                            Pedido em {formatDisplayDateTime(order.registerTime)}
-                        </Text>
-                    </View>
-
-                    {!!orderSummary.clientName && (
-                        <Text style={styles.clientName}>
-                            {orderSummary.clientName}
-                        </Text>
-                    )}
-
-                    {order.registerTime !== order.updateTime && (
-                        <Text style={styles.orderMeta}>
-                            Em preparo desde {formatDisplayDateTime(order.updateTime)}
-                        </Text>
-                    )}
-
-                    <Text style={styles.orderQty}>
-                        {orderProduct?.quantity} {orderProduct?.product?.product}(s)
-                    </Text>
-
-                    {!!productDescription && (
-                        <Text style={styles.detailLine}>
-                            {productDescription}
-                        </Text>
-                    )}
-
-                    {!!productComment && (
-                        <Text style={styles.detailLine}>
-                            OBS: {productComment}
-                        </Text>
-                    )}
+                    <OrderHeader order={orderHeaderPayload} isKds />
                 </Card.Content>
 
                 <OrderProductComponents
@@ -165,35 +107,60 @@ const Working = ({
                     ppcColorsOverride={ppcColors}
                 />
 
-                {(status_out || printButtonProps) && (
+                {shouldShowActions && (
                     <Card.Actions style={styles.actions}>
-                        {printButtonProps ? (
-                            <PrintButton
-                                {...printButtonProps}
-                                job={{
-                                    type: 'order-product-queue',
-                                    orderProductQueueId: order?.id || order?.['@id'],
-                                }}
-                                label="Imprimir"
-                                iconColor={ppcColors.textPrimary}
-                                style={[
-                                    styles.actionButton,
-                                    styles.secondaryActionButton,
-                                ]}
-                            />
-                        ) : null}
-                        <Button
-                            mode="contained"
-                            buttonColor={ppcColors.accent}
-                            textColor={ppcColors.pillTextDark}
-                            style={styles.actionButton}
-                            labelStyle={styles.actionLabel}
-                            loading={isMoving}
-                            disabled={isMoving || !status_out?.['@id'] || typeof saveQueueItem !== 'function'}
+                        <View style={styles.actionTools}>
+                            {printButtonProps ? (
+                                <PrintButton
+                                    {...printButtonProps}
+                                    job={{
+                                        type: 'order-product-queue',
+                                        orderProductQueueId: order?.id || order?.['@id'],
+                                    }}
+                                    compact
+                                    layout={{ variant: 'icon' }}
+                                    iconColor={ppcColors.accentInfo}
+                                    compactButtonStyle={styles.actionIconButton}
+                                    compactSelectStyle={styles.actionIconButton}
+                                />
+                            ) : null}
+
+                            {canPreviewOrder ? (
+                                <TouchableOpacity
+                                    onPress={() => onPreviewOrder(orderEntity)}
+                                    style={styles.actionIconButton}
+                                >
+                                    <Icon
+                                        name="visibility"
+                                        size={19}
+                                        color={ppcColors.accentInfo}
+                                    />
+                                </TouchableOpacity>
+                            ) : null}
+                        </View>
+
+                        <TouchableOpacity
                             onPress={() => finalize(order)}
+                            disabled={isMoving || !canFinalize}
+                            style={[
+                                styles.actionPrimaryButton,
+                                styles.actionSuccessButton,
+                                (isMoving || !canFinalize)
+                                    ? styles.actionButtonDisabled
+                                    : null,
+                            ]}
                         >
-                            Finalizar
-                        </Button>
+                            {isMoving ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Icon name="check-circle" size={16} color="#FFFFFF" />
+                                    <Text style={[styles.actionPrimaryText, { color: '#FFFFFF' }]}>
+                                        Finalizar
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
                     </Card.Actions>
                 )}
             </Card>
