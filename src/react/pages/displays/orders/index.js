@@ -216,6 +216,18 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
   const map = new Map()
 
   items.forEach(item => {
+    if (
+      item?.productGroup &&
+      (
+        item?.showInParentQueue === false ||
+        item?.show_in_parent_queue === false ||
+        item?.showProductGroupInQueue === false ||
+        item?.show_product_group_in_queue === false
+      )
+    ) {
+      return
+    }
+
     const product = item?.product || {}
     const parentId =
       item?.productGroup?.parentProduct?.id || product?.id
