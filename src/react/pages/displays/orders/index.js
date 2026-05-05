@@ -218,7 +218,12 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
   items.forEach(item => {
     if (
       item?.productGroup &&
-      (item?.showProductGroupInQueue === false || item?.show_product_group_in_queue === false)
+      (
+        item?.showInParentQueue === false ||
+        item?.show_in_parent_queue === false ||
+        item?.showProductGroupInQueue === false ||
+        item?.show_product_group_in_queue === false
+      )
     ) {
       return
     }
