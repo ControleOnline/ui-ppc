@@ -890,7 +890,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               ]}
             />
             <View style={[styles.orderCardInner, compactMode && styles.tvOrderCardInner]}>
-              <OrderHeader order={order} isKds />
+              <OrderHeader order={order} isKds stackRightSectionBelow={tvMode} />
 
               {hasVisibleProducts && (
                 <View style={[styles.productsWrap, compactMode && styles.tvProductsWrap]}>
