@@ -4,6 +4,8 @@ checks:
 build:
   nodes:
     analysis:
+      environment:
+        node: v16
       project_setup:
         override: true
       tests:
