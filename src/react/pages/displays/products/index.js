@@ -16,7 +16,7 @@ import {
 import InOut from './Status/InOut';
 import Working from './Status/Working';
 import createStyles from './index.styles';
-import DateShortcutFilter from '@controleonline/ui-common/src/react/components/filters/DateShortcutFilter';
+import DateShortcutFilter from '@controleonline/ui-default/src/react/components/filters/DateShortcutFilter';
 import {
     DEFAULT_DATE_FILTER_KEY,
     getDateRange,
