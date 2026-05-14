@@ -11,10 +11,11 @@ import {
   parseConfigsObject,
   resolveDisplaySize,
 } from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
-import OrderHeader, {
+import {
   resolveDisplayedOrderStatus,
 } from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import OrderProducts from '@controleonline/ui-orders/src/react/components/OrderProducts'
+import OrderStackedTopBar from '@controleonline/ui-orders/src/react/pages/orders/sales/components/OrderStackedTopBar'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
 import { DISPLAY_DEVICE_TYPE } from '@controleonline/ui-common/src/react/utils/printerDevices'
@@ -1064,12 +1065,15 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               ]}
             />
             <View style={[styles.orderCardInner, compactMode && styles.tvOrderCardInner]}>
-              <OrderHeader
+              <OrderStackedTopBar
                 order={order}
                 isKds
-                stackRightSectionBelow={false}
-                showWaitingTime={false}
-                metaText={ticketSummary.clientName}
+                orderHeaderProps={{
+                  showWaitingTime: false,
+                  metaText: ticketSummary.clientName,
+                }}
+                showActions={false}
+                showBackButton={false}
               />
 
               {hasVisibleProducts && (
