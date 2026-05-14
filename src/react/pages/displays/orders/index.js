@@ -600,7 +600,11 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       useCompactTvStyles && styles.tvOrderProductGroupItemPriceText,
     ],
   }), [styles, useCompactTvStyles])
-  const showSkeleton = isLoading && (!Array.isArray(orders) || orders.length === 0)
+  const hasOrderFeedRefreshed = Boolean(refreshDebug.lastAt)
+  const showSkeleton =
+    isLoading &&
+    (!Array.isArray(orders) || orders.length === 0) &&
+    !(tvMode && hasOrderFeedRefreshed)
 
   const noteRefresh = useCallback((source, detail = '') => {
     const updatedAt = new Date().toISOString()
@@ -762,7 +766,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   }, [currentCompany?.id, selectedDisplayId])
 
   const listCount = sortedOrders.length
-  const hasOrderFeedRefreshed = Boolean(refreshDebug.lastAt)
   const shouldRenderDeliveryMap =
     tvMode && hasOrderFeedRefreshed && !showSkeleton && listCount === 0
 
@@ -796,7 +799,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     return () => {
       cancelled = true
     }
-  }, [fetchDeliveryMapPayload, refreshDebug.lastAt, shouldRenderDeliveryMap])
+  }, [fetchDeliveryMapPayload, shouldRenderDeliveryMap])
 
   const tvPageItems = useMemo(() => {
     if (!useTvPagedLayout || !tvLayout) return []

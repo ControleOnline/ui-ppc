@@ -91,6 +91,11 @@ const createStyles = ppcColors =>
       height: 8,
       borderRadius: 999,
     },
+    legendStoreDot: {
+      backgroundColor: '#111827',
+      borderWidth: 2,
+      borderColor: '#FBBF24',
+    },
     legendText: {
       color: ppcColors.textSecondary,
       fontSize: 10,

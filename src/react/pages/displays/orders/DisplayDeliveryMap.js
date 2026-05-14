@@ -5,6 +5,7 @@ import createStyles from './DisplayDeliveryMap.styles'
 
 const GOOGLE_MAPS_SCRIPT_ID = 'display-delivery-google-maps-api-script'
 const GOOGLE_MAPS_CALLBACK_NAME = '__displayDeliveryGoogleMapsApiReady__'
+const DELIVERY_POPUP_ROTATION_MS = 10000
 
 const normalizeText = value => String(value || '').trim()
 
@@ -38,25 +39,37 @@ const getStatusColor = delivery => {
   return normalizeText(delivery?.status?.color) || '#F59E0B'
 }
 
+const getRouteColor = delivery => {
+  const status = getStatusKey(delivery)
+  if (status === 'closed') return '#15803D'
+  if (status === 'way' || status === 'away') return '#0369A1'
+  return getStatusColor(delivery)
+}
+
 const getDeliveryTitle = delivery => {
   const displayCode = normalizeText(delivery?.displayCode)
   const id = normalizeText(delivery?.id)
   return displayCode ? `#${displayCode}` : id ? `#${id}` : 'Entrega'
 }
 
-const getDeliveryAddressText = delivery =>
-  normalizeText(
-    delivery?.address?.formatted ||
-    delivery?.address?.streetLine ||
-    delivery?.address,
-  )
+const getAddressText = address => {
+  if (!address) return ''
+  if (typeof address === 'string') return normalizeText(address)
 
-const getDeliveryPositionFromPayload = delivery => {
+  return normalizeText(address.formatted || address.streetLine)
+}
+
+const getDeliveryAddressText = delivery =>
+  getAddressText(delivery?.address)
+
+const getProviderAddressText = payload => getAddressText(payload?.provider?.address)
+
+const getPositionFromAddressPayload = address => {
   const latitude = parseCoordinate(
-    delivery?.address?.latitude ?? delivery?.latitude,
+    address?.latitude,
   )
   const longitude = parseCoordinate(
-    delivery?.address?.longitude ?? delivery?.longitude,
+    address?.longitude,
   )
 
   if (latitude === null || longitude === null) {
@@ -65,6 +78,52 @@ const getDeliveryPositionFromPayload = delivery => {
 
   return { lat: latitude, lng: longitude }
 }
+
+const getDeliveryPositionFromPayload = delivery =>
+  getPositionFromAddressPayload(delivery?.address) ||
+  getPositionFromAddressPayload(delivery)
+
+const getProviderPositionFromPayload = payload =>
+  getPositionFromAddressPayload(payload?.provider?.address)
+
+const svgToDataUrl = svg =>
+  `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+
+const buildPinIcon = (google, color) => ({
+  url: svgToDataUrl(`
+    <svg width="48" height="60" viewBox="0 0 48 60" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow" x="-40%" y="-30%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#0f172a" flood-opacity=".35"/>
+        </filter>
+      </defs>
+      <path filter="url(#shadow)" d="M24 3C13.5 3 6 10.7 6 21.4C6 35.9 24 56 24 56S42 35.9 42 21.4C42 10.7 34.5 3 24 3Z" fill="${escapeHtml(color)}" stroke="#FFFFFF" stroke-width="4"/>
+      <circle cx="24" cy="21" r="11" fill="#0F172A" fill-opacity=".20"/>
+    </svg>
+  `),
+  scaledSize: new google.maps.Size(48, 60),
+  anchor: new google.maps.Point(24, 56),
+  labelOrigin: new google.maps.Point(24, 22),
+})
+
+const buildStoreIcon = google => ({
+  url: svgToDataUrl(`
+    <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow" x="-35%" y="-25%" width="170%" height="170%">
+          <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#0f172a" flood-opacity=".34"/>
+        </filter>
+      </defs>
+      <circle filter="url(#shadow)" cx="30" cy="30" r="24" fill="#111827" stroke="#FFFFFF" stroke-width="4"/>
+      <path d="M18 30H42V43H18V30Z" fill="#FFFFFF"/>
+      <path d="M16 28L30 17L44 28H16Z" fill="#FBBF24"/>
+      <path d="M25 34H35V43H25V34Z" fill="#111827"/>
+    </svg>
+  `),
+  scaledSize: new google.maps.Size(60, 60),
+  anchor: new google.maps.Point(30, 30),
+  labelOrigin: new google.maps.Point(30, 52),
+})
 
 const loadGoogleMapsApi = apiKey => {
   if (Platform.OS !== 'web' || typeof window === 'undefined') {
@@ -155,6 +214,13 @@ const resolveDeliveryPosition = async ({ delivery, geocoder }) => {
   return geocodeAddress(geocoder, getDeliveryAddressText(delivery))
 }
 
+const resolveProviderPosition = async ({ payload, geocoder }) => {
+  const payloadPosition = getProviderPositionFromPayload(payload)
+  if (payloadPosition) return payloadPosition
+
+  return geocodeAddress(geocoder, getProviderAddressText(payload))
+}
+
 const injectPopupStyles = () => {
   if (typeof document === 'undefined') return
   if (document.getElementById('display-delivery-map-popup-styles')) return
@@ -216,6 +282,45 @@ const buildPopupContent = delivery => {
   `
 }
 
+const buildStorePopupContent = payload => {
+  const providerName = normalizeText(payload?.provider?.alias || payload?.provider?.name || 'Loja')
+  const addressText = getProviderAddressText(payload)
+
+  return `
+    <div class="display-delivery-popup">
+      <div class="display-delivery-popup-title">${escapeHtml(providerName)}</div>
+      <div class="display-delivery-popup-status" style="background:#111827">Loja</div>
+      ${addressText ? `<div class="display-delivery-popup-line">${escapeHtml(addressText)}</div>` : ''}
+    </div>
+  `
+}
+
+const drawRouteLine = ({ google, map, originPosition, destinationPosition, delivery }) => {
+  const color = getRouteColor(delivery)
+
+  return new google.maps.Polyline({
+    path: [originPosition, destinationPosition],
+    geodesic: true,
+    strokeColor: color,
+    strokeOpacity: 0.72,
+    strokeWeight: 4,
+    icons: [
+      {
+        icon: {
+          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+          scale: 3.2,
+          strokeColor: color,
+          fillColor: color,
+          fillOpacity: 1,
+        },
+        offset: '55%',
+        repeat: '140px',
+      },
+    ],
+    map,
+  })
+}
+
 const DisplayDeliveryMap = ({
   payload = null,
   isLoading = false,
@@ -243,6 +348,7 @@ const DisplayDeliveryMap = ({
     }
 
     let cancelled = false
+    let popupRotationTimer = null
     setMapState('loading')
     injectPopupStyles()
 
@@ -262,7 +368,9 @@ const DisplayDeliveryMap = ({
         })
         const infoWindow = new google.maps.InfoWindow({ maxWidth: 340 })
         const bounds = new google.maps.LatLngBounds()
+        const deliveryMarkerEntries = []
         let markerCount = 0
+        const originPosition = await resolveProviderPosition({ payload, geocoder })
 
         const markerEntries = await Promise.all(
           deliveries.map(async delivery => ({
@@ -273,24 +381,56 @@ const DisplayDeliveryMap = ({
 
         if (cancelled) return
 
+        if (originPosition) {
+          bounds.extend(originPosition)
+
+          const storeMarker = new google.maps.Marker({
+            position: originPosition,
+            map,
+            title: 'Loja',
+            zIndex: 1000,
+            icon: buildStoreIcon(google),
+          })
+
+          storeMarker.addListener('click', () => {
+            infoWindow.setContent(buildStorePopupContent(payload))
+            infoWindow.open({
+              anchor: storeMarker,
+              map,
+              shouldFocus: false,
+            })
+          })
+        }
+
         markerEntries.forEach(({ delivery, position }) => {
           if (!position) return
 
           markerCount += 1
+          const markerLabel = String(markerCount)
           bounds.extend(position)
+
+          if (originPosition) {
+            drawRouteLine({
+              google,
+              map,
+              originPosition,
+              destinationPosition: position,
+              delivery,
+            })
+          }
 
           const marker = new google.maps.Marker({
             position,
             map,
             title: getDeliveryTitle(delivery),
             animation: google.maps.Animation.DROP,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 10,
-              fillColor: getStatusColor(delivery),
-              fillOpacity: 0.96,
-              strokeColor: '#FFFFFF',
-              strokeWeight: 3,
+            zIndex: 100 + markerCount,
+            icon: buildPinIcon(google, getStatusColor(delivery)),
+            label: {
+              text: markerLabel,
+              color: '#FFFFFF',
+              fontSize: '14px',
+              fontWeight: '900',
             },
           })
 
@@ -302,6 +442,8 @@ const DisplayDeliveryMap = ({
               shouldFocus: false,
             })
           })
+
+          deliveryMarkerEntries.push({ delivery, marker })
         })
 
         if (markerCount === 0) {
@@ -316,10 +458,34 @@ const DisplayDeliveryMap = ({
           left: 56,
         })
 
+        const openDeliveryPopup = index => {
+          const entry = deliveryMarkerEntries[index % deliveryMarkerEntries.length]
+          if (!entry || cancelled) return
+
+          infoWindow.setContent(buildPopupContent(entry.delivery))
+          infoWindow.open({
+            anchor: entry.marker,
+            map,
+            shouldFocus: false,
+          })
+          map.panTo(entry.marker.getPosition())
+        }
+
         google.maps.event.addListenerOnce(map, 'idle', () => {
+          if (cancelled) return
+
           if (markerCount === 1 && map.getZoom() > 15) {
             map.setZoom(15)
           }
+
+          let nextPopupIndex = 0
+          openDeliveryPopup(nextPopupIndex)
+          nextPopupIndex += 1
+
+          popupRotationTimer = window.setInterval(() => {
+            openDeliveryPopup(nextPopupIndex)
+            nextPopupIndex += 1
+          }, DELIVERY_POPUP_ROTATION_MS)
         })
 
         setMapState('ready')
@@ -330,8 +496,11 @@ const DisplayDeliveryMap = ({
 
     return () => {
       cancelled = true
+      if (popupRotationTimer) {
+        window.clearInterval(popupRotationTimer)
+      }
     }
-  }, [apiKey, deliveries, enabled])
+  }, [apiKey, deliveries, enabled, payload])
 
   if (isLoading && !payload) {
     return (
@@ -377,10 +546,14 @@ const DisplayDeliveryMap = ({
         <View>
           <Text style={styles.mapTitle}>Ultimas entregas</Text>
           <Text style={styles.mapSubtitle}>
-            Em entrega sempre visivel. Finalizados: ultimos 10 do dia.
+            Caminhos saindo da loja. Finalizados: ultimos 10.
           </Text>
         </View>
         <View style={styles.legendWrap}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, styles.legendStoreDot]} />
+            <Text style={styles.legendText}>Loja</Text>
+          </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#0EA5E9' }]} />
             <Text style={styles.legendText}>Em entrega</Text>
@@ -403,7 +576,7 @@ const DisplayDeliveryMap = ({
           </View>
         )}
 
-        {(isLoading || mapState === 'loading') && (
+        {((isLoading && !payload) || mapState === 'loading') && (
           <View style={styles.mapOverlay}>
             <ActivityIndicator color={ppcColors.accentInfo || '#0EA5E9'} />
             <Text style={styles.mapOverlayText}>Montando mapa...</Text>
