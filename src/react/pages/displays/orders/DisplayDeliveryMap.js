@@ -5,6 +5,8 @@ import createStyles from './DisplayDeliveryMap.styles'
 
 const GOOGLE_MAPS_SCRIPT_ID = 'display-delivery-google-maps-api-script'
 const GOOGLE_MAPS_CALLBACK_NAME = '__displayDeliveryGoogleMapsApiReady__'
+const GOOGLE_MAPS_LOAD_TIMEOUT_MS = 15000
+const GOOGLE_MAPS_POLL_INTERVAL_MS = 100
 const DELIVERY_POPUP_ROTATION_MS = 10000
 
 const normalizeText = value => String(value || '').trim()
@@ -138,27 +140,77 @@ const loadGoogleMapsApi = apiKey => {
     return window.__displayDeliveryGoogleMapsPromise
   }
 
-  window.__displayDeliveryGoogleMapsPromise = new Promise((resolve, reject) => {
+  const loadPromise = new Promise((resolve, reject) => {
+    let settled = false
+    let pollTimer = null
+    let timeoutTimer = null
+
+    const cleanup = () => {
+      if (pollTimer) {
+        window.clearInterval(pollTimer)
+        pollTimer = null
+      }
+
+      if (timeoutTimer) {
+        window.clearTimeout(timeoutTimer)
+        timeoutTimer = null
+      }
+    }
+
     const resolveMaps = () => {
-      if (window.google?.maps) {
-        resolve(window.google.maps)
+      if (settled || !window.google?.maps) {
+        return false
+      }
+
+      settled = true
+      cleanup()
+      resolve(window.google.maps)
+      return true
+    }
+
+    const rejectMaps = error => {
+      if (settled) {
         return
       }
 
-      reject(new Error('google-maps-unavailable'))
+      settled = true
+      cleanup()
+      reject(error)
+    }
+
+    const startWatching = () => {
+      if (settled || pollTimer || timeoutTimer) {
+        return
+      }
+
+      pollTimer = window.setInterval(() => {
+        resolveMaps()
+      }, GOOGLE_MAPS_POLL_INTERVAL_MS)
+
+      timeoutTimer = window.setTimeout(() => {
+        rejectMaps(new Error('google-maps-load-failed'))
+      }, GOOGLE_MAPS_LOAD_TIMEOUT_MS)
+    }
+
+    const handleLoad = () => {
+      if (resolveMaps()) {
+        return
+      }
+
+      startWatching()
     }
 
     const handleError = () => {
-      window.__displayDeliveryGoogleMapsPromise = null
-      reject(new Error('google-maps-load-failed'))
+      rejectMaps(new Error('google-maps-load-failed'))
     }
 
-    window[GOOGLE_MAPS_CALLBACK_NAME] = resolveMaps
+    window[GOOGLE_MAPS_CALLBACK_NAME] = handleLoad
 
     const existingDisplayScript = document.getElementById(GOOGLE_MAPS_SCRIPT_ID)
     if (existingDisplayScript) {
-      existingDisplayScript.addEventListener('load', resolveMaps, { once: true })
+      existingDisplayScript.addEventListener('load', handleLoad, { once: true })
       existingDisplayScript.addEventListener('error', handleError, { once: true })
+      startWatching()
       return
     }
 
@@ -166,8 +218,9 @@ const loadGoogleMapsApi = apiKey => {
       'script[src*="maps.googleapis.com/maps/api/js"]',
     )
     if (existingMapsScript) {
-      existingMapsScript.addEventListener('load', resolveMaps, { once: true })
+      existingMapsScript.addEventListener('load', handleLoad, { once: true })
       existingMapsScript.addEventListener('error', handleError, { once: true })
+      startWatching()
       return
     }
 
@@ -178,9 +231,15 @@ const loadGoogleMapsApi = apiKey => {
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
       apiKey,
     )}&loading=async&callback=${GOOGLE_MAPS_CALLBACK_NAME}`
-    script.addEventListener('load', resolveMaps, { once: true })
+    script.addEventListener('load', handleLoad, { once: true })
     script.addEventListener('error', handleError, { once: true })
     document.head.appendChild(script)
+    startWatching()
+  })
+
+  window.__displayDeliveryGoogleMapsPromise = loadPromise.catch(error => {
+    window.__displayDeliveryGoogleMapsPromise = null
+    throw error
   })
 
   return window.__displayDeliveryGoogleMapsPromise
@@ -349,12 +408,31 @@ const DisplayDeliveryMap = ({
 
     let cancelled = false
     let popupRotationTimer = null
-    setMapState('loading')
-    injectPopupStyles()
+    let initRetryTimer = null
+    let initRetryCount = 0
 
-    loadGoogleMapsApi(apiKey)
-      .then(async () => {
-        if (cancelled || !window.google?.maps) return
+    const clearInitRetryTimer = () => {
+      if (initRetryTimer) {
+        window.clearTimeout(initRetryTimer)
+        initRetryTimer = null
+      }
+    }
+
+    const initializeMap = async () => {
+      try {
+        if (cancelled || !window.google?.maps) {
+          return
+        }
+
+        await new Promise(resolve => {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(resolve)
+          })
+        })
+
+        if (cancelled || !window.google?.maps) {
+          return
+        }
 
         const google = window.google
         const geocoder = new google.maps.Geocoder()
@@ -489,13 +567,41 @@ const DisplayDeliveryMap = ({
         })
 
         setMapState('ready')
+      } catch (error) {
+        if (cancelled) {
+          return
+        }
+
+        if (initRetryCount === 0) {
+          initRetryCount += 1
+          clearInitRetryTimer()
+          initRetryTimer = window.setTimeout(() => {
+            initializeMap()
+          }, 400)
+          return
+        }
+
+        console.error('DisplayDeliveryMap init failed', error)
+        setMapState('error')
+      }
+    }
+
+    setMapState('loading')
+    injectPopupStyles()
+
+    loadGoogleMapsApi(apiKey)
+      .then(() => {
+        initializeMap()
       })
-      .catch(() => {
-        if (!cancelled) setMapState('error')
+      .catch(error => {
+        if (cancelled) return
+        console.error('DisplayDeliveryMap Google Maps load failed', error)
+        setMapState('error')
       })
 
     return () => {
       cancelled = true
+      clearInitRetryTimer()
       if (popupRotationTimer) {
         window.clearInterval(popupRotationTimer)
       }
