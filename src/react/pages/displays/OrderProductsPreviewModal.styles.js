@@ -24,6 +24,13 @@ const createStyles = ppcColors =>
             backgroundColor: ppcColors.modalBg || ppcColors.appBg,
             overflow: 'hidden',
         },
+        headerWrap: {
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            paddingBottom: 10,
+            borderBottomWidth: 1,
+            borderBottomColor: ppcColors.borderSoft,
+        },
         scroll: {
             flex: 1,
         },

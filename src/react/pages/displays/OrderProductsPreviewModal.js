@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
 import { Modal, ScrollView, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader';
 import OrderItemsTab from '@controleonline/ui-orders/src/react/pages/orders/sales/OrderItemsTab';
-import OrderStackedTopBar from '@controleonline/ui-orders/src/react/pages/orders/sales/components/OrderStackedTopBar';
-import { ORDER_TOP_BAR_ACTIONS } from '@controleonline/ui-orders/src/react/pages/orders/sales/components/OrderTopBarActions';
 import { getOrderRouteId } from '@controleonline/ui-orders/src/react/utils/orderRoute';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import createStyles from './OrderProductsPreviewModal.styles';
@@ -27,7 +26,6 @@ const resolveEmbeddedOrderProducts = order => {
 const OrderProductsPreviewModal = ({
     visible = false,
     order = null,
-    display = null,
     onClose = null,
     ppcColorsOverride = null,
 }) => {
@@ -40,7 +38,6 @@ const OrderProductsPreviewModal = ({
         () => resolveEmbeddedOrderProducts(order),
         [order?.orderProducts],
     );
-    const displayId = display?.id || null;
 
     if (!visible || !orderId) {
         return null;
@@ -69,20 +66,9 @@ const OrderProductsPreviewModal = ({
                             { paddingBottom: Math.max(insets?.bottom || 0, 12) },
                         ]}
                     >
-                        <OrderStackedTopBar
-                            order={order}
-                            isKds
-                            onBackPress={onClose}
-                            buttons={[ORDER_TOP_BAR_ACTIONS.PRINT]}
-                            printJob={{ type: 'order', orderId }}
-                            printDisabled={!orderId}
-                            printerSelection={{
-                                enabled: true,
-                                context: 'display',
-                                display,
-                                displayId,
-                            }}
-                        />
+                        <View style={styles.headerWrap}>
+                            <OrderHeader order={order} isKds />
+                        </View>
 
                         <ScrollView
                             style={styles.scroll}

@@ -1002,7 +1002,6 @@ const DisplayProducts = ({ display = {} }) => {
             <OrderProductsPreviewModal
                 visible={!!previewOrder}
                 order={previewOrder}
-                display={display}
                 onClose={closePreviewOrder}
                 ppcColorsOverride={ppcColors}
             />

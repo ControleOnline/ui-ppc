@@ -28,6 +28,7 @@ import {
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton'
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
 import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
+import { resolveDisplayTicketSummary } from '@controleonline/ui-ppc/src/react/pages/displays/products/displayPrintRules'
 import createStyles from './index.styles'
 import DisplayDeliveryMap from './DisplayDeliveryMap'
 import DisplayConferenceAutoPrintDispatcher from './DisplayConferenceAutoPrintDispatcher'
@@ -681,6 +682,36 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     return orderProductsByOrderId
   }, [orderProductsActions])
 
+  const loadDetailedOrdersForOrders = useCallback(async queueOrders => {
+    const normalizedOrders = Array.isArray(queueOrders) ? queueOrders : []
+    const detailedOrders = await Promise.all(
+      normalizedOrders.map(async order => {
+        const orderId = parseEntityId(order?.id || order?.['@id'])
+
+        if (!orderId) {
+          return order
+        }
+
+        try {
+          const detailedOrder = await api.fetch(`orders/${orderId}`)
+
+          if (!detailedOrder || typeof detailedOrder !== 'object') {
+            return order
+          }
+
+          return {
+            ...order,
+            ...detailedOrder,
+          }
+        } catch {
+          return order
+        }
+      }),
+    )
+
+    return detailedOrders
+  }, [])
+
   const mergeOrdersWithDetailedProducts = useCallback(
     (queueOrders, orderProductsByOrderId) =>
       (Array.isArray(queueOrders) ? queueOrders : []).map(order => {
@@ -726,10 +757,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         const queueOrders = Array.isArray(data) ? data : []
 
         try {
+          const hydratedOrders = tvMode
+            ? await loadDetailedOrdersForOrders(queueOrders)
+            : queueOrders
           const orderProductsByOrderId =
-            await loadDetailedOrderProductsForOrders(queueOrders)
+            await loadDetailedOrderProductsForOrders(hydratedOrders)
           setOrders(
-            mergeOrdersWithDetailedProducts(queueOrders, orderProductsByOrderId),
+            mergeOrdersWithDetailedProducts(hydratedOrders, orderProductsByOrderId),
           )
         } catch {
           setOrders(queueOrders)
@@ -742,8 +776,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     currentCompany?.id,
     displayId,
     loadDetailedOrderProductsForOrders,
+    loadDetailedOrdersForOrders,
     mergeOrdersWithDetailedProducts,
     noteRefresh,
+    tvMode,
   ])
 
   const sortedOrders = useMemo(() => {
@@ -995,6 +1031,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
           />
         </View>
       ) : null
+      const ticketSummary = resolveDisplayTicketSummary(order)
 
       return (
         <View
@@ -1027,7 +1064,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               ]}
             />
             <View style={[styles.orderCardInner, compactMode && styles.tvOrderCardInner]}>
-              <OrderHeader order={order} isKds stackRightSectionBelow={tvMode} />
+              <OrderHeader
+                order={order}
+                isKds
+                stackRightSectionBelow={false}
+                showWaitingTime={false}
+                metaText={ticketSummary.clientName}
+              />
 
               {hasVisibleProducts && (
                 <View style={[styles.productsWrap, compactMode && styles.tvProductsWrap]}>
