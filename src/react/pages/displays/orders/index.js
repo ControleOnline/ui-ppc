@@ -394,6 +394,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const peopleStore = useStore('people')
   const queuesStore = useStore('queues')
   const ordersStore = useStore('orders')
+  const orderProductsStore = useStore('order_products')
   const deviceConfigStore = useStore('device_config')
   const deviceStore = useStore('device')
   const websocketStore = useStore('websocket')
@@ -402,6 +403,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const runtimeDebugActions = runtimeDebugStore.actions
   const { isLoading, messages: queueMessages } = getters
   const ordersActions = ordersStore.actions
+  const orderProductsActions = orderProductsStore.actions
   const ordersMessages = ordersStore?.getters?.messages
   const companyDeviceConfigs = deviceConfigStore?.getters?.items || []
   const currentDevice = deviceStore?.getters?.item || {}
@@ -626,6 +628,62 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     })
   }, [])
 
+  const loadDetailedOrderProductsForOrders = useCallback(async queueOrders => {
+    const orderIds = [
+      ...new Set(
+        (Array.isArray(queueOrders) ? queueOrders : [])
+          .map(order => parseEntityId(order?.id || order?.['@id']))
+          .filter(Boolean),
+      ),
+    ]
+
+    if (!orderIds.length) {
+      return new Map()
+    }
+
+    const detailedOrderProducts = await orderProductsActions.getItems({
+      'order.id': orderIds,
+      itemsPerPage: Math.max(200, orderIds.length * 20),
+    })
+    const orderProductsByOrderId = new Map()
+
+    ;(Array.isArray(detailedOrderProducts) ? detailedOrderProducts : []).forEach(
+      orderProduct => {
+        const orderId = parseEntityId(orderProduct?.order)
+
+        if (!orderId) {
+          return
+        }
+
+        if (!orderProductsByOrderId.has(orderId)) {
+          orderProductsByOrderId.set(orderId, [])
+        }
+
+        orderProductsByOrderId.get(orderId).push(orderProduct)
+      },
+    )
+
+    return orderProductsByOrderId
+  }, [orderProductsActions])
+
+  const mergeOrdersWithDetailedProducts = useCallback(
+    (queueOrders, orderProductsByOrderId) =>
+      (Array.isArray(queueOrders) ? queueOrders : []).map(order => {
+        const orderId = parseEntityId(order?.id || order?.['@id'])
+        const detailedOrderProducts = orderProductsByOrderId?.get(orderId)
+
+        if (!Array.isArray(detailedOrderProducts) || detailedOrderProducts.length === 0) {
+          return order
+        }
+
+        return {
+          ...order,
+          orderProducts: detailedOrderProducts,
+        }
+      }),
+    [],
+  )
+
   const fetchOrders = useCallback((source = 'manual', detail = '') => {
     if (!displayId || !currentCompany?.id) return
 
@@ -637,11 +695,29 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         provider: currentCompany.id,
         itemsPerPage: 50,
       })
-      .then(data => {
-        setOrders(Array.isArray(data) ? data : [])
+      .then(async data => {
+        const queueOrders = Array.isArray(data) ? data : []
+
+        try {
+          const orderProductsByOrderId =
+            await loadDetailedOrderProductsForOrders(queueOrders)
+          setOrders(
+            mergeOrdersWithDetailedProducts(queueOrders, orderProductsByOrderId),
+          )
+        } catch {
+          setOrders(queueOrders)
+        }
+
         noteRefresh(source, detail)
       })
-  }, [actions, currentCompany?.id, displayId, noteRefresh])
+  }, [
+    actions,
+    currentCompany?.id,
+    displayId,
+    loadDetailedOrderProductsForOrders,
+    mergeOrdersWithDetailedProducts,
+    noteRefresh,
+  ])
 
   const sortedOrders = useMemo(() => {
     if (!Array.isArray(orders)) return []
