@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useStore } from '@store'
+import { api } from '@controleonline/ui-common/src/api'
 import {
   DISPLAY_SIZE_DEFAULT,
   isDisplaySideBreakEnabled,
@@ -28,6 +29,7 @@ import PrintButton from '@controleonline/ui-orders/src/react/components/PrintBut
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
 import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
 import createStyles from './index.styles'
+import DisplayDeliveryMap from './DisplayDeliveryMap'
 import DisplayConferenceAutoPrintDispatcher from './DisplayConferenceAutoPrintDispatcher'
 import TvAutoScrollView from './TvAutoScrollView'
 import {
@@ -187,6 +189,12 @@ const removeConsumedMessages = (messages, companyId) =>
   (Array.isArray(messages) ? messages : []).filter(
     message => !isMessageForCompany(message, companyId),
   )
+
+const getFirstResponseMember = response => {
+  if (Array.isArray(response?.member)) return response.member[0] || null
+  if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'][0] || null
+  return response && typeof response === 'object' ? response : null
+}
 
 const resolveOrderDateValue = order =>
   normalizeText(order?.alterDate || order?.alter_date || order?.orderDate)
@@ -418,6 +426,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const [sectionTitleHeight] = useState(0)
   const [debugBarHeight] = useState(0)
   const [tvCurrentPage, setTvCurrentPage] = useState(0)
+  const [deliveryMapPayload, setDeliveryMapPayload] = useState(null)
+  const [deliveryMapLoading, setDeliveryMapLoading] = useState(false)
+  const [deliveryMapError, setDeliveryMapError] = useState('')
   const [refreshDebug, setRefreshDebug] = useState({
     lastAt: null,
     lastSource: 'boot',
@@ -684,6 +695,18 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     [],
   )
 
+  const fetchDeliveryMapPayload = useCallback(async () => {
+    if (!currentCompany?.id) return null
+
+    const response = await api.fetch('orders-delivery-map', {
+      params: {
+        provider: `/people/${currentCompany.id}`,
+      },
+    })
+
+    return getFirstResponseMember(response)
+  }, [currentCompany?.id])
+
   const fetchOrders = useCallback((source = 'manual', detail = '') => {
     if (!displayId || !currentCompany?.id) return
 
@@ -739,6 +762,41 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   }, [currentCompany?.id, selectedDisplayId])
 
   const listCount = sortedOrders.length
+  const hasOrderFeedRefreshed = Boolean(refreshDebug.lastAt)
+  const shouldRenderDeliveryMap =
+    tvMode && hasOrderFeedRefreshed && !showSkeleton && listCount === 0
+
+  useEffect(() => {
+    if (!shouldRenderDeliveryMap) {
+      setDeliveryMapPayload(null)
+      setDeliveryMapLoading(false)
+      setDeliveryMapError('')
+      return undefined
+    }
+
+    let cancelled = false
+
+    setDeliveryMapLoading(true)
+    setDeliveryMapError('')
+
+    fetchDeliveryMapPayload()
+      .then(payload => {
+        if (cancelled) return
+        setDeliveryMapPayload(payload)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setDeliveryMapPayload(null)
+        setDeliveryMapError('Nao foi possivel carregar as entregas recentes.')
+      })
+      .finally(() => {
+        if (!cancelled) setDeliveryMapLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [fetchDeliveryMapPayload, refreshDebug.lastAt, shouldRenderDeliveryMap])
 
   const tvPageItems = useMemo(() => {
     if (!useTvPagedLayout || !tvLayout) return []
@@ -1111,6 +1169,14 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             </View>
           ))}
         </View>
+      ) : shouldRenderDeliveryMap ? (
+        <DisplayDeliveryMap
+          payload={deliveryMapPayload}
+          isLoading={deliveryMapLoading}
+          error={deliveryMapError}
+          ppcColors={ppcColors}
+          tvMode={tvMode}
+        />
       ) : useTvPagedLayout ? (
         <View
           style={[

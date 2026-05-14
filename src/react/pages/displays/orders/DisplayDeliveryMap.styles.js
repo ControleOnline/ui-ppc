@@ -1,0 +1,138 @@
+import { StyleSheet } from 'react-native'
+import { withOpacity } from '@controleonline/../../src/styles/branding'
+
+const createStyles = ppcColors =>
+  StyleSheet.create({
+    emptyWrap: {
+      flex: 1,
+      margin: 12,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: ppcColors.borderSoft,
+      backgroundColor: ppcColors.cardBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      gap: 10,
+    },
+    tvEmptyWrap: {
+      margin: 8,
+    },
+    emptyTitle: {
+      color: ppcColors.textPrimary,
+      fontSize: 20,
+      fontWeight: '900',
+      textAlign: 'center',
+    },
+    emptyText: {
+      color: ppcColors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    mapWrap: {
+      flex: 1,
+      paddingHorizontal: 8,
+      paddingTop: 6,
+      paddingBottom: 8,
+      gap: 8,
+    },
+    tvMapWrap: {
+      paddingHorizontal: 6,
+      paddingTop: 4,
+      paddingBottom: 6,
+    },
+    mapHeader: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: ppcColors.borderSoft,
+      backgroundColor: ppcColors.cardBg,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    mapTitle: {
+      color: ppcColors.textPrimary,
+      fontSize: 16,
+      lineHeight: 20,
+      fontWeight: '900',
+    },
+    mapSubtitle: {
+      marginTop: 2,
+      color: ppcColors.textSecondary,
+      fontSize: 10,
+      lineHeight: 13,
+      fontWeight: '700',
+    },
+    legendWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: ppcColors.border,
+      backgroundColor: ppcColors.panelBg,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      gap: 5,
+    },
+    legendDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 999,
+    },
+    legendText: {
+      color: ppcColors.textSecondary,
+      fontSize: 10,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+    },
+    mapCard: {
+      flex: 1,
+      minHeight: 260,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: ppcColors.borderSoft,
+      backgroundColor: ppcColors.cardBg,
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    mapViewport: {
+      flex: 1,
+      minHeight: 260,
+    },
+    nativeFallback: {
+      flex: 1,
+      minHeight: 260,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 18,
+    },
+    mapOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(ppcColors.cardBg, 0.82),
+      gap: 8,
+      padding: 18,
+    },
+    mapOverlayText: {
+      color: ppcColors.textPrimary,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: '800',
+      textAlign: 'center',
+    },
+  })
+
+export default createStyles
