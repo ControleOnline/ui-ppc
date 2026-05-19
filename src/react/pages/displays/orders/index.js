@@ -207,9 +207,6 @@ const getFirstResponseMember = response => {
   return response && typeof response === 'object' ? response : null
 }
 
-const resolveOrderDateValue = order =>
-  normalizeText(order?.alterDate || order?.alter_date || order?.orderDate)
-
 const estimateTextUnits = (value, charsPerLine = 28) => {
   const normalized = normalizeText(value)
   if (!normalized) return 0
@@ -674,6 +671,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
           status: { realStatus: ['open'] },
           orderType: 'sale',
           provider: currentCompany.id,
+          'order[alterDate]': 'asc',
           page: targetPage,
           itemsPerPage: DISPLAY_ORDERS_PAGE_SIZE,
         },
@@ -744,15 +742,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     const loadedOrders = flattenOrdersPages(ordersPages)
     if (!Array.isArray(loadedOrders)) return []
 
-    return [...loadedOrders]
-      .filter(isDisplayVisibleOrder)
-      .sort((a, b) => {
-        const aTime = new Date(resolveOrderDateValue(a)).getTime()
-        const bTime = new Date(resolveOrderDateValue(b)).getTime()
-        const safeATime = Number.isFinite(aTime) ? aTime : 0
-        const safeBTime = Number.isFinite(bTime) ? bTime : 0
-        return safeATime - safeBTime
-      })
+    return loadedOrders.filter(isDisplayVisibleOrder)
   }, [ordersPages])
 
   const showSkeleton =
