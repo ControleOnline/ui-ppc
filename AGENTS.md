@@ -12,7 +12,8 @@
 ## Regras
 - A tela de displays de pedidos deve renderizar apenas pedidos operacionais de venda (`orderType = sale`). Pedidos `cart` pertencem ao fluxo de rascunho/carrinho e nao devem aparecer no display.
 - A tela de displays de pedidos deve reaproveitar a mesma listagem de produtos usada em `ui-orders` para `OrderDetails` e `POS`. O card do pedido pode mudar, mas a leitura interna dos itens precisa ser a mesma.
-- Como `/orders-queue` pode vir com itens rasos, displays de pedido devem enriquecer os itens via `/order_products` antes de renderizar quando precisarem mostrar a hierarquia visual dos componentes.
+- A tela de displays de pedido deve consumir `/orders-queue` como fonte principal da arvore de itens. O backend agora pode expor a hierarquia completa com group dedicado; use `/order_products` apenas como fallback legado quando o payload vier sem componentes aninhados.
+- A listagem de pedidos no display deve carregar em blocos pequenos, preferencialmente 5 itens por pagina, e buscar a proxima pagina sob demanda para evitar fan-out desnecessario.
 - Em display `tv`, quando nao houver pedidos visiveis, o fallback de mapa de entregas deve consumir somente `/orders-delivery-map`; nao montar a regra de `way/away` e `closed` no frontend.
 - Quando `ui-ppc` abrir popup/modal com detalhes de pedido, o topo deve reaproveitar o mesmo cabecalho canonico de `ui-orders` (`OrderHeader` e barra superior correspondente). A impressao do pedido ou do item entra na mesma barra padronizada de acoes, nunca em faixa paralela isolada.
 - Cards de pedido em displays/KDS tambem devem usar o mesmo `OrderHeader` canonico de `ui-orders`. Nao remontar numero do pedido, cliente, datas ou status com JSX local so para essas colunas operacionais.
