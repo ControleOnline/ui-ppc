@@ -93,7 +93,7 @@ const normalizeQuantity = value => {
 
 const formatQuantityPrefix = value => {
   const quantity = normalizeQuantity(value)
-  return quantity >= 2 ? `${quantity}x ` : ''
+  return quantity > 2 ? `${quantity}x ` : ''
 }
 
 const getOrderProductsPreview = (order, maxItems = 5) => {
@@ -854,6 +854,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             styles={orderProductsStyles}
             showDetails
             maxCards={tvMode ? null : 5}
+            showRootQuantityPrefix={false}
           />
         </View>
       ) : null
