@@ -6,30 +6,19 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useStore } from '@store'
 import { api } from '@controleonline/ui-common/src/api'
 import {
-  DISPLAY_SIZE_DEFAULT,
-  isDisplaySideBreakEnabled,
-  parseConfigsObject,
-  resolveDisplaySize,
-} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
-import {
   resolveDisplayedOrderStatus,
 } from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import OrderProducts from '@controleonline/ui-orders/src/react/components/OrderProducts'
 import OrderStackedTopBar from '@controleonline/ui-orders/src/react/pages/orders/sales/components/OrderStackedTopBar'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
-import { DISPLAY_DEVICE_TYPE } from '@controleonline/ui-common/src/react/utils/printerDevices'
-
-import {
-  filterDeviceConfigsByCompany,
-  normalizeDeviceId,
-  normalizeEntityId,
-} from '@controleonline/ui-common/src/react/utils/paymentDevices'
+import { normalizeEntityId } from '@controleonline/ui-common/src/react/utils/paymentDevices'
 
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton'
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
 import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
 import { resolveDisplayTicketSummary } from '@controleonline/ui-ppc/src/react/pages/displays/products/displayPrintRules'
+import resolveResponsiveOrderColumns from './responsiveColumns'
 import {
   DISPLAY_ORDERS_PAGE_SIZE,
   extractCollectionItems,
@@ -51,23 +40,8 @@ import {
   removePendingConferenceAutoPrintJob,
 } from './conferenceAutoPrint'
 
-import {
-  DISPLAY_DEVICE_LINK_CONFIG_KEY,
-  DISPLAY_MIN_COLUMNS_CONFIG_KEY,
-} from '@controleonline/ui-ppc/src/react/utils/forcedDisplay'
-
 const { isDisplayVisibleOrder } = require('./orderVisibility')
 const normalizeText = value => String(value || '').trim()
-
-const normalizeQuantity = value => {
-  const numericValue = Number(value || 0)
-  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 1
-}
-
-const formatQuantityPrefix = value => {
-  const quantity = normalizeQuantity(value)
-  return quantity >= 2 ? `${quantity}x ` : ''
-}
 
 const getOrderProductCategoryLabel = item =>
   normalizeText(
@@ -105,130 +79,25 @@ const formatDebugClock = value => {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
-
-const parsePositiveInteger = value => {
-  const normalized = String(value || '').replace(/\D+/g, '').trim()
-  if (!normalized) return null
-
-  const parsed = Number(normalized)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
-}
-
-const resolveDisplayLayoutScale = sizeLevel =>
-  clamp(
-    1 + ((Number(sizeLevel || DISPLAY_SIZE_DEFAULT) - DISPLAY_SIZE_DEFAULT) * 0.09),
-    0.64,
-    1.45,
-  )
-
+const MAX_PROCESSED_CONFERENCE_PRINT_EVENTS = 200
 const TV_LAYOUT_GAP = 8
-const TV_MIN_CARD_WIDTH = 300
-const TV_SIDE_BREAK_MIN_COLUMNS = 4
 const TV_BASE_PAGE_ROTATION_MS = 9000
 const TV_MAX_PAGE_ROTATION_MS = 22000
-const MAX_PROCESSED_CONFERENCE_PRINT_EVENTS = 200
 
-const resolveDisplayDeviceConfig = ({
-  deviceConfigs = [],
-  companyId,
-  currentDeviceId,
-  displayId,
-}) => {
-  const normalizedDisplayId = normalizeEntityId(displayId)
-  if (!normalizedDisplayId) {
-    return null
-  }
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
 
-  const matchingConfigs = filterDeviceConfigsByCompany(deviceConfigs, companyId)
-    .filter(deviceConfig => {
-      const deviceType = String(deviceConfig?.type || deviceConfig?.device?.type || '')
-        .trim()
-        .toUpperCase()
-
-      if (deviceType !== DISPLAY_DEVICE_TYPE) {
-        return false
-      }
-
-      const configs = parseConfigsObject(deviceConfig?.configs)
-      return normalizeEntityId(configs?.[DISPLAY_DEVICE_LINK_CONFIG_KEY]) === normalizedDisplayId
-    })
-
-  if (matchingConfigs.length === 0) {
-    return null
-  }
-
-  return (
-    matchingConfigs.find(
-      deviceConfig =>
-        normalizeDeviceId(deviceConfig?.device?.device) ===
-        normalizeDeviceId(currentDeviceId),
-    ) || matchingConfigs[0]
-  )
+const normalizeQuantity = value => {
+  const numericValue = Number(value || 0)
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 1
 }
 
-const parseEntityId = value => {
-  if (!value) return null
-  if (typeof value === 'number') return value
-  if (typeof value === 'string') {
-    const trimmed = value.trim()
-    if (/^\d+$/.test(trimmed)) return Number(trimmed)
-    const iriMatch = trimmed.match(/\/(\d+)(?:\/)?$/)
-    if (iriMatch?.[1]) return Number(iriMatch[1])
-    return null
-  }
-  if (typeof value?.id === 'number') return value.id
-  if (typeof value?.id === 'string') return parseEntityId(value.id)
-  if (value?.['@id']) return parseEntityId(String(value['@id']))
-  return null
-}
-
-const isMessageForCompany = (message, companyId) => {
-  if (!message) return false
-
-  const expectedCompanyId = parseEntityId(companyId)
-  const messageCompanyId = parseEntityId(message.company)
-
-  if (!expectedCompanyId || !messageCompanyId) {
-    return true
-  }
-
-  return expectedCompanyId === messageCompanyId
-}
-
-const removeConsumedMessages = (messages, companyId) =>
-  (Array.isArray(messages) ? messages : []).filter(
-    message => !isMessageForCompany(message, companyId),
-  )
-
-const getFirstResponseMember = response => {
-  if (Array.isArray(response?.member)) return response.member[0] || null
-  if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'][0] || null
-  return response && typeof response === 'object' ? response : null
-}
-
-const estimateTextUnits = (value, charsPerLine = 28) => {
-  const normalized = normalizeText(value)
-  if (!normalized) return 0
-
-  const safeCharsPerLine = Math.max(12, Math.round(Number(charsPerLine || 0)))
-  return Math.max(1, Math.ceil(normalized.length / safeCharsPerLine))
-}
-
-const getStatusVisual = (order, ppcColors) => {
-  const statusPresentation = resolveDisplayedOrderStatus(order, ppcColors.textSecondary)
-
-  return {
-    label: statusPresentation.labelUpper,
-    textColor: statusPresentation.color,
-    borderColor: withOpacity(statusPresentation.color, 0.42),
-    bgColor: withOpacity(statusPresentation.color, 0.12),
-  }
+const formatQuantityPrefix = value => {
+  const quantity = normalizeQuantity(value)
+  return quantity >= 2 ? `${quantity}x ` : ''
 }
 
 const getOrderProductsPreview = (order, maxItems = 5) => {
   const items = Array.isArray(order?.orderProducts) ? order.orderProducts : []
-
   const map = new Map()
 
   items.forEach(item => {
@@ -245,8 +114,7 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
     }
 
     const product = item?.product || {}
-    const parentId =
-      item?.productGroup?.parentProduct?.id || product?.id
+    const parentId = item?.productGroup?.parentProduct?.id || product?.id
 
     if (!map.has(parentId)) {
       map.set(parentId, {
@@ -260,12 +128,10 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
 
     const parent = map.get(parentId)
 
-    // soma quantidade do principal
     if (!item?.productGroup) {
       parent.quantity += Number(item?.quantity || 1)
     }
 
-    // se tiver grupo → organizar
     if (item?.productGroup) {
       const groupName = getOrderProductBucketLabel(item)
 
@@ -286,6 +152,14 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
   return Number.isFinite(maxItems)
     ? products.slice(0, Math.max(0, maxItems))
     : products
+}
+
+const estimateTextUnits = (value, charsPerLine = 28) => {
+  const normalized = normalizeText(value)
+  if (!normalized) return 0
+
+  const safeCharsPerLine = Math.max(12, Math.round(Number(charsPerLine || 0)))
+  return Math.max(1, Math.ceil(normalized.length / safeCharsPerLine))
 }
 
 const estimateTvProductUnits = (product, charsPerLine = 28) => {
@@ -337,45 +211,19 @@ const chunkItems = (items, size) => {
   return chunks
 }
 
-const getTvBaseColumns = width => {
-  if (width > 1920) return 6
-  if (width >= 1600) return 5
-  if (width >= 1200) return 4
-  if (width >= 800) return 3
-  if (width >= 600) return 2
-  return 1
-}
-
 const resolveTvLayoutMetrics = ({
   width,
   height,
   summaryHeight,
   sectionHeight,
   footerHeight = 0,
-  sizeScale = 1,
+  columns = 1,
 }) => {
   const contentWidth = Math.max(220, Math.round(width - 24))
   const availableHeight = Math.max(
     140,
     Math.round(height - summaryHeight - sectionHeight - footerHeight - 20),
   )
-  const minCardWidth = Math.max(
-    220,
-    Math.round(TV_MIN_CARD_WIDTH * Number(sizeScale || 1)),
-  )
-  let columns = Math.max(
-    TV_SIDE_BREAK_MIN_COLUMNS,
-    getTvBaseColumns(width),
-  )
-  while (
-    columns > TV_SIDE_BREAK_MIN_COLUMNS &&
-    Math.floor((contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / columns) < minCardWidth
-  ) {
-    columns -= 1
-  }
-
-  const rows = 1
-
   const cardWidth = Math.floor(
     (contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / Math.max(1, columns),
   )
@@ -388,13 +236,64 @@ const resolveTvLayoutMetrics = ({
 
   return {
     columns,
-    rows,
+    rows: 1,
     cardWidth,
     cardHeight,
     contentWidth,
     availableHeight,
-    cardsPerPage: Math.max(1, columns * rows),
+    cardsPerPage: Math.max(1, columns),
     charsPerLine,
+  }
+}
+
+const parseEntityId = value => {
+  if (!value) return null
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (/^\d+$/.test(trimmed)) return Number(trimmed)
+    const iriMatch = trimmed.match(/\/(\d+)(?:\/)?$/)
+    if (iriMatch?.[1]) return Number(iriMatch[1])
+    return null
+  }
+  if (typeof value?.id === 'number') return value.id
+  if (typeof value?.id === 'string') return parseEntityId(value.id)
+  if (value?.['@id']) return parseEntityId(String(value['@id']))
+  return null
+}
+
+const isMessageForCompany = (message, companyId) => {
+  if (!message) return false
+
+  const expectedCompanyId = parseEntityId(companyId)
+  const messageCompanyId = parseEntityId(message.company)
+
+  if (!expectedCompanyId || !messageCompanyId) {
+    return true
+  }
+
+  return expectedCompanyId === messageCompanyId
+}
+
+const removeConsumedMessages = (messages, companyId) =>
+  (Array.isArray(messages) ? messages : []).filter(
+    message => !isMessageForCompany(message, companyId),
+  )
+
+const getFirstResponseMember = response => {
+  if (Array.isArray(response?.member)) return response.member[0] || null
+  if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'][0] || null
+  return response && typeof response === 'object' ? response : null
+}
+
+const getStatusVisual = (order, ppcColors) => {
+  const statusPresentation = resolveDisplayedOrderStatus(order, ppcColors.textSecondary)
+
+  return {
+    label: statusPresentation.labelUpper,
+    textColor: statusPresentation.color,
+    borderColor: withOpacity(statusPresentation.color, 0.42),
+    bgColor: withOpacity(statusPresentation.color, 0.12),
   }
 }
 
@@ -410,8 +309,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const peopleStore = useStore('people')
   const queuesStore = useStore('queues')
   const ordersStore = useStore('orders')
-  const deviceConfigStore = useStore('device_config')
-  const deviceStore = useStore('device')
   const websocketStore = useStore('websocket')
   const runtimeDebugStore = useStore('runtime_debug')
   const { getters, actions } = queuesStore
@@ -419,8 +316,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const { messages: queueMessages } = getters
   const ordersActions = ordersStore.actions
   const ordersMessages = ordersStore?.getters?.messages
-  const companyDeviceConfigs = deviceConfigStore?.getters?.items || []
-  const currentDevice = deviceStore?.getters?.item || {}
   const websocketStatus = websocketStore?.getters?.summary || {}
   const websocketConnected = Boolean(websocketStatus?.connected)
   const { currentCompany } = peopleStore.getters
@@ -465,45 +360,12 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     () => normalizeEntityId(display?.id || display?.['@id'] || displayId),
     [display, displayId],
   )
+  const useTvPagedLayout = tvMode
 
-  const linkedDisplayDeviceConfig = useMemo(
-    () =>
-      resolveDisplayDeviceConfig({
-        deviceConfigs: companyDeviceConfigs,
-        companyId: currentCompany?.id,
-        currentDeviceId: currentDevice?.id || currentDevice?.device,
-        displayId: selectedDisplayId,
-      }),
-    [
-      companyDeviceConfigs,
-      currentCompany?.id,
-      currentDevice?.device,
-      currentDevice?.id,
-      selectedDisplayId,
-    ],
+  const columns = useMemo(
+    () => resolveResponsiveOrderColumns(effectiveWidth),
+    [effectiveWidth],
   )
-
-  const linkedDisplayConfigs = useMemo(
-    () => parseConfigsObject(linkedDisplayDeviceConfig?.configs),
-    [linkedDisplayDeviceConfig?.configs],
-  )
-
-  const displaySize = useMemo(
-    () => (tvMode ? resolveDisplaySize(linkedDisplayConfigs) : DISPLAY_SIZE_DEFAULT),
-    [linkedDisplayConfigs, tvMode],
-  )
-
-  const displaySideBreakEnabled = useMemo(
-    () => tvMode && isDisplaySideBreakEnabled(linkedDisplayConfigs),
-    [linkedDisplayConfigs, tvMode],
-  )
-
-  const tvLayoutScale = useMemo(
-    () => resolveDisplayLayoutScale(displaySize),
-    [displaySize],
-  )
-
-  const useTvPagedLayout = displaySideBreakEnabled
 
   const tvLayout = useMemo(() => {
     if (!useTvPagedLayout) return null
@@ -514,30 +376,19 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       summaryHeight,
       sectionHeight: sectionTitleHeight,
       footerHeight: tvMode ? debugBarHeight : 0,
-      sizeScale: tvLayoutScale,
+      columns,
     })
   }, [
+    columns,
     debugBarHeight,
     effectiveHeight,
     effectiveWidth,
     sectionTitleHeight,
     summaryHeight,
-    tvLayoutScale,
     tvMode,
     useTvPagedLayout,
   ])
 
-  const configuredMinColumns = useMemo(() => {
-    return parsePositiveInteger(linkedDisplayConfigs?.[DISPLAY_MIN_COLUMNS_CONFIG_KEY])
-  }, [linkedDisplayConfigs])
-
-  const columns = useMemo(() => {
-    const responsiveColumns = useTvPagedLayout
-      ? (tvLayout?.columns || 1)
-      : getTvBaseColumns(Math.round(effectiveWidth / tvLayoutScale))
-
-    return Math.max(responsiveColumns, configuredMinColumns || 1)
-  }, [configuredMinColumns, effectiveWidth, tvLayout?.columns, tvLayoutScale, useTvPagedLayout])
   const tvCardMaxHeight = useMemo(() => {
     if (!tvMode) return null
 
@@ -854,6 +705,26 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     useTvPagedLayout,
   ])
 
+  useEffect(() => {
+    if (!useTvPagedLayout) return
+
+    setTvCurrentPage(previousPage =>
+      previousPage >= tvPages.length ? 0 : previousPage,
+    )
+  }, [tvPages.length, useTvPagedLayout])
+
+  useEffect(() => {
+    if (!useTvPagedLayout || tvPages.length <= 1) {
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setTvCurrentPage(previousPage => (previousPage + 1) % tvPages.length)
+    }, tvPageRotationMs)
+
+    return () => clearTimeout(timer)
+  }, [tvPageRotationMs, tvPages.length, tvCurrentPage, useTvPagedLayout])
+
   const hasQueueRefreshMessage = useMemo(
     () =>
       (Array.isArray(queueMessages) ? queueMessages : []).some(message =>
@@ -961,26 +832,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       return () => clearInterval(interval)
     }, [refreshOrders, websocketConnected]),
   )
-
-  useEffect(() => {
-    if (!useTvPagedLayout) return
-
-    setTvCurrentPage(previousPage =>
-      previousPage >= tvPages.length ? 0 : previousPage,
-    )
-  }, [tvPages.length, useTvPagedLayout])
-
-  useEffect(() => {
-    if (!useTvPagedLayout || tvPages.length <= 1) {
-      return
-    }
-
-    const timer = setTimeout(() => {
-      setTvCurrentPage(previousPage => (previousPage + 1) % tvPages.length)
-    }, tvPageRotationMs)
-
-    return () => clearTimeout(timer)
-  }, [tvPageRotationMs, tvPages.length, tvCurrentPage, useTvPagedLayout])
 
   const renderOrderCard = useCallback(
     (itemOrRenderInfo, cardStyle = null) => {
@@ -1226,7 +1077,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       ) : (
         <FlatList
           data={sortedOrders}
-          key={`orders-cols-${columns}-size-${displaySize}`}
+          key={`orders-cols-${columns}`}
           numColumns={columns}
           keyExtractor={item => String(item.id)}
           renderItem={renderOrderCard}
