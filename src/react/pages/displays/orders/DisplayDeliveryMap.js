@@ -3,6 +3,11 @@ import { ActivityIndicator, Platform, Text, View } from 'react-native'
 
 import createStyles from './DisplayDeliveryMap.styles'
 
+const NativeDisplayDeliveryMap =
+  Platform.OS !== 'web'
+    ? require('./DisplayDeliveryMap.native').default
+    : null
+
 const GOOGLE_MAPS_SCRIPT_ID = 'display-delivery-google-maps-api-script'
 const GOOGLE_MAPS_CALLBACK_NAME = '__displayDeliveryGoogleMapsApiReady__'
 const GOOGLE_MAPS_LOAD_TIMEOUT_MS = 15000
@@ -387,6 +392,18 @@ const DisplayDeliveryMap = ({
   ppcColors = {},
   tvMode = false,
 }) => {
+  if (Platform.OS !== 'web' && NativeDisplayDeliveryMap) {
+    return (
+      <NativeDisplayDeliveryMap
+        payload={payload}
+        isLoading={isLoading}
+        error={error}
+        ppcColors={ppcColors}
+        tvMode={tvMode}
+      />
+    )
+  }
+
   const containerRef = useRef(null)
   const [mapState, setMapState] = useState('idle')
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
