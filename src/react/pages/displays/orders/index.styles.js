@@ -824,6 +824,10 @@ const createStyles = ppcColors =>
       paddingBottom: 6,
       overflow: 'hidden',
     },
+    tvMapStage: {
+      flex: 1,
+      position: 'relative',
+    },
     tvPageGrid: {
       width: '100%',
       flexDirection: 'row',
