@@ -1,5 +1,5 @@
-import React, {useEffect, useMemo, useRef} from 'react'
-import {ActivityIndicator, StyleSheet, Text, View} from 'react-native'
+import React, {useEffect, useMemo, useRef, useState} from 'react'
+import {ActivityIndicator, Platform, StyleSheet, Text, View} from 'react-native'
 
 import createStyles from './DisplayDeliveryMap.styles'
 
@@ -16,6 +16,7 @@ const NativeMapView = nativeMapComponents?.default || null
 const Marker = nativeMapComponents?.Marker || null
 const Callout = nativeMapComponents?.Callout || null
 const Polyline = nativeMapComponents?.Polyline || null
+const PROVIDER_GOOGLE = nativeMapComponents?.PROVIDER_GOOGLE || null
 const HAS_NATIVE_MAP_SUPPORT = Boolean(NativeMapView && Marker && Callout)
 
 const normalizeText = value => String(value || '').trim()
@@ -204,6 +205,7 @@ export default function DisplayDeliveryMap({
   tvMode = false,
 }) {
   const mapRef = useRef(null)
+  const [mapReady, setMapReady] = useState(false)
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
   const deliveries = useMemo(
     () => (Array.isArray(payload?.deliveries) ? payload.deliveries : []),
@@ -243,9 +245,17 @@ export default function DisplayDeliveryMap({
   }, [deliveryEntries, originPosition])
 
   const initialRegion = useMemo(() => buildRegion(focusCoordinates), [focusCoordinates])
+  const shouldRenderMap =
+    !((isLoading && !payload) || error || !enabled || deliveryEntries.length === 0)
 
   useEffect(() => {
-    if (!mapRef.current || focusCoordinates.length === 0) {
+    if (!shouldRenderMap) {
+      setMapReady(false)
+    }
+  }, [shouldRenderMap])
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || focusCoordinates.length === 0) {
       return undefined
     }
 
@@ -271,7 +281,7 @@ export default function DisplayDeliveryMap({
     }, 80)
 
     return () => clearTimeout(timeoutId)
-  }, [focusCoordinates])
+  }, [focusCoordinates, mapReady])
 
   if (!HAS_NATIVE_MAP_SUPPORT) {
     return (
@@ -354,11 +364,13 @@ export default function DisplayDeliveryMap({
           ref={mapRef}
           style={styles.mapViewport}
           initialRegion={initialRegion}
+          provider={Platform.OS === 'android' && PROVIDER_GOOGLE ? PROVIDER_GOOGLE : undefined}
           showsUserLocation={false}
           showsMyLocationButton={false}
           showsCompass
           rotateEnabled
-          toolbarEnabled={false}>
+          toolbarEnabled={false}
+          onMapReady={() => setMapReady(true)}>
           {originPosition ? (
             <Marker
               key="delivery-origin"
