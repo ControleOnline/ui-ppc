@@ -101,20 +101,17 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
   const map = new Map()
 
   items.forEach(item => {
-    if (
-      item?.productGroup &&
-      (
-        item?.showInParentQueue === false ||
-        item?.show_in_parent_queue === false ||
-        item?.showProductGroupInQueue === false ||
-        item?.show_product_group_in_queue === false
-      )
-    ) {
-      return
-    }
-
     const product = item?.product || {}
-    const parentId = item?.productGroup?.parentProduct?.id || product?.id
+    const shouldShowInParentQueue =
+      item?.showInParentQueue !== false &&
+      item?.show_in_parent_queue !== false &&
+      item?.showProductGroupInQueue !== false &&
+      item?.show_product_group_in_queue !== false
+    const hasParentGroup = !!item?.productGroup
+    const shouldNestInParent = hasParentGroup && shouldShowInParentQueue
+    const parentId = shouldNestInParent
+      ? item?.productGroup?.parentProduct?.id || product?.id
+      : item?.id || product?.id
 
     if (!map.has(parentId)) {
       map.set(parentId, {
@@ -128,11 +125,11 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
 
     const parent = map.get(parentId)
 
-    if (!item?.productGroup) {
+    if (!shouldNestInParent) {
       parent.quantity += Number(item?.quantity || 1)
     }
 
-    if (item?.productGroup) {
+    if (shouldNestInParent) {
       const groupName = getOrderProductBucketLabel(item)
 
       if (!parent.groups[groupName]) {
