@@ -837,7 +837,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             maxCards={tvMode ? null : 5}
             showRootQuantityPrefix={false}
             showHierarchyGuides={
-              tvMode ||
               String(display?.displayType || route.params?.displayType || '').toLowerCase() === 'orders'
             }
           />
