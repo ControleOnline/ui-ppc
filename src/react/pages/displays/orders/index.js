@@ -833,8 +833,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             order={order}
             styles={orderProductsStyles}
             showDetails
+            showPricing={false}
             maxCards={tvMode ? null : 5}
             showRootQuantityPrefix={false}
+            showHierarchyGuides={
+              tvMode ||
+              String(display?.displayType || route.params?.displayType || '').toLowerCase() === 'orders'
+            }
           />
         </View>
       ) : null
