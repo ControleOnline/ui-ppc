@@ -16,6 +16,7 @@
 - Em `products`, a fonte operacional e `order_product_queues`; a hierarquia visual pode usar `order_product` como referencia, mas nenhum item fora da fila deve aparecer.
 - Em `products`, nao repetir no card a legenda textual da fila/status que o topo do display ja mostra; a fila continua sendo usada para cor e contexto, nao como badge redundante no item.
 - Em `tv` e `orders`, a arvore vem de `orderProducts` completos e a regra `showInParentQueue` e apenas visual para nao encaixar o filho no pai.
+- Em `tv`, `orders` e displays de `products`, `ProductGroup.showInDisplay=false` oculta apenas o titulo do grupo. O bucket continua existindo para agrupar os itens e a impressao correspondente deve seguir a mesma regra.
 - A listagem de pedidos no display deve carregar em blocos pequenos, preferencialmente 5 itens por pagina, e buscar a proxima pagina sob demanda para evitar fan-out desnecessario.
 - Em display `tv`, quando nao houver pedidos visiveis, o fallback de mapa de entregas deve consumir somente `/orders-delivery-map`; nao montar a regra de `way/away` e `closed` no frontend.
 - Quando `ui-ppc` abrir popup/modal com detalhes de pedido, o topo deve reaproveitar o mesmo cabecalho canonico de `ui-orders` (`OrderHeader` e barra superior correspondente). A impressao do pedido ou do item entra na mesma barra padronizada de acoes, nunca em faixa paralela isolada.

@@ -39,37 +39,13 @@ import {
   isRelevantConferenceAutoPrintMessage,
   removePendingConferenceAutoPrintJob,
 } from './conferenceAutoPrint'
+import {
+  getOrderProductBucketKey,
+  getOrderProductBucketLabel,
+} from '@controleonline/ui-orders/src/react/components/OrderProducts.utils'
 
 const { isDisplayVisibleOrder } = require('./orderVisibility')
 const normalizeText = value => String(value || '').trim()
-
-const getOrderProductCategoryLabel = item =>
-  normalizeText(
-    item?.product?.category?.name ||
-    item?.product?.category?.category ||
-    item?.category?.name ||
-    item?.category?.category ||
-    item?.product?.productCategory?.category?.name ||
-    item?.product?.productCategory?.category?.category ||
-    item?.product?.productCategories?.[0]?.category?.name ||
-    item?.product?.productCategories?.[0]?.category?.category ||
-    item?.productCategory?.category?.name ||
-    item?.productCategory?.category?.category ||
-    item?.product?.categoryName ||
-    '',
-  )
-
-const getOrderProductGroupLabel = item =>
-  normalizeText(
-    item?.productGroup?.productGroup ||
-    item?.productGroup?.name ||
-    item?.productGroupName ||
-    item?.groupName ||
-    '',
-  )
-
-const getOrderProductBucketLabel = item =>
-  getOrderProductCategoryLabel(item) || getOrderProductGroupLabel(item) || 'Outros'
 
 const formatDebugClock = value => {
   const date = new Date(value)
@@ -130,13 +106,17 @@ const getOrderProductsPreview = (order, maxItems = 5) => {
     }
 
     if (shouldNestInParent) {
-      const groupName = getOrderProductBucketLabel(item)
+      const groupKey = getOrderProductBucketKey(item)
+      const groupLabel = getOrderProductBucketLabel(item)
 
-      if (!parent.groups[groupName]) {
-        parent.groups[groupName] = []
+      if (!parent.groups[groupKey]) {
+        parent.groups[groupKey] = {
+          label: groupLabel,
+          items: [],
+        }
       }
 
-      parent.groups[groupName].push({
+      parent.groups[groupKey].items.push({
         id: item?.id,
         name: normalizeText(product?.product),
         quantity: Number(item?.quantity || 1),
@@ -160,16 +140,16 @@ const estimateTextUnits = (value, charsPerLine = 28) => {
 }
 
 const estimateTvProductUnits = (product, charsPerLine = 28) => {
-  const groupEntries = Object.entries(product?.groups || {})
+  const groupEntries = Object.values(product?.groups || {})
   let units = 1
 
   units += estimateTextUnits(product?.name, charsPerLine)
   units += estimateTextUnits(product?.description, charsPerLine + 8)
 
-  groupEntries.forEach(([groupName, items]) => {
-    units += estimateTextUnits(groupName, charsPerLine + 10)
+  groupEntries.forEach(group => {
+    units += estimateTextUnits(group?.label, charsPerLine + 10)
 
-    ;(Array.isArray(items) ? items : []).forEach(child => {
+    ;(Array.isArray(group?.items) ? group.items : []).forEach(child => {
       units += estimateTextUnits(
         `${formatQuantityPrefix(child?.quantity)}${normalizeText(child?.name)}`.trim(),
         charsPerLine,
