@@ -84,6 +84,7 @@ const OrderProductsPreviewModal = ({
                                 routeOrderId={orderId}
                                 showPricing={false}
                                 showRootQuantityPrefix={false}
+                                showQueuePresentation={false}
                                 variant="main"
                             />
                         </ScrollView>

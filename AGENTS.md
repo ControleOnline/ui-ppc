@@ -14,6 +14,7 @@
 - A tela de displays de pedidos deve reaproveitar a mesma listagem de produtos usada em `ui-orders` para `OrderDetails` e `POS`. O card do pedido pode mudar, mas a leitura interna dos itens precisa ser a mesma.
 - A tela de displays de pedido deve consumir `/orders-queue` como fonte principal da arvore de itens. O backend agora pode expor a hierarquia completa com group dedicado; use `/order_products` apenas como fallback legado quando o payload vier sem componentes aninhados.
 - Em `products`, a fonte operacional e `order_product_queues`; a hierarquia visual pode usar `order_product` como referencia, mas nenhum item fora da fila deve aparecer.
+- Em `products`, nao repetir no card a legenda textual da fila/status que o topo do display ja mostra; a fila continua sendo usada para cor e contexto, nao como badge redundante no item.
 - Em `tv` e `orders`, a arvore vem de `orderProducts` completos e a regra `showInParentQueue` e apenas visual para nao encaixar o filho no pai.
 - A listagem de pedidos no display deve carregar em blocos pequenos, preferencialmente 5 itens por pagina, e buscar a proxima pagina sob demanda para evitar fan-out desnecessario.
 - Em display `tv`, quando nao houver pedidos visiveis, o fallback de mapa de entregas deve consumir somente `/orders-delivery-map`; nao montar a regra de `way/away` e `closed` no frontend.

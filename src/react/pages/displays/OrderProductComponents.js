@@ -313,6 +313,7 @@ const OrderProductComponents = ({ order_product, ppcColorsOverride = null }) => 
                 showPricing={false}
                 showImages
                 showRootQuantityPrefix={false}
+                showQueuePresentation={false}
             />
 
             {isLoadingDetails && shouldFetchDetails ? (

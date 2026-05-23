@@ -93,7 +93,7 @@ const normalizeQuantity = value => {
 
 const formatQuantityPrefix = value => {
   const quantity = normalizeQuantity(value)
-  return quantity > 2 ? `${quantity}x ` : ''
+  return quantity > 1 ? `${quantity}x ` : ''
 }
 
 const getOrderProductsPreview = (order, maxItems = 5) => {
