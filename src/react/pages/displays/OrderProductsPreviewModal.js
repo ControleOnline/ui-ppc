@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Modal, ScrollView, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader';
+import OrderStackedTopBar from '@controleonline/ui-orders/src/react/pages/orders/sales/components/OrderStackedTopBar';
 import OrderItemsTab from '@controleonline/ui-orders/src/react/pages/orders/sales/OrderItemsTab';
 import { getOrderRouteId } from '@controleonline/ui-orders/src/react/utils/orderRoute';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
@@ -27,6 +27,8 @@ const OrderProductsPreviewModal = ({
     visible = false,
     order = null,
     onClose = null,
+    display = null,
+    displayId = null,
     ppcColorsOverride = null,
 }) => {
     const insets = useSafeAreaInsets();
@@ -37,6 +39,15 @@ const OrderProductsPreviewModal = ({
     const orderProducts = useMemo(
         () => resolveEmbeddedOrderProducts(order),
         [order?.orderProducts],
+    );
+    const printerSelection = useMemo(
+        () => ({
+            enabled: true,
+            context: 'display',
+            display,
+            displayId: display?.id || displayId || undefined,
+        }),
+        [display, displayId],
     );
 
     if (!visible || !orderId) {
@@ -67,7 +78,19 @@ const OrderProductsPreviewModal = ({
                         ]}
                     >
                         <View style={styles.headerWrap}>
-                            <OrderHeader order={order} isKds />
+                            <OrderStackedTopBar
+                                order={order}
+                                isKds
+                                onBackPress={onClose}
+                                showBackButton
+                                backIconName="close"
+                                buttons={['print']}
+                                printJob={{
+                                    type: 'order',
+                                    orderId,
+                                }}
+                                printerSelection={printerSelection}
+                            />
                         </View>
 
                         <ScrollView
@@ -83,9 +106,8 @@ const OrderProductsPreviewModal = ({
                                 orderProducts={orderProducts}
                                 routeOrderId={orderId}
                                 showPricing={false}
-                                showRootQuantityPrefix={false}
-                                showQueuePresentation={false}
-                                variant="main"
+                                showRootQuantityPrefix
+                                showQueuePresentation
                             />
                         </ScrollView>
                     </View>

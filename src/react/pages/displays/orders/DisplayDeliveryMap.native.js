@@ -637,7 +637,7 @@ export default function DisplayDeliveryMap({
   const [androidMapState, setAndroidMapState] = useState('loading')
   const [androidMapErrorMessage, setAndroidMapErrorMessage] = useState('')
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
-  const apiKey = normalizeText(payload?.googleMapsApiKey)
+  const apiKey = normalizeText(payload?.androidGoogleMapsApiKey)
   const deliveries = useMemo(
     () => (Array.isArray(payload?.deliveries) ? payload.deliveries : []),
     [payload?.deliveries],
@@ -800,8 +800,8 @@ export default function DisplayDeliveryMap({
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
         <Text style={styles.emptyTitle}>Sem pedidos na fila</Text>
-        <Text style={styles.emptyText}>
-          Configure a chave do Google Maps para exibir as ultimas entregas.
+      <Text style={styles.emptyText}>
+          Configure a chave do Google Maps Android para exibir as ultimas entregas.
         </Text>
       </View>
     )

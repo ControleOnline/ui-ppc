@@ -1003,6 +1003,8 @@ const DisplayProducts = ({ display = {} }) => {
                 visible={!!previewOrder}
                 order={previewOrder}
                 onClose={closePreviewOrder}
+                display={display}
+                displayId={display?.id || displayId}
                 ppcColorsOverride={ppcColors}
             />
 

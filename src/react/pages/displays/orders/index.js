@@ -378,7 +378,8 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   }, [currentCompany?.id, selectedDisplayId])
 
   const listCount = sortedOrders.length
-  const shouldRenderDeliveryMap = tvMode
+  const shouldRenderDeliveryMap =
+    tvMode && hasOrderFeedRefreshed && !showSkeleton && listCount === 0
 
   useEffect(() => {
     if (!shouldRenderDeliveryMap) {
@@ -726,23 +727,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         </>
       )}
 
-      {tvMode ? (
-        <View style={styles.tvMapStage}>
-          <DisplayDeliveryMap
-            payload={deliveryMapPayload}
-            isLoading={deliveryMapLoading}
-            error={deliveryMapError}
-            ppcColors={ppcColors}
-            tvMode={tvMode}
-          />
-
-          <OperationalInsightsDock
-            filters={operationalInsightsFilters || null}
-            ppcColors={ppcColors}
-            periodLabel="Hoje"
-          />
-        </View>
-      ) : showSkeleton ? (
+      {showSkeleton ? (
         <View style={styles.skeletonWrap}>
           {[1, 2, 3].map(key => (
             <View key={`orders-skeleton-${key}`} style={styles.skeletonCard}>
@@ -766,6 +751,40 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             </View>
           ))}
         </View>
+      ) : tvMode ? (
+        shouldRenderDeliveryMap ? (
+          <View style={styles.tvMapStage}>
+            <DisplayDeliveryMap
+              payload={deliveryMapPayload}
+              isLoading={deliveryMapLoading}
+              error={deliveryMapError}
+              ppcColors={ppcColors}
+              tvMode={tvMode}
+            />
+
+            <OperationalInsightsDock
+              filters={operationalInsightsFilters || null}
+              ppcColors={ppcColors}
+              periodLabel="Hoje"
+            />
+          </View>
+        ) : (
+          <FlatList
+            data={sortedOrders}
+            key={`orders-cols-${columns}`}
+            numColumns={columns}
+            keyExtractor={item => String(item.id)}
+            renderItem={renderOrderCard}
+            columnWrapperStyle={
+              columns > 1
+                ? styles.tvColumnWrapper
+                : null
+            }
+            contentContainerStyle={styles.tvList}
+            onEndReached={loadMoreOrders}
+            onEndReachedThreshold={0.3}
+          />
+        )
       ) : (
         <FlatList
           data={sortedOrders}

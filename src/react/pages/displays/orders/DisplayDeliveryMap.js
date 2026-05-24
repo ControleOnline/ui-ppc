@@ -3,10 +3,7 @@ import { ActivityIndicator, Platform, Text, View } from 'react-native'
 
 import createStyles from './DisplayDeliveryMap.styles'
 
-const NativeDisplayDeliveryMap =
-  Platform.OS !== 'web'
-    ? require('./DisplayDeliveryMap.native').default
-    : null
+void (ActivityIndicator, Text, View)
 
 const GOOGLE_MAPS_SCRIPT_ID = 'display-delivery-google-maps-api-script'
 const GOOGLE_MAPS_CALLBACK_NAME = '__displayDeliveryGoogleMapsApiReady__'
@@ -392,22 +389,10 @@ const DisplayDeliveryMap = ({
   ppcColors = {},
   tvMode = false,
 }) => {
-  if (Platform.OS !== 'web' && NativeDisplayDeliveryMap) {
-    return (
-      <NativeDisplayDeliveryMap
-        payload={payload}
-        isLoading={isLoading}
-        error={error}
-        ppcColors={ppcColors}
-        tvMode={tvMode}
-      />
-    )
-  }
-
   const containerRef = useRef(null)
   const [mapState, setMapState] = useState('idle')
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
-  const apiKey = normalizeText(payload?.googleMapsApiKey)
+  const apiKey = normalizeText(payload?.webGoogleMapsApiKey)
   const deliveries = useMemo(
     () => (Array.isArray(payload?.deliveries) ? payload.deliveries : []),
     [payload?.deliveries],
@@ -647,8 +632,8 @@ const DisplayDeliveryMap = ({
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
         <Text style={styles.emptyTitle}>Sem pedidos na fila</Text>
-        <Text style={styles.emptyText}>
-          Configure a chave do Google Maps para exibir as ultimas entregas.
+      <Text style={styles.emptyText}>
+          Configure a chave do Google Maps Web para exibir as ultimas entregas.
         </Text>
       </View>
     )
