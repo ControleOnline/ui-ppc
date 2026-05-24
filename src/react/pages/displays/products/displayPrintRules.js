@@ -29,14 +29,7 @@ const sanitizeIdentityValue = value => {
   return normalized && !isPrivacyPlaceholder(normalized) ? normalized : '';
 };
 
-const resolveClientName = (order, remoteOrderSummary = null) =>
-  sanitizeIdentityValue(order?.client?.name) ||
-  sanitizeIdentityValue(order?.client?.alias) ||
-  sanitizeIdentityValue(order?.person?.name) ||
-  sanitizeIdentityValue(order?.person?.alias) ||
-  sanitizeIdentityValue(order?.customer?.name) ||
-  sanitizeIdentityValue(remoteOrderSummary?.customer?.name) ||
-  sanitizeIdentityValue(order?.customerName);
+const resolveClientName = order => sanitizeIdentityValue(order?.client?.name);
 
 export const resolveDisplayTicketSummary = order => {
   const remoteOrderSummary = buildFood99OrderSummary(order) || null;
@@ -48,7 +41,7 @@ export const resolveDisplayTicketSummary = order => {
     marketplaceOrderCode:
       identity.externalId || resolveMarketplaceOrderCode(order, remoteOrderSummary),
     identity,
-    clientName: resolveClientName(order, remoteOrderSummary),
+    clientName: resolveClientName(order),
   };
 };
 
