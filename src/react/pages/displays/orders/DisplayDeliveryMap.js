@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Platform, Text, View } from 'react-native'
 
 import createStyles from './DisplayDeliveryMap.styles'
+import { resolveDisplayDeliveryWebApiKey } from './DisplayDeliveryMap.shared'
 
 void (ActivityIndicator, Text, View)
 
@@ -392,7 +393,7 @@ const DisplayDeliveryMap = ({
   const containerRef = useRef(null)
   const [mapState, setMapState] = useState('idle')
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
-  const apiKey = normalizeText(payload?.webGoogleMapsApiKey)
+  const apiKey = resolveDisplayDeliveryWebApiKey(payload)
   const deliveries = useMemo(
     () => (Array.isArray(payload?.deliveries) ? payload.deliveries : []),
     [payload?.deliveries],
@@ -632,8 +633,8 @@ const DisplayDeliveryMap = ({
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
         <Text style={styles.emptyTitle}>Sem pedidos na fila</Text>
-      <Text style={styles.emptyText}>
-          Configure a chave do Google Maps Web para exibir as ultimas entregas.
+        <Text style={styles.emptyText}>
+          Configure no cadastro da empresa a chave do Google Maps usada pelo display.
         </Text>
       </View>
     )

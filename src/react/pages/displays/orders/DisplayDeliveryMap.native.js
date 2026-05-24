@@ -5,6 +5,7 @@ import {env} from '@env'
 import {resolveAppDomain} from '@controleonline/ui-common/src/utils/appDomain'
 
 import createStyles from './DisplayDeliveryMap.styles'
+import {resolveDisplayDeliveryAndroidWebViewApiKey} from './DisplayDeliveryMap.shared'
 
 const getNativeMapComponents = () => {
   if (Platform.OS === 'android') {
@@ -391,7 +392,7 @@ const buildAndroidWebMapHtml = ({
         };
 
         window.gm_authFailure = function gmAuthFailure() {
-          showError('Chave do Google Maps invalida para este dispositivo.');
+          showError('Nao foi possivel autenticar a chave do Google Maps usada pelo display.');
         };
 
         window.addEventListener('error', function handleWindowError(event) {
@@ -637,7 +638,7 @@ export default function DisplayDeliveryMap({
   const [androidMapState, setAndroidMapState] = useState('loading')
   const [androidMapErrorMessage, setAndroidMapErrorMessage] = useState('')
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
-  const apiKey = normalizeText(payload?.androidGoogleMapsApiKey)
+  const apiKey = resolveDisplayDeliveryAndroidWebViewApiKey(payload)
   const deliveries = useMemo(
     () => (Array.isArray(payload?.deliveries) ? payload.deliveries : []),
     [payload?.deliveries],
@@ -800,8 +801,8 @@ export default function DisplayDeliveryMap({
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
         <Text style={styles.emptyTitle}>Sem pedidos na fila</Text>
-      <Text style={styles.emptyText}>
-          Configure a chave do Google Maps Android para exibir as ultimas entregas.
+        <Text style={styles.emptyText}>
+          Configure no cadastro da empresa a chave do Google Maps usada pelo display.
         </Text>
       </View>
     )
