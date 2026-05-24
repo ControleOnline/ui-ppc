@@ -105,6 +105,67 @@ const getStatusVisual = (order, ppcColors) => {
   }
 }
 
+const translateRefreshDebugToken = value => {
+  switch (String(value || '').trim()) {
+    case 'boot':
+      return global.t?.t('display', 'label', 'boot')
+    case 'startup':
+      return global.t?.t('display', 'label', 'startup')
+    case 'manual':
+      return global.t?.t('display', 'label', 'manual')
+    case 'scroll':
+      return global.t?.t('display', 'label', 'scroll')
+    case 'load-more':
+      return global.t?.t('display', 'label', 'loadMore')
+    case 'socket':
+      return global.t?.t('display', 'label', 'socket')
+    case 'queues':
+      return global.t?.t('display', 'label', 'queues')
+    case 'orders':
+      return global.t?.t('display', 'label', 'orders')
+    case 'focus':
+      return global.t?.t('display', 'label', 'focus')
+    case 'screen-focus':
+      return global.t?.t('display', 'label', 'screenFocus')
+    case 'interval':
+      return global.t?.t('display', 'label', 'interval')
+    case 'connected-poll':
+      return global.t?.t('display', 'label', 'connectedPoll')
+    case 'fallback-poll':
+      return global.t?.t('display', 'label', 'fallbackPoll')
+    default:
+      return value
+  }
+}
+
+const formatRefreshDebugDetail = detail => {
+  const normalizedDetail = String(detail || '').trim()
+  if (!normalizedDetail) return ''
+
+  const pageFailedMatch = normalizedDetail.match(/^page (\d+) failed$/)
+  if (pageFailedMatch?.[1]) {
+    return `${global.t?.t('display', 'label', 'page')} ${pageFailedMatch[1]} ${global.t?.t('display', 'label', 'failed')}`
+  }
+
+  const pageMatch = normalizedDetail.match(/^page (\d+)(?: \((.+)\))?$/)
+  if (pageMatch?.[1]) {
+    const nextDetail = pageMatch[2]
+      ? ` (${translateRefreshDebugToken(pageMatch[2])})`
+      : ''
+
+    return `${global.t?.t('display', 'label', 'page')} ${pageMatch[1]}${nextDetail}`
+  }
+
+  if (normalizedDetail.includes('+')) {
+    return normalizedDetail
+      .split('+')
+      .map(translateRefreshDebugToken)
+      .join(' + ')
+  }
+
+  return translateRefreshDebugToken(normalizedDetail)
+}
+
 // Display exibe apenas pedidos em produção com workflow ainda aberto.
 
 
@@ -240,7 +301,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       order: 20,
       updatedAt,
       lines: [
-        `ultimo refresh: ${formatDebugClock(updatedAt)} | origem: ${source || 'manual'}${detail ? ` (${detail})` : ''}`,
+        `${global.t?.t('display', 'label', 'lastRefresh')}: ${formatDebugClock(updatedAt)} | ${global.t?.t('display', 'label', 'source')}: ${translateRefreshDebugToken(source || 'manual')}${detail ? ` (${formatRefreshDebugDetail(detail)})` : ''}`,
       ],
     })
   }, [runtimeDebugActions])
@@ -402,7 +463,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       .catch(() => {
         if (cancelled) return
         setDeliveryMapPayload(null)
-        setDeliveryMapError('Nao foi possivel carregar as entregas recentes.')
+        setDeliveryMapError(global.t?.t('display', 'message', 'unableLoadRecentDeliveries'))
       })
       .finally(() => {
         if (!cancelled) setDeliveryMapLoading(false)
@@ -630,7 +691,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               <PrintButton
                 job={{ type: 'order', orderId: parseEntityId(order?.id) || order?.id }}
                 store="orders"
-                label="Imprimir pedido"
+                label={global.t?.t('display', 'button', 'printOrder')}
                 iconColor={ppcColors.pillTextDark}
                 style={styles.printActionButton}
                 printerSelection={{
@@ -690,9 +751,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 </View>
                 <View style={styles.summaryTitleWrap}>
                   <Text numberOfLines={1} style={styles.summaryTitle}>
-                    {String(display?.display || 'Display')}
+                    {String(display?.display || global.t?.t('display', 'title', 'display'))}
                   </Text>
-                  <Text style={styles.summarySubtitle}>Pedidos na fila</Text>
+                  <Text style={styles.summarySubtitle}>{global.t?.t('display', 'subtitle', 'ordersInQueue')}</Text>
                 </View>
               </View>
 
@@ -713,7 +774,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                     { color: display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo },
                   ]}
                 >
-                  {String(display?.displayType || 'orders').toUpperCase()}
+                  {String(
+                    global.t?.t('display', 'label', String(display?.displayType || 'orders')),
+                  ).toUpperCase()}
                 </Text>
               </View>
             </View>
@@ -721,7 +784,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
           <View style={styles.sectionTitleRow}>
             <View style={styles.sectionLine} />
-            <Text style={styles.sectionTitle}>LISTA DE PEDIDOS</Text>
+            <Text style={styles.sectionTitle}>{global.t?.t('display', 'title', 'orderList')}</Text>
             <View style={styles.sectionLine} />
           </View>
         </>
@@ -765,7 +828,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             <OperationalInsightsDock
               filters={operationalInsightsFilters || null}
               ppcColors={ppcColors}
-              periodLabel="Hoje"
+              periodLabel={global.t?.t('display', 'subtitle', 'today')}
             />
           </View>
         ) : (

@@ -44,9 +44,9 @@ const getStatusKey = delivery =>
 
 const getStatusLabel = delivery => {
   const status = getStatusKey(delivery)
-  if (status === 'closed') return 'Finalizado'
-  if (status === 'way' || status === 'away') return 'Em entrega'
-  return normalizeText(delivery?.status?.status || delivery?.status || 'Entrega')
+  if (status === 'closed') return global.t?.t('display', 'status', 'closed')
+  if (status === 'way' || status === 'away') return global.t?.t('display', 'status', 'inDelivery')
+  return normalizeText(delivery?.status?.status || delivery?.status) || global.t?.t('display', 'status', 'delivery')
 }
 
 const getStatusColor = delivery => {
@@ -66,7 +66,7 @@ const getRouteColor = delivery => {
 const getDeliveryTitle = delivery => {
   const displayCode = normalizeText(delivery?.displayCode)
   const id = normalizeText(delivery?.id)
-  return displayCode ? `#${displayCode}` : id ? `#${id}` : 'Entrega'
+  return displayCode ? `#${displayCode}` : id ? `#${id}` : global.t?.t('display', 'title', 'delivery')
 }
 
 const getAddressText = address => {
@@ -214,9 +214,24 @@ const buildAndroidWebMapHtml = ({
   payload,
 }) => {
   const providerName = normalizeText(
-    payload?.provider?.alias || payload?.provider?.name || 'Loja',
+    payload?.provider?.alias || payload?.provider?.name || global.t?.t('display', 'label', 'store'),
   )
   const providerAddress = getProviderAddressText(payload)
+  const storeLabel = normalizeText(global.t?.t('display', 'label', 'store'))
+  const storeShortLabel = normalizeText(global.t?.t('display', 'label', 'storeShort'))
+  const statusLabel = normalizeText(global.t?.t('display', 'label', 'status'))
+  const unableLoadGoogleMapsMessage = normalizeText(
+    global.t?.t('display', 'message', 'unableLoadGoogleMaps'),
+  )
+  const unableAuthenticateDisplayGoogleMapsKeyMessage = normalizeText(
+    global.t?.t('display', 'message', 'unableAuthenticateDisplayGoogleMapsKey'),
+  )
+  const errorLoadingGoogleMapsMessage = normalizeText(
+    global.t?.t('display', 'message', 'errorLoadingGoogleMaps'),
+  )
+  const unableLocateAddressesOnMapMessage = normalizeText(
+    global.t?.t('display', 'message', 'unableLocateAddressesOnMap'),
+  )
   const serializedPayload = serializeForHtml({
     center: originPosition || deliveryEntries[0]?.position || null,
     store:
@@ -227,7 +242,7 @@ const buildAndroidWebMapHtml = ({
             address: escapeHtml(providerAddress),
             iconUrl: buildWebViewPinIcon({
               color: '#111827',
-              label: 'L',
+              label: storeShortLabel,
               isStore: true,
             }),
           }
@@ -374,7 +389,7 @@ const buildAndroidWebMapHtml = ({
         const createInfoContent = item => {
           const clientLine = item.clientName ? '<div class="info-line">' + item.clientName + '</div>' : '';
           const addressLine = item.address ? '<div class="info-line">' + item.address + '</div>' : '';
-          const statusLine = item.statusKey ? '<div class="info-muted">Status: ' + item.statusKey + '</div>' : '';
+          const statusLine = item.statusKey ? '<div class="info-muted">${escapeHtml(statusLabel)}: ' + item.statusKey + '</div>' : '';
 
           return [
             '<div class="info-card">',
@@ -388,15 +403,15 @@ const buildAndroidWebMapHtml = ({
         };
 
         window.handleMapError = function handleMapError() {
-          showError('Nao foi possivel carregar o Google Maps.');
+          showError(${serializeForHtml(unableLoadGoogleMapsMessage)});
         };
 
         window.gm_authFailure = function gmAuthFailure() {
-          showError('Nao foi possivel autenticar a chave do Google Maps usada pelo display.');
+          showError(${serializeForHtml(unableAuthenticateDisplayGoogleMapsKeyMessage)});
         };
 
         window.addEventListener('error', function handleWindowError(event) {
-          const message = event && event.message ? event.message : 'Erro ao carregar o Google Maps.';
+          const message = event && event.message ? event.message : ${serializeForHtml(errorLoadingGoogleMapsMessage)};
           postMessage({ type: 'window-error', message });
         });
 
@@ -478,7 +493,7 @@ const buildAndroidWebMapHtml = ({
                 marker.addListener('click', () => {
                   infoWindow.setContent(createInfoContent({
                     title: MAP_DATA.store.title,
-                    statusLabel: 'Loja',
+                    statusLabel: ${serializeForHtml(storeLabel)},
                     clientName: '',
                     address: MAP_DATA.store.address,
                     statusKey: '',
@@ -533,7 +548,7 @@ const buildAndroidWebMapHtml = ({
               });
 
               if (markerCount === 0) {
-                showError('Nao foi possivel localizar os enderecos no mapa.');
+                showError(${serializeForHtml(unableLocateAddressesOnMapMessage)});
                 return;
               }
 
@@ -551,10 +566,10 @@ const buildAndroidWebMapHtml = ({
 
               postMessage({type: 'ready'});
             }).catch(() => {
-              showError('Nao foi possivel localizar os enderecos no mapa.');
+              showError(${serializeForHtml(unableLocateAddressesOnMapMessage)});
             });
           } catch (error) {
-            showError('Nao foi possivel carregar o Google Maps.');
+            showError(${serializeForHtml(unableLoadGoogleMapsMessage)});
           }
         };
       </script>
@@ -606,20 +621,24 @@ const DeliveryCallout = ({delivery}) => {
       </View>
       {clientName ? <Text style={nativeStyles.calloutLine}>{clientName}</Text> : null}
       {addressText ? <Text style={nativeStyles.calloutLine}>{addressText}</Text> : null}
-      <Text style={nativeStyles.calloutMuted}>Status: {getStatusKey(delivery)}</Text>
+      <Text style={nativeStyles.calloutMuted}>
+        {global.t?.t('display', 'label', 'status')}: {getStatusKey(delivery)}
+      </Text>
     </View>
   )
 }
 
 const StoreCallout = ({payload}) => {
-  const providerName = normalizeText(payload?.provider?.alias || payload?.provider?.name || 'Loja')
+  const providerName = normalizeText(
+    payload?.provider?.alias || payload?.provider?.name || global.t?.t('display', 'label', 'store'),
+  )
   const addressText = getProviderAddressText(payload)
 
   return (
     <View style={nativeStyles.calloutCard}>
       <Text style={nativeStyles.calloutTitle}>{providerName}</Text>
       <View style={[nativeStyles.statusPill, nativeStyles.storePill]}>
-        <Text style={nativeStyles.statusPillText}>Loja</Text>
+        <Text style={nativeStyles.statusPillText}>{global.t?.t('display', 'label', 'store')}</Text>
       </View>
       {addressText ? <Text style={nativeStyles.calloutLine}>{addressText}</Text> : null}
     </View>
@@ -771,9 +790,9 @@ export default function DisplayDeliveryMap({
   if (Platform.OS !== 'android' && !HAS_NATIVE_MAP_SUPPORT) {
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
-        <Text style={styles.emptyTitle}>Mapa indisponivel no dispositivo</Text>
+        <Text style={styles.emptyTitle}>{global.t?.t('display', 'title', 'mapUnavailableOnDevice')}</Text>
         <Text style={styles.emptyText}>
-          O suporte nativo de mapa nao esta disponivel neste ambiente.
+          {global.t?.t('display', 'message', 'nativeMapSupportUnavailable')}
         </Text>
       </View>
     )
@@ -783,7 +802,7 @@ export default function DisplayDeliveryMap({
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
         <ActivityIndicator color={ppcColors.accentInfo || '#0EA5E9'} />
-        <Text style={styles.emptyTitle}>Carregando entregas recentes</Text>
+        <Text style={styles.emptyTitle}>{global.t?.t('display', 'title', 'loadingRecentDeliveries')}</Text>
       </View>
     )
   }
@@ -791,7 +810,7 @@ export default function DisplayDeliveryMap({
   if (error) {
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
-        <Text style={styles.emptyTitle}>Sem pedidos na fila</Text>
+        <Text style={styles.emptyTitle}>{global.t?.t('display', 'title', 'noOrdersInQueue')}</Text>
         <Text style={styles.emptyText}>{error}</Text>
       </View>
     )
@@ -800,9 +819,9 @@ export default function DisplayDeliveryMap({
   if (!enabled) {
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
-        <Text style={styles.emptyTitle}>Sem pedidos na fila</Text>
+        <Text style={styles.emptyTitle}>{global.t?.t('display', 'title', 'noOrdersInQueue')}</Text>
         <Text style={styles.emptyText}>
-          Configure no cadastro da empresa a chave do Google Maps usada pelo display.
+          {global.t?.t('display', 'message', 'configureDisplayGoogleMapsKey')}
         </Text>
       </View>
     )
@@ -811,9 +830,9 @@ export default function DisplayDeliveryMap({
   if (Platform.OS === 'android' ? !hasAndroidRenderableDeliveries : deliveryEntries.length === 0) {
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
-        <Text style={styles.emptyTitle}>Sem pedidos na fila</Text>
+        <Text style={styles.emptyTitle}>{global.t?.t('display', 'title', 'noOrdersInQueue')}</Text>
         <Text style={styles.emptyText}>
-          Nenhuma entrega recente com endereco para exibir.
+          {global.t?.t('display', 'message', 'noRecentDeliveriesWithAddress')}
         </Text>
       </View>
     )
@@ -823,23 +842,23 @@ export default function DisplayDeliveryMap({
     <View style={[styles.mapWrap, tvMode && styles.tvMapWrap]}>
       <View style={styles.mapHeader}>
         <View>
-          <Text style={styles.mapTitle}>Ultimas entregas</Text>
+          <Text style={styles.mapTitle}>{global.t?.t('display', 'title', 'latestDeliveries')}</Text>
           <Text style={styles.mapSubtitle}>
-            Caminhos saindo da loja. Finalizados: ultimos 10.
+            {global.t?.t('display', 'message', 'routesLeavingStoreLastTenCompleted')}
           </Text>
         </View>
         <View style={styles.legendWrap}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, styles.legendStoreDot]} />
-            <Text style={styles.legendText}>Loja</Text>
+            <Text style={styles.legendText}>{global.t?.t('display', 'label', 'store')}</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, {backgroundColor: '#0EA5E9'}]} />
-            <Text style={styles.legendText}>Em entrega</Text>
+            <Text style={styles.legendText}>{global.t?.t('display', 'status', 'inDelivery')}</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, {backgroundColor: '#16A34A'}]} />
-            <Text style={styles.legendText}>Finalizado</Text>
+            <Text style={styles.legendText}>{global.t?.t('display', 'status', 'closed')}</Text>
           </View>
         </View>
       </View>
@@ -903,8 +922,8 @@ export default function DisplayDeliveryMap({
                 <Text style={styles.mapOverlayText}>
                   {androidMapState === 'error'
                     ? androidMapErrorMessage ||
-                      'Nao foi possivel carregar o Google Maps no Android.'
-                    : 'Carregando mapa de entregas...'}
+                      global.t?.t('display', 'message', 'unableLoadGoogleMapsOnAndroid')
+                    : global.t?.t('display', 'message', 'loadingDeliveryMap')}
                 </Text>
               </View>
             ) : null}
@@ -925,9 +944,13 @@ export default function DisplayDeliveryMap({
               <Marker
                 key="delivery-origin"
                 coordinate={originPosition}
-                title="Loja"
+                title={global.t?.t('display', 'label', 'store')}
                 zIndex={1000}>
-                <MarkerPin color="#FBBF24" label="L" isStore />
+                <MarkerPin
+                  color="#FBBF24"
+                  label={global.t?.t('display', 'label', 'storeShort')}
+                  isStore
+                />
                 <Callout tooltip>
                   <StoreCallout payload={payload} />
                 </Callout>

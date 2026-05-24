@@ -405,8 +405,8 @@ export const OperationalInsightsKpiCard = ({
   const orders = summary?.orders ?? summary?.totals?.orders ?? 0
   const units = summary?.units ?? summary?.totals?.units ?? 0
   const tiles = [
-    { label: 'Pedidos', value: orders },
-    { label: 'Produtos', value: units },
+    { label: global.t?.t('display', 'label', 'orders'), value: orders },
+    { label: global.t?.t('display', 'label', 'products'), value: units },
   ]
 
   return (
@@ -428,10 +428,14 @@ export const OperationalInsightsKpiCard = ({
 
       <View style={styles.kpiPills}>
         <View style={styles.kpiPill}>
-          <Text style={styles.kpiPillText}>{formatNumber(orders)} pedidos</Text>
+          <Text style={styles.kpiPillText}>
+            {formatNumber(orders)} {global.t?.t('display', 'label', 'orders')}
+          </Text>
         </View>
         <View style={styles.kpiPill}>
-          <Text style={styles.kpiPillText}>{formatNumber(units)} produtos</Text>
+          <Text style={styles.kpiPillText}>
+            {formatNumber(units)} {global.t?.t('display', 'label', 'products')}
+          </Text>
         </View>
       </View>
     </CardShell>
@@ -445,9 +449,9 @@ export const OperationalInsightsRankingCard = ({
   accentColor,
   items,
   valueKey = 'units',
-  valueLabel = 'unidades',
+  valueLabel = global.t?.t('display', 'label', 'units'),
   secondaryKey = 'orders',
-  secondaryLabel = 'pedidos',
+  secondaryLabel = global.t?.t('display', 'label', 'orders'),
   limit = 5,
   iconName = 'chart-bar',
 }) => {
@@ -500,12 +504,12 @@ export const OperationalInsightsRankingCard = ({
 
           {sourceItems.length > visibleItems.length ? (
             <Text style={styles.rankingFooter}>
-              +{sourceItems.length - visibleItems.length} itens adicionais
+              +{sourceItems.length - visibleItems.length} {global.t?.t('display', 'label', 'additionalItems')}
             </Text>
           ) : null}
         </View>
       ) : (
-        <Text style={styles.rankingEmpty}>Sem dados para o período selecionado.</Text>
+        <Text style={styles.rankingEmpty}>{global.t?.t('display', 'message', 'noDataForSelectedPeriod')}</Text>
       )}
     </CardShell>
   )
@@ -554,7 +558,7 @@ export const OperationalInsightsTrendCard = ({
           })}
         </View>
       ) : (
-        <Text style={styles.rankingEmpty}>Sem série histórica para o período selecionado.</Text>
+        <Text style={styles.rankingEmpty}>{global.t?.t('display', 'message', 'noHistoricalSeriesForSelectedPeriod')}</Text>
       )}
     </CardShell>
   )
@@ -592,9 +596,9 @@ export const OperationalInsightsAbcCard = ({
               <Text style={styles.abcBucketLabel}>{bucket}</Text>
               <Text style={[styles.abcBucketValue, { color }]}>{formatPercent(bucketData.share || 0)}</Text>
               <Text style={styles.abcBucketMeta}>
-                {formatNumber(bucketData.units || 0)} un
+                {formatNumber(bucketData.units || 0)} {global.t?.t('display', 'label', 'unitsAbbreviation')}
                 {' '}
-                {formatNumber(bucketData.items || 0)} itens
+                {formatNumber(bucketData.items || 0)} {global.t?.t('display', 'label', 'items')}
               </Text>
             </View>
           )
@@ -616,12 +620,12 @@ export const OperationalInsightsAbcCard = ({
             </View>
           )
         }) : (
-          <Text style={styles.rankingEmpty}>Sem itens para a curva ABC.</Text>
+          <Text style={styles.rankingEmpty}>{global.t?.t('display', 'message', 'noItemsForAbcCurve')}</Text>
         )}
       </View>
 
       <Text style={styles.rankingFooter}>
-        Total: {formatNumber(totalUnits)} unidades
+        {global.t?.t('display', 'label', 'total')}: {formatNumber(totalUnits)} {global.t?.t('display', 'label', 'units')}
       </Text>
     </CardShell>
   )
@@ -650,10 +654,14 @@ export const OperationalInsightsStatusCard = ({
           <ActivityIndicator size="small" color={accentColor || ppcColors?.accentInfo || '#0EA5E9'} />
         ) : null}
         <Text style={styles.statusTitle}>
-          {loading ? 'Carregando indicadores' : 'Painel indisponível'}
+          {loading
+            ? global.t?.t('display', 'title', 'loadingIndicators')
+            : global.t?.t('display', 'title', 'unavailablePanel')}
         </Text>
         <Text style={styles.statusMessage}>
-          {message || (loading ? 'Preparando métricas operacionais.' : 'Sem dados operacionais para exibir.')}
+          {message || (loading
+            ? global.t?.t('display', 'message', 'preparingOperationalMetrics')
+            : global.t?.t('display', 'message', 'noOperationalDataToDisplay'))}
         </Text>
       </View>
     </CardShell>

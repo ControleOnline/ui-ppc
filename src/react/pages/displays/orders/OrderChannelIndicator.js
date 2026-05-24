@@ -17,7 +17,7 @@ const OrderChannelIndicator = ({
 }) => {
   const channelLogo = useMemo(() => getOrderChannelLogo(order), [order])
   const channelLabel = useMemo(
-    () => normalizeLabel(getOrderChannelLabel(order) || 'Balcao'),
+    () => normalizeLabel(getOrderChannelLabel(order) || global.t?.t('display', 'label', 'counter')),
     [order],
   )
 

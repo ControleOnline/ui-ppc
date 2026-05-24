@@ -60,7 +60,7 @@ const createStyles = ppcColors =>
 const OperationalInsightsDock = ({
   filters = {},
   ppcColors = {},
-  periodLabel = 'Hoje',
+  periodLabel = global.t?.t('display', 'subtitle', 'today'),
 }) => {
   const { width } = useWindowDimensions()
   const insets = useSafeAreaInsets()
@@ -117,7 +117,7 @@ const OperationalInsightsDock = ({
       ]}
     >
       <View style={styles.headerPill}>
-        <Text style={styles.headerText}>Indicadores operacionais</Text>
+        <Text style={styles.headerText}>{global.t?.t('display', 'title', 'operationalInsights')}</Text>
       </View>
 
       <Animated.View

@@ -32,9 +32,10 @@ const getStatusKey = delivery =>
 
 const getStatusLabel = delivery => {
   const status = getStatusKey(delivery)
-  if (status === 'closed') return 'Finalizado'
-  if (status === 'way' || status === 'away') return 'Em entrega'
-  return normalizeText(delivery?.status?.status || delivery?.status || 'Entrega')
+  if (status === 'closed') return global.t?.t('display', 'status', 'closed')
+  if (status === 'way' || status === 'away') return global.t?.t('display', 'status', 'inDelivery')
+
+  return normalizeText(delivery?.status?.status || delivery?.status) || global.t?.t('display', 'status', 'delivery')
 }
 
 const getStatusColor = delivery => {
@@ -54,7 +55,7 @@ const getRouteColor = delivery => {
 const getDeliveryTitle = delivery => {
   const displayCode = normalizeText(delivery?.displayCode)
   const id = normalizeText(delivery?.id)
-  return displayCode ? `#${displayCode}` : id ? `#${id}` : 'Entrega'
+  return displayCode ? `#${displayCode}` : id ? `#${id}` : global.t?.t('display', 'title', 'delivery')
 }
 
 const getAddressText = address => {
@@ -339,19 +340,21 @@ const buildPopupContent = delivery => {
       </div>
       ${clientName ? `<div class="display-delivery-popup-line">${escapeHtml(clientName)}</div>` : ''}
       ${addressText ? `<div class="display-delivery-popup-line">${escapeHtml(addressText)}</div>` : ''}
-      <div class="display-delivery-popup-muted">Status: ${escapeHtml(getStatusKey(delivery))}</div>
+      <div class="display-delivery-popup-muted">${escapeHtml(global.t?.t('display', 'label', 'status'))}: ${escapeHtml(getStatusLabel(delivery))}</div>
     </div>
   `
 }
 
 const buildStorePopupContent = payload => {
-  const providerName = normalizeText(payload?.provider?.alias || payload?.provider?.name || 'Loja')
+  const providerName = normalizeText(
+    payload?.provider?.alias || payload?.provider?.name || global.t?.t('display', 'label', 'store'),
+  )
   const addressText = getProviderAddressText(payload)
 
   return `
     <div class="display-delivery-popup">
       <div class="display-delivery-popup-title">${escapeHtml(providerName)}</div>
-      <div class="display-delivery-popup-status" style="background:#111827">Loja</div>
+      <div class="display-delivery-popup-status" style="background:#111827">${escapeHtml(global.t?.t('display', 'label', 'store'))}</div>
       ${addressText ? `<div class="display-delivery-popup-line">${escapeHtml(addressText)}</div>` : ''}
     </div>
   `
@@ -468,7 +471,7 @@ const DisplayDeliveryMap = ({
           const storeMarker = new google.maps.Marker({
             position: originPosition,
             map,
-            title: 'Loja',
+            title: global.t?.t('display', 'label', 'store'),
             zIndex: 1000,
             icon: buildStoreIcon(google),
           })
@@ -615,7 +618,7 @@ const DisplayDeliveryMap = ({
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
         <ActivityIndicator color={ppcColors.accentInfo || '#0EA5E9'} />
-        <Text style={styles.emptyTitle}>Carregando entregas recentes</Text>
+        <Text style={styles.emptyTitle}>{global.t?.t('display', 'title', 'loadingRecentDeliveries')}</Text>
       </View>
     )
   }
@@ -623,7 +626,7 @@ const DisplayDeliveryMap = ({
   if (error) {
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
-        <Text style={styles.emptyTitle}>Sem pedidos na fila</Text>
+        <Text style={styles.emptyTitle}>{global.t?.t('display', 'title', 'noOrdersInQueue')}</Text>
         <Text style={styles.emptyText}>{error}</Text>
       </View>
     )
@@ -632,9 +635,9 @@ const DisplayDeliveryMap = ({
   if (!enabled) {
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
-        <Text style={styles.emptyTitle}>Sem pedidos na fila</Text>
+        <Text style={styles.emptyTitle}>{global.t?.t('display', 'title', 'noOrdersInQueue')}</Text>
         <Text style={styles.emptyText}>
-          Configure no cadastro da empresa a chave do Google Maps usada pelo display.
+          {global.t?.t('display', 'message', 'configureDisplayGoogleMapsKey')}
         </Text>
       </View>
     )
@@ -643,8 +646,8 @@ const DisplayDeliveryMap = ({
   if (deliveries.length === 0) {
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
-        <Text style={styles.emptyTitle}>Sem pedidos na fila</Text>
-        <Text style={styles.emptyText}>Nenhuma entrega recente com endereco para exibir.</Text>
+        <Text style={styles.emptyTitle}>{global.t?.t('display', 'title', 'noOrdersInQueue')}</Text>
+        <Text style={styles.emptyText}>{global.t?.t('display', 'message', 'noRecentDeliveriesWithAddress')}</Text>
       </View>
     )
   }
@@ -653,23 +656,23 @@ const DisplayDeliveryMap = ({
     <View style={[styles.mapWrap, tvMode && styles.tvMapWrap]}>
       <View style={styles.mapHeader}>
         <View>
-          <Text style={styles.mapTitle}>Ultimas entregas</Text>
+          <Text style={styles.mapTitle}>{global.t?.t('display', 'title', 'latestDeliveries')}</Text>
           <Text style={styles.mapSubtitle}>
-            Caminhos saindo da loja. Finalizados: ultimos 10.
+            {global.t?.t('display', 'message', 'routesLeavingStoreLastTenCompleted')}
           </Text>
         </View>
         <View style={styles.legendWrap}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, styles.legendStoreDot]} />
-            <Text style={styles.legendText}>Loja</Text>
+            <Text style={styles.legendText}>{global.t?.t('display', 'label', 'store')}</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#0EA5E9' }]} />
-            <Text style={styles.legendText}>Em entrega</Text>
+            <Text style={styles.legendText}>{global.t?.t('display', 'status', 'inDelivery')}</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#16A34A' }]} />
-            <Text style={styles.legendText}>Finalizado</Text>
+            <Text style={styles.legendText}>{global.t?.t('display', 'status', 'closed')}</Text>
           </View>
         </View>
       </View>
@@ -680,7 +683,7 @@ const DisplayDeliveryMap = ({
         ) : (
           <View style={styles.nativeFallback}>
             <Text style={styles.emptyText}>
-              Mapa de entregas disponivel apenas no display web.
+              {global.t?.t('display', 'message', 'deliveryMapAvailableOnlyOnWebDisplay')}
             </Text>
           </View>
         )}
@@ -688,14 +691,14 @@ const DisplayDeliveryMap = ({
         {((isLoading && !payload) || mapState === 'loading') && (
           <View style={styles.mapOverlay}>
             <ActivityIndicator color={ppcColors.accentInfo || '#0EA5E9'} />
-            <Text style={styles.mapOverlayText}>Montando mapa...</Text>
+            <Text style={styles.mapOverlayText}>{global.t?.t('display', 'message', 'buildingMap')}</Text>
           </View>
         )}
 
         {mapState === 'empty' && (
           <View style={styles.mapOverlay}>
             <Text style={styles.mapOverlayText}>
-              Nao foi possivel localizar os enderecos no mapa.
+              {global.t?.t('display', 'message', 'unableLocateAddressesOnMap')}
             </Text>
           </View>
         )}
@@ -703,7 +706,7 @@ const DisplayDeliveryMap = ({
         {mapState === 'error' && (
           <View style={styles.mapOverlay}>
             <Text style={styles.mapOverlayText}>
-              Nao foi possivel carregar o Google Maps.
+              {global.t?.t('display', 'message', 'unableLoadGoogleMaps')}
             </Text>
           </View>
         )}

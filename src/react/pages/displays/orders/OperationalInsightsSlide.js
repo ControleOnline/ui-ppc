@@ -68,7 +68,7 @@ const useOperationalInsightData = ({ insightKey, filters, enabled }) => {
           return
         }
 
-        setError('Nao foi possivel carregar este card.')
+        setError(global.t?.t('display', 'message', 'unableLoadOperationalCard'))
       })
       .finally(() => {
         if (!cancelled && requestGeneration === requestGenerationRef.current) {
@@ -93,9 +93,9 @@ const renderCard = ({ slide, ppcColors, payload, isLoading, error }) => {
     return (
       <OperationalInsightsStatusCard
         ppcColors={ppcColors}
-        title="Indicadores operacionais"
-        subtitle="Sem dados"
-        message="Nao foi possivel montar os cartões operacionais."
+        title={global.t?.t('display', 'title', 'operationalInsights')}
+        subtitle={global.t?.t('display', 'subtitle', 'noData')}
+        message={global.t?.t('display', 'message', 'unableBuildOperationalCards')}
       />
     )
   }
@@ -107,7 +107,7 @@ const renderCard = ({ slide, ppcColors, payload, isLoading, error }) => {
         title={slide.title}
         subtitle={slide.subtitle}
         loading
-        message="Carregando os dados deste card."
+        message={global.t?.t('display', 'message', 'loadingCurrentCardData')}
         accentColor={slide.accentColor}
       />
     )
@@ -131,7 +131,7 @@ const renderCard = ({ slide, ppcColors, payload, isLoading, error }) => {
         ppcColors={ppcColors}
         title={slide.title}
         subtitle={slide.subtitle}
-        message="Sem dados para o período selecionado."
+        message={global.t?.t('display', 'message', 'noDataForSelectedPeriod')}
         accentColor={slide.accentColor}
       />
     )
@@ -195,9 +195,9 @@ const renderCard = ({ slide, ppcColors, payload, isLoading, error }) => {
       return (
         <OperationalInsightsStatusCard
           ppcColors={ppcColors}
-          title={slide.title || 'Indicadores operacionais'}
-          subtitle={slide.subtitle || 'Sem dados'}
-          message="Formato de cartão não reconhecido."
+          title={slide.title || global.t?.t('display', 'title', 'operationalInsights')}
+          subtitle={slide.subtitle || global.t?.t('display', 'subtitle', 'noData')}
+          message={global.t?.t('display', 'message', 'unrecognizedCardFormat')}
           accentColor={slide.accentColor}
         />
       )
