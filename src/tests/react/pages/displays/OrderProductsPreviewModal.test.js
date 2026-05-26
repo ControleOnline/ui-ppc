@@ -8,6 +8,10 @@ jest.mock('react-native', () => {
   const React = require('react')
   const createComponent = name =>
     function MockComponent(props) {
+      if (name === 'ScrollView') {
+        global.__scrollViewProps = props
+      }
+
       return React.createElement(name.toLowerCase(), null, props.children)
     }
 
@@ -62,6 +66,7 @@ describe('OrderProductsPreviewModal', () => {
   it('opens the order-details style popup with whole-order print and detailed items', () => {
     global.__orderStackedTopBarProps = null
     global.__orderItemsTabProps = null
+    global.__scrollViewProps = null
 
     const markup = ReactDOMServer.renderToStaticMarkup(
       React.createElement(OrderProductsPreviewModal, {
@@ -120,6 +125,9 @@ describe('OrderProductsPreviewModal', () => {
     expect(global.__orderItemsTabProps.order).toBeUndefined()
     expect(global.__orderItemsTabProps.orderProducts).toBeUndefined()
     expect(global.__orderItemsTabProps.variant).toBeUndefined()
+    expect(global.__scrollViewProps.contentContainerStyle).toMatchObject({
+      flexGrow: 1,
+    })
 
     expect(markup).not.toContain('null')
   })
