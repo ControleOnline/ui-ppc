@@ -112,22 +112,13 @@ describe('OrderProductsPreviewModal', () => {
     })
 
     expect(global.__orderItemsTabProps).toMatchObject({
-      order: {
-        id: 812,
-        client: {name: 'Cliente Exemplo'},
-        orderProducts: [
-          {
-            id: 1,
-            quantity: 3,
-            product: {id: 100, product: 'Combo Exemplo'},
-          },
-        ],
-      },
       routeOrderId: '812',
       showPricing: false,
       showRootQuantityPrefix: true,
       showQueuePresentation: true,
     })
+    expect(global.__orderItemsTabProps.order).toBeUndefined()
+    expect(global.__orderItemsTabProps.orderProducts).toBeUndefined()
     expect(global.__orderItemsTabProps.variant).toBeUndefined()
 
     expect(markup).not.toContain('null')

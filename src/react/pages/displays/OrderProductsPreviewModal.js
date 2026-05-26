@@ -7,22 +7,6 @@ import { getOrderRouteId } from '@controleonline/ui-orders/src/react/utils/order
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import createStyles from './OrderProductsPreviewModal.styles';
 
-const resolveEmbeddedOrderProducts = order => {
-    if (Array.isArray(order?.orderProducts)) {
-        return order.orderProducts;
-    }
-
-    if (Array.isArray(order?.orderProducts?.member)) {
-        return order.orderProducts.member;
-    }
-
-    if (Array.isArray(order?.orderProducts?.['hydra:member'])) {
-        return order.orderProducts['hydra:member'];
-    }
-
-    return [];
-};
-
 const OrderProductsPreviewModal = ({
     visible = false,
     order = null,
@@ -36,10 +20,6 @@ const OrderProductsPreviewModal = ({
     const ppcColors = ppcColorsOverride || defaultPpcColors;
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
     const orderId = useMemo(() => getOrderRouteId(order), [order]);
-    const orderProducts = useMemo(
-        () => resolveEmbeddedOrderProducts(order),
-        [order?.orderProducts],
-    );
     const printerSelection = useMemo(
         () => ({
             enabled: true,
@@ -102,8 +82,6 @@ const OrderProductsPreviewModal = ({
                                 addProductsButtonLabel=""
                                 canAddProductsToOrder={false}
                                 onAddProduct={() => {}}
-                                order={order}
-                                orderProducts={orderProducts}
                                 routeOrderId={orderId}
                                 showPricing={false}
                                 showRootQuantityPrefix
