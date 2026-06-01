@@ -969,29 +969,28 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                     displayId: display?.id,
                   }}
                 />
-                {canShowReadyButton ? (
-                  <TouchableOpacity
-                    activeOpacity={0.88}
-                    disabled={Boolean(readyActionOrderId)}
-                    onPress={() => {
-                      void handleMarkOrderReady(order)
-                    }}
-                    style={[
-                      styles.readyActionButton,
-                      isReadyActionLoading && styles.readyActionButtonLoading,
-                    ]}>
-                    {isReadyActionLoading ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                        style={styles.readyActionButtonText}>
-                        {global.t?.t('orders', 'button', 'orderReady') || 'Pronto'}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                ) : null}
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  disabled={Boolean(readyActionOrderId) || !canShowReadyButton}
+                  onPress={() => {
+                    void handleMarkOrderReady(order)
+                  }}
+                  style={[
+                    styles.readyActionButton,
+                    !canShowReadyButton && styles.readyActionButtonDisabled,
+                    isReadyActionLoading && styles.readyActionButtonLoading,
+                  ]}>
+                  {isReadyActionLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={styles.readyActionButtonText}>
+                      {global.t?.t('orders', 'button', 'orderReady') || 'Pronto'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
           )}

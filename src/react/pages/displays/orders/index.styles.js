@@ -285,6 +285,9 @@ const createStyles = ppcColors =>
       justifyContent: 'center',
       gap: 8,
     },
+    readyActionButtonDisabled: {
+      opacity: 0.55,
+    },
     readyActionButtonLoading: {
       opacity: 0.8,
     },
