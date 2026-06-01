@@ -1,5 +1,20 @@
 const normalizeText = value => String(value || '').trim()
 
+const DISPLAY_ORDER_STATUS_FILTERS = new Set([
+  'open',
+  'pending',
+  'closed',
+  'canceled',
+])
+
+const normalizeStatusFilter = value => {
+  const normalized = normalizeText(value).toLowerCase()
+
+  return DISPLAY_ORDER_STATUS_FILTERS.has(normalized)
+    ? normalized
+    : 'open'
+}
+
 const getOrderRealStatus = order => {
   const candidates = [
     order?.status?.realStatus,
@@ -20,10 +35,11 @@ const getOrderRealStatus = order => {
 const getOrderType = order =>
   normalizeText(order?.orderType).toLowerCase()
 
-const isDisplayVisibleOrder = order => {
+const isDisplayVisibleOrder = (order, statusFilter = 'open') => {
   const realStatus = getOrderRealStatus(order)
+  const normalizedStatusFilter = normalizeStatusFilter(statusFilter)
 
-  return getOrderType(order) === 'sale' && realStatus === 'open'
+  return getOrderType(order) === 'sale' && realStatus === normalizedStatusFilter
 }
 
 module.exports = {

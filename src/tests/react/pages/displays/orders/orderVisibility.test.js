@@ -26,7 +26,7 @@ describe('orderVisibility', () => {
     ).toBe(true)
   })
 
-  it('hides pending sale orders even when local status is ready', () => {
+  it('hides pending sale orders with the default filter', () => {
     expect(
       isDisplayVisibleOrder({
         status: { realStatus: 'pending', status: 'ready' },
@@ -35,7 +35,41 @@ describe('orderVisibility', () => {
     ).toBe(false)
   })
 
-  it('hides sale orders already in route', () => {
+  it.each(['open', 'pending', 'closed', 'canceled'])(
+    'shows %s sale orders when the filter is selected',
+    statusFilter => {
+      expect(
+        isDisplayVisibleOrder(
+          {
+            status: { realStatus: statusFilter },
+            orderType: 'sale',
+          },
+          statusFilter,
+        ),
+      ).toBe(true)
+    },
+  )
+
+  it('falls back to open when the filter value is invalid', () => {
+    expect(
+      isDisplayVisibleOrder(
+        {
+          status: { realStatus: 'open' },
+          orderType: 'sale',
+        },
+        'unknown',
+      ),
+    ).toBe(true)
+
+    expect(
+      isDisplayVisibleOrder({
+        status: { realStatus: 'pending', status: 'way' },
+        orderType: 'sale',
+      }, 'unknown'),
+    ).toBe(false)
+  })
+
+  it('hides sale orders already in route when open is selected', () => {
     expect(
       isDisplayVisibleOrder({
         status: { realStatus: 'pending', status: 'way' },
@@ -44,7 +78,7 @@ describe('orderVisibility', () => {
     ).toBe(false)
   })
 
-  it('hides closed sale orders', () => {
+  it('hides closed sale orders with the default filter', () => {
     expect(
       isDisplayVisibleOrder({
         status: { realStatus: 'closed', status: 'closed' },

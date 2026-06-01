@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dimensions, FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
+import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useStore } from '@store'
 import { api } from '@controleonline/ui-common/src/api'
+import CompactFilterSelector from '@controleonline/ui-default/src/react/components/filters/CompactFilterSelector'
+import DateShortcutFilter from '@controleonline/ui-default/src/react/components/filters/DateShortcutFilter'
 import {
   resolveDisplayedOrderStatus,
 } from '@controleonline/ui-orders/src/react/components/OrderHeader'
@@ -13,12 +15,14 @@ import OrderStackedTopBar from '@controleonline/ui-orders/src/react/pages/orders
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
 import { normalizeEntityId } from '@controleonline/ui-common/src/react/utils/paymentDevices'
-import { getDateRange } from '@controleonline/ui-common/src/react/utils/dateRangeFilter'
+import {
+  DEFAULT_DATE_FILTER_KEY,
+  getDateRange,
+} from '@controleonline/ui-common/src/react/utils/dateRangeFilter'
 
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton'
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
 import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
-import { resolveDisplayTicketSummary } from '@controleonline/ui-ppc/src/react/pages/displays/products/displayPrintRules'
 import resolveResponsiveOrderColumns from './responsiveColumns'
 import {
   DISPLAY_ORDERS_PAGE_SIZE,
@@ -33,6 +37,13 @@ import createStyles from './index.styles'
 import DisplayDeliveryMap from './DisplayDeliveryMap'
 import DisplayConferenceAutoPrintDispatcher from './DisplayConferenceAutoPrintDispatcher'
 import TvAutoScrollView from './TvAutoScrollView'
+import {
+  buildDisplayOrdersQueueQuery,
+  DEFAULT_DISPLAY_ORDER_APP_FILTER,
+  DEFAULT_DISPLAY_ORDER_STATUS_FILTER,
+  resolveDisplayOrderAppFilter,
+  resolveDisplayOrderStatusFilter,
+} from './ordersFilters'
 import {
   appendPendingConferenceAutoPrintJob,
   buildConferenceAutoPrintMessageFingerprint,
@@ -166,12 +177,33 @@ const formatRefreshDebugDetail = detail => {
   return translateRefreshDebugToken(normalizedDetail)
 }
 
+const createEmptyCustomDateRange = () => ({
+  from: '',
+  to: '',
+})
+
+const DISPLAY_ORDER_STATUS_OPTIONS = [
+  { key: 'open', label: 'Aberto' },
+  { key: 'pending', label: 'Pendente' },
+  { key: 'closed', label: 'Fechado' },
+  { key: 'canceled', label: 'Cancelado' },
+]
+
+const DISPLAY_ORDER_APP_OPTIONS = [
+  { key: 'all', label: 'Todos' },
+  { key: 'Food99', label: 'Food99' },
+  { key: 'iFood', label: 'iFood' },
+  { key: 'SHOP', label: 'SHOP' },
+  { key: 'POS', label: 'POS' },
+]
+
 // Display exibe apenas pedidos em produção com workflow ainda aberto.
 
 
 const Orders = ({ display = {}, isTvDisplay = false }) => {
   const route = useRoute()
   const navigation = useNavigation()
+  const isFocused = useIsFocused()
   const { width } = useWindowDimensions()
   const displayId = decodeURIComponent(route.params?.id || '')
 
@@ -200,6 +232,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     lastSource: 'boot',
     lastDetail: 'startup',
   })
+  const [dateFilterKey, setDateFilterKey] = useState(DEFAULT_DATE_FILTER_KEY)
+  const [customDateRange, setCustomDateRange] = useState(createEmptyCustomDateRange)
+  const [statusFilter, setStatusFilter] = useState(DEFAULT_DISPLAY_ORDER_STATUS_FILTER)
+  const [appFilter, setAppFilter] = useState(DEFAULT_DISPLAY_ORDER_APP_FILTER)
   const [pendingConferenceAutoPrintOrderIds, setPendingConferenceAutoPrintOrderIds] = useState([])
   const processedConferencePrintEventsRef = useRef(new Map())
   const ordersPagesRef = useRef({})
@@ -312,6 +348,17 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     }
   }, [runtimeDebugActions])
 
+  const resetOrdersFeed = useCallback(() => {
+    ordersFeedGenerationRef.current += 1
+    ordersPagesRef.current = {}
+    ordersTotalItemsRef.current = 0
+    ordersLoadingPagesRef.current.clear()
+    setOrdersPages({})
+    setIsInitialOrdersLoading(false)
+    processedConferencePrintEventsRef.current.clear()
+    setPendingConferenceAutoPrintOrderIds([])
+  }, [])
+
   const markProcessedConferencePrintKeys = useCallback(keys => {
     keys.forEach(key => {
       processedConferencePrintEventsRef.current.set(key, Date.now())
@@ -343,15 +390,22 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     }
 
     try {
+      const query = buildDisplayOrdersQueueQuery({
+        companyId: currentCompany.id,
+        dateFilterKey,
+        customDateRange,
+        statusFilter,
+        appFilter,
+        itemsPerPage: DISPLAY_ORDERS_PAGE_SIZE,
+        page: targetPage,
+      })
+
+      if (!query) {
+        return []
+      }
+
       const response = await api.fetch('/orders-queue', {
-        params: {
-          status: { realStatus: ['open'] },
-          orderType: 'sale',
-          provider: currentCompany.id,
-          'order[alterDate]': 'asc',
-          page: targetPage,
-          itemsPerPage: DISPLAY_ORDERS_PAGE_SIZE,
-        },
+        params: query,
       })
 
       if (requestGeneration !== ordersFeedGenerationRef.current) {
@@ -384,9 +438,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       }
     }
   }, [
+    appFilter,
+    customDateRange,
     currentCompany?.id,
     displayId,
     noteRefresh,
+    dateFilterKey,
+    statusFilter,
   ])
 
   const fetchDeliveryMapPayload = useCallback(async () => {
@@ -419,8 +477,8 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     const loadedOrders = flattenOrdersPages(ordersPages)
     if (!Array.isArray(loadedOrders)) return []
 
-    return loadedOrders.filter(isDisplayVisibleOrder)
-  }, [ordersPages])
+    return loadedOrders.filter(order => isDisplayVisibleOrder(order, statusFilter))
+  }, [ordersPages, statusFilter])
 
   const showSkeleton =
     isInitialOrdersLoading &&
@@ -428,15 +486,48 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     !(tvMode && hasOrderFeedRefreshed)
 
   useEffect(() => {
-    ordersFeedGenerationRef.current += 1
-    ordersPagesRef.current = {}
-    ordersTotalItemsRef.current = 0
-    ordersLoadingPagesRef.current.clear()
-    setOrdersPages({})
-    setIsInitialOrdersLoading(false)
-    processedConferencePrintEventsRef.current.clear()
-    setPendingConferenceAutoPrintOrderIds([])
-  }, [currentCompany?.id, selectedDisplayId])
+    if (!isFocused || !currentCompany?.id || !selectedDisplayId) {
+      return undefined
+    }
+
+    resetOrdersFeed()
+    refreshOrders('focus', 'screen-focus')
+    return undefined
+  }, [
+    currentCompany?.id,
+    dateFilterKey,
+    appFilter,
+    customDateRange?.from,
+    customDateRange?.to,
+    isFocused,
+    refreshOrders,
+    resetOrdersFeed,
+    selectedDisplayId,
+    statusFilter,
+  ])
+
+  useEffect(() => {
+    if (!isFocused || !currentCompany?.id || !selectedDisplayId) {
+      return undefined
+    }
+
+    const refreshIntervalMs = websocketConnected ? 30000 : 20000
+
+    const interval = setInterval(() => {
+      refreshOrders(
+        'interval',
+        websocketConnected ? 'connected-poll' : 'fallback-poll',
+      )
+    }, refreshIntervalMs)
+
+    return () => clearInterval(interval)
+  }, [
+    currentCompany?.id,
+    isFocused,
+    refreshOrders,
+    selectedDisplayId,
+    websocketConnected,
+  ])
 
   const listCount = sortedOrders.length
   const shouldRenderDeliveryMap =
@@ -489,6 +580,24 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       ...(dateRange?.before ? { 'orderDate[before]': dateRange.before } : {}),
     }
   }, [currentCompany?.id])
+
+  const selectedStatusLabel =
+    DISPLAY_ORDER_STATUS_OPTIONS.find(option => option.key === statusFilter)?.label ||
+    DISPLAY_ORDER_STATUS_OPTIONS[0].label
+
+  const selectedAppLabel =
+    DISPLAY_ORDER_APP_OPTIONS.find(option => option.key === appFilter)?.label ||
+    DISPLAY_ORDER_APP_OPTIONS[0].label
+
+  const handleStatusFilterChange = useCallback(optionKey => {
+    setStatusFilter(resolveDisplayOrderStatusFilter(optionKey))
+    return true
+  }, [])
+
+  const handleAppFilterChange = useCallback(optionKey => {
+    setAppFilter(resolveDisplayOrderAppFilter(optionKey))
+    return true
+  }, [])
 
   const hasQueueRefreshMessage = useMemo(
     () =>
@@ -582,22 +691,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     refreshOrders,
   ])
 
-  useFocusEffect(
-    useCallback(() => {
-      refreshOrders('focus', 'screen-focus')
-      const refreshIntervalMs = websocketConnected ? 30000 : 20000
-
-      const interval = setInterval(() => {
-        refreshOrders(
-          'interval',
-          websocketConnected ? 'connected-poll' : 'fallback-poll',
-        )
-      }, refreshIntervalMs)
-
-      return () => clearInterval(interval)
-    }, [refreshOrders, websocketConnected]),
-  )
-
   const renderOrderCard = useCallback(
     (itemOrRenderInfo, cardStyle = null) => {
       const compactMode = useCompactTvStyles
@@ -624,12 +717,11 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             maxCards={tvMode ? null : 5}
             showRootQuantityPrefix={false}
             showHierarchyGuides={
-              String(display?.displayType || route.params?.displayType || '').toLowerCase() === 'orders'
+            String(display?.displayType || route.params?.displayType || '').toLowerCase() === 'orders'
             }
           />
         </View>
       ) : null
-      const ticketSummary = resolveDisplayTicketSummary(order)
 
       return (
         <View
@@ -665,7 +757,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 isKds
                 orderHeaderProps={{
                   showWaitingTime: false,
-                  metaText: ticketSummary.clientName,
+                  metaText: order?.client?.name || '',
                 }}
                 showActions={false}
                 showBackButton={false}
@@ -778,6 +870,52 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                     global.t?.t('display', 'label', String(display?.displayType || 'orders')),
                   ).toUpperCase()}
                 </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.filtersCard}>
+            <View style={styles.filtersDateRow}>
+              <DateShortcutFilter
+                value={dateFilterKey}
+                onChange={setDateFilterKey}
+                customRange={customDateRange}
+                onCustomRangeChange={setCustomDateRange}
+                colors={ppcColors}
+                dense
+                labelCaption="Período"
+              />
+            </View>
+
+            <View style={styles.filtersOptionsRow}>
+              <View style={styles.filterOptionColumn}>
+                <CompactFilterSelector
+                  accentColor={ppcColors.accentInfo}
+                  dense
+                  active
+                  icon="filter"
+                  label={selectedStatusLabel}
+                  labelCaption="Status"
+                  options={DISPLAY_ORDER_STATUS_OPTIONS}
+                  selectedKey={statusFilter}
+                  title="Status"
+                  onSelect={handleStatusFilterChange}
+                />
+              </View>
+
+              <View style={styles.filterOptionColumn}>
+                <CompactFilterSelector
+                  accentColor={ppcColors.accentInfo}
+                  dense
+                  active={appFilter !== DEFAULT_DISPLAY_ORDER_APP_FILTER}
+                  icon="package"
+                  label={selectedAppLabel}
+                  labelCaption="App"
+                  options={DISPLAY_ORDER_APP_OPTIONS}
+                  selectedKey={appFilter}
+                  title="App"
+                  onSelect={handleAppFilterChange}
+                />
               </View>
             </View>
           </View>

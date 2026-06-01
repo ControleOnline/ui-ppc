@@ -2,7 +2,7 @@ const {jest} = require('@jest/globals')
 
 const {describe, expect, it} = global
 
-jest.mock('@controleonline/ui-orders/src/react/services/food99OrderSummary', () => ({
+jest.mock('@controleonline/ui-orders/src/react/services/marketplaceOrderSummary', () => ({
   buildFood99OrderSummary: jest.fn(() => ({
     customer: {
       name: 'Remote Customer',

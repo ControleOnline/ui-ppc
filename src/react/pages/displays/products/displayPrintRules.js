@@ -1,4 +1,4 @@
-import {buildFood99OrderSummary} from '@controleonline/ui-orders/src/react/services/food99OrderSummary';
+import {buildFood99OrderSummary} from '@controleonline/ui-orders/src/react/services/marketplaceOrderSummary';
 import {
   resolveMarketplaceAppLabel,
   resolveMarketplaceOrderCode,

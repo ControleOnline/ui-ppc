@@ -90,6 +90,27 @@ const createStyles = ppcColors =>
       borderTopWidth: 1,
       borderTopColor: withOpacity(ppcColors.border, 0.7),
     },
+    filtersCard: {
+      marginHorizontal: 12,
+      marginTop: 10,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: ppcColors.borderSoft,
+      backgroundColor: ppcColors.cardBg,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    filtersDateRow: {
+      marginBottom: 8,
+    },
+    filtersOptionsRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    filterOptionColumn: {
+      flex: 1,
+      minWidth: 0,
+    },
     summaryTypePill: {
       alignSelf: 'flex-start',
       borderRadius: 999,
