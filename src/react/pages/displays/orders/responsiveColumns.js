@@ -1,3 +1,12 @@
+export const resolveResponsiveOrderViewportWidth = (windowWidth, screenWidth) => {
+  const normalizedWindowWidth = Number(windowWidth || 0)
+  if (normalizedWindowWidth > 0) {
+    return normalizedWindowWidth
+  }
+
+  return Number(screenWidth || 0)
+}
+
 const resolveResponsiveOrderColumns = width => {
   const safeWidth = Number(width || 0)
 

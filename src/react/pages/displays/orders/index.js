@@ -23,7 +23,6 @@ import {
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton'
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
 import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
-import resolveResponsiveOrderColumns from './responsiveColumns'
 import {
   DISPLAY_ORDERS_PAGE_SIZE,
   extractCollectionItems,
@@ -45,6 +44,10 @@ import {
   resolveDisplayOrderAppFilter,
   resolveDisplayOrderStatusFilter,
 } from './ordersFilters'
+import {
+  resolveResponsiveOrderColumns,
+  resolveResponsiveOrderViewportWidth,
+} from './responsiveColumns'
 import {
   appendPendingConferenceAutoPrintJob,
   buildConferenceAutoPrintMessageFingerprint,
@@ -248,8 +251,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
   const effectiveWidth = useMemo(() => {
     const screenWidth = Number(Dimensions.get('screen')?.width || 0)
-    const windowWidth = Number(width || 0)
-    return Math.max(windowWidth, screenWidth)
+    return resolveResponsiveOrderViewportWidth(width, screenWidth)
   }, [width])
 
   const selectedDisplayId = useMemo(

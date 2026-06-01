@@ -1,8 +1,18 @@
 /* global describe, expect, it */
 
-import resolveResponsiveOrderColumns from '@controleonline/ui-ppc/src/react/pages/displays/orders/responsiveColumns'
+import resolveResponsiveOrderColumns, {
+  resolveResponsiveOrderViewportWidth,
+} from '@controleonline/ui-ppc/src/react/pages/displays/orders/responsiveColumns'
 
 describe('resolveResponsiveOrderColumns', () => {
+  it('uses the actual window width when the browser viewport is narrower than the screen', () => {
+    expect(resolveResponsiveOrderViewportWidth(420, 1366)).toBe(420)
+  })
+
+  it('falls back to the screen width when the window width is unavailable', () => {
+    expect(resolveResponsiveOrderViewportWidth(0, 1366)).toBe(1366)
+  })
+
   it('keeps a single column on the narrow tv viewport from the screenshot', () => {
     expect(resolveResponsiveOrderColumns(734)).toBe(1)
   })
