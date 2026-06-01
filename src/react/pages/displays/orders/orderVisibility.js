@@ -1,6 +1,7 @@
 const normalizeText = value => String(value || '').trim()
 
 const DISPLAY_ORDER_STATUS_FILTERS = new Set([
+  'all',
   'open',
   'pending',
   'closed',
@@ -39,7 +40,15 @@ const isDisplayVisibleOrder = (order, statusFilter = 'open') => {
   const realStatus = getOrderRealStatus(order)
   const normalizedStatusFilter = normalizeStatusFilter(statusFilter)
 
-  return getOrderType(order) === 'sale' && realStatus === normalizedStatusFilter
+  if (getOrderType(order) !== 'sale') {
+    return false
+  }
+
+  if (normalizedStatusFilter === 'all') {
+    return true
+  }
+
+  return realStatus === normalizedStatusFilter
 }
 
 module.exports = {

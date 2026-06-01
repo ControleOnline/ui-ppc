@@ -18,6 +18,7 @@ describe('ordersFilters', () => {
   })
 
   it('normalizes invalid status and app filters to their defaults', () => {
+    expect(resolveDisplayOrderStatusFilter('all')).toBe('all')
     expect(resolveDisplayOrderStatusFilter()).toBe('open')
     expect(resolveDisplayOrderStatusFilter('invalid')).toBe('open')
     expect(resolveDisplayOrderAppFilter()).toBe('all')
@@ -65,5 +66,21 @@ describe('ordersFilters', () => {
       itemsPerPage: 10,
       'order[alterDate]': 'asc',
     })
+  })
+
+  it('omits the status constraint when all statuses are selected', () => {
+    const query = buildDisplayOrdersQueueQuery({
+      companyId: 22,
+      statusFilter: 'all',
+    })
+
+    expect(query).toMatchObject({
+      provider: 22,
+      orderType: 'sale',
+      page: 1,
+      itemsPerPage: 5,
+      'order[alterDate]': 'asc',
+    })
+    expect(query.status).toBeUndefined()
   })
 })

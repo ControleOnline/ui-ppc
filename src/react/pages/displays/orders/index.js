@@ -1,8 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Dimensions, FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Pressable,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useStore } from '@store'
 import { api } from '@controleonline/ui-common/src/api'
 import CompactFilterSelector from '@controleonline/ui-default/src/react/components/filters/CompactFilterSelector'
@@ -39,9 +48,7 @@ import DisplayConferenceAutoPrintDispatcher from './DisplayConferenceAutoPrintDi
 import TvAutoScrollView from './TvAutoScrollView'
 import {
   buildDisplayOrdersQueueQuery,
-  DEFAULT_DISPLAY_ORDER_APP_FILTER,
   DEFAULT_DISPLAY_ORDER_STATUS_FILTER,
-  resolveDisplayOrderAppFilter,
   resolveDisplayOrderStatusFilter,
 } from './ordersFilters'
 import {
@@ -107,6 +114,82 @@ const getFirstResponseMember = response => {
   if (Array.isArray(response?.member)) return response.member[0] || null
   if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'][0] || null
   return response && typeof response === 'object' ? response : null
+}
+
+const formatApiError = error => {
+  if (!error) {
+    return (
+      global.t?.t('orders', 'message', 'unableCompleteOperation') ||
+      'Nao foi possivel concluir a operacao.'
+    )
+  }
+
+  if (typeof error === 'string') {
+    return error
+  }
+
+  if (Array.isArray(error?.message)) {
+    return error.message
+      .map(item => item?.message || item?.title || String(item))
+      .filter(Boolean)
+      .join('\n')
+  }
+
+  return (
+    error?.message ||
+    error?.description ||
+    error?.errmsg ||
+    global.t?.t('orders', 'message', 'unableCompleteOperation') ||
+    'Nao foi possivel concluir a operacao.'
+  )
+}
+
+const TERMINAL_ORDER_STATUSES = new Set(['closed', 'canceled', 'cancelled'])
+
+const canMarkOrderReady = order => {
+  const realStatus = String(order?.status?.realStatus || '').trim().toLowerCase()
+  const status = String(order?.status?.status || '').trim().toLowerCase()
+  const app = String(order?.app || '').trim().toLowerCase()
+
+  if (TERMINAL_ORDER_STATUSES.has(realStatus)) {
+    return false
+  }
+
+  if (!['pos', 'shop'].includes(app)) {
+    return true
+  }
+
+  return realStatus === 'open' && status === 'preparing'
+}
+
+const replaceOrderInPages = (pagesByNumber, updatedOrder) => {
+  const updatedOrderId = parseEntityId(updatedOrder?.id)
+
+  if (!updatedOrderId) {
+    return null
+  }
+
+  let didReplace = false
+
+  const nextPages = Object.entries(pagesByNumber || {}).reduce(
+    (accumulator, [pageNumber, pageItems]) => {
+      accumulator[pageNumber] = Array.isArray(pageItems)
+        ? pageItems.map(pageOrder => {
+            if (parseEntityId(pageOrder?.id) !== updatedOrderId) {
+              return pageOrder
+            }
+
+            didReplace = true
+            return updatedOrder
+          })
+        : pageItems
+
+      return accumulator
+    },
+    {},
+  )
+
+  return didReplace ? nextPages : null
 }
 
 const getStatusVisual = (order, ppcColors) => {
@@ -187,21 +270,15 @@ const createEmptyCustomDateRange = () => ({
 })
 
 const DISPLAY_ORDER_STATUS_OPTIONS = [
+  { key: 'all', label: 'Todos' },
   { key: 'open', label: 'Aberto' },
   { key: 'pending', label: 'Pendente' },
   { key: 'closed', label: 'Fechado' },
   { key: 'canceled', label: 'Cancelado' },
 ]
 
-const DISPLAY_ORDER_APP_OPTIONS = [
-  { key: 'all', label: 'Todos' },
-  { key: 'Food99', label: 'Food99' },
-  { key: 'iFood', label: 'iFood' },
-  { key: 'SHOP', label: 'SHOP' },
-  { key: 'POS', label: 'POS' },
-]
-
-// Display exibe apenas pedidos em produção com workflow ainda aberto.
+// Display exibe pedidos de venda do fluxo do display; o filtro de status pode
+// alternar entre uma fase específica ou todos os status.
 
 
 const Orders = ({ display = {}, isTvDisplay = false }) => {
@@ -239,9 +316,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const [dateFilterKey, setDateFilterKey] = useState(DEFAULT_DATE_FILTER_KEY)
   const [customDateRange, setCustomDateRange] = useState(createEmptyCustomDateRange)
   const [statusFilter, setStatusFilter] = useState(DEFAULT_DISPLAY_ORDER_STATUS_FILTER)
-  const [appFilter, setAppFilter] = useState(DEFAULT_DISPLAY_ORDER_APP_FILTER)
   const [pendingConferenceAutoPrintOrderIds, setPendingConferenceAutoPrintOrderIds] = useState([])
+  const [readyActionOrderId, setReadyActionOrderId] = useState(null)
   const processedConferencePrintEventsRef = useRef(new Map())
+  const readyActionOrderIdRef = useRef(null)
   const ordersPagesRef = useRef({})
   const ordersTotalItemsRef = useRef(0)
   const ordersLoadingPagesRef = useRef(new Map())
@@ -398,7 +476,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         dateFilterKey,
         customDateRange,
         statusFilter,
-        appFilter,
         itemsPerPage: DISPLAY_ORDERS_PAGE_SIZE,
         page: targetPage,
       })
@@ -441,7 +518,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       }
     }
   }, [
-    appFilter,
     customDateRange,
     currentCompany?.id,
     displayId,
@@ -499,7 +575,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   }, [
     currentCompany?.id,
     dateFilterKey,
-    appFilter,
     customDateRange?.from,
     customDateRange?.to,
     isFocused,
@@ -534,8 +609,48 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
   const listCount = sortedOrders.length
   const topCounterValue = resolveOrdersTopCounterValue(ordersTotalItemsRef.current)
+  const headerDisplayTitle =
+    String(
+      display?.display ||
+      global.t?.t('configs', 'title', 'displayDetails') ||
+      'Display Details',
+    ).trim() || 'Display Details'
   const shouldRenderDeliveryMap =
     tvMode && hasOrderFeedRefreshed && !showSkeleton && listCount === 0
+
+  useLayoutEffect(() => {
+    if (tvMode) {
+      return undefined
+    }
+
+    navigation.setOptions({
+      headerTitleAlign: 'left',
+      headerTitle: () => (
+        <View style={styles.headerTitleWrap}>
+          <Text numberOfLines={1} style={styles.headerTitleText}>
+            {headerDisplayTitle}
+          </Text>
+          <View style={styles.headerCountBubble}>
+            {isInitialOrdersLoading && listCount === 0 ? (
+              <View style={styles.headerCountSkeleton} />
+            ) : (
+              <Text style={styles.headerCountText}>{topCounterValue}</Text>
+            )}
+          </View>
+        </View>
+      ),
+    })
+
+    return undefined
+  }, [
+    headerDisplayTitle,
+    isInitialOrdersLoading,
+    listCount,
+    navigation,
+    styles,
+    topCounterValue,
+    tvMode,
+  ])
 
   useEffect(() => {
     if (!shouldRenderDeliveryMap) {
@@ -589,19 +704,67 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     DISPLAY_ORDER_STATUS_OPTIONS.find(option => option.key === statusFilter)?.label ||
     DISPLAY_ORDER_STATUS_OPTIONS[0].label
 
-  const selectedAppLabel =
-    DISPLAY_ORDER_APP_OPTIONS.find(option => option.key === appFilter)?.label ||
-    DISPLAY_ORDER_APP_OPTIONS[0].label
-
   const handleStatusFilterChange = useCallback(optionKey => {
     setStatusFilter(resolveDisplayOrderStatusFilter(optionKey))
     return true
   }, [])
 
-  const handleAppFilterChange = useCallback(optionKey => {
-    setAppFilter(resolveDisplayOrderAppFilter(optionKey))
-    return true
-  }, [])
+  const handleMarkOrderReady = useCallback(
+    async order => {
+      const orderId = parseEntityId(order?.id)
+
+      if (!orderId || readyActionOrderIdRef.current || !canMarkOrderReady(order)) {
+        return
+      }
+
+      readyActionOrderIdRef.current = orderId
+      setReadyActionOrderId(orderId)
+
+      try {
+        const response = await api.fetch(`/orders/${orderId}/ready`, {
+          method: 'POST',
+        })
+
+        const actionResult = response?.result || response
+        if (String(actionResult?.errno ?? '').trim() !== '0') {
+          throw actionResult || response
+        }
+
+        try {
+          const refreshedOrderResponse = await api.fetch(`/orders/${orderId}`)
+          const refreshedOrder = getFirstResponseMember(refreshedOrderResponse)
+
+          if (refreshedOrder) {
+            const nextPages = replaceOrderInPages(
+              ordersPagesRef.current,
+              refreshedOrder,
+            )
+
+            if (nextPages) {
+              ordersPagesRef.current = nextPages
+              setOrdersPages(nextPages)
+            }
+
+            ordersActions.syncOrder?.(refreshedOrder)
+          }
+        } catch {
+        }
+
+        await refreshOrders('manual', `ready-${orderId}`)
+      } catch (error) {
+        Alert.alert(
+          global.t?.t('orders', 'title', 'error') || 'Erro',
+          formatApiError(error),
+        )
+      } finally {
+        if (readyActionOrderIdRef.current === orderId) {
+          readyActionOrderIdRef.current = null
+        }
+        setReadyActionOrderId(current => (current === orderId ? null : current))
+      }
+    },
+    [ordersActions, refreshOrders],
+  )
 
   const hasQueueRefreshMessage = useMemo(
     () =>
@@ -707,6 +870,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
       const order = normalizedItem?.order || normalizedItem
       const statusVisual = getStatusVisual(order, ppcColors)
+      const orderId = parseEntityId(order?.id)
+      const resolvedOrderId = orderId || order?.id
+      const canShowReadyButton = canMarkOrderReady(order)
+      const isReadyActionLoading = Boolean(readyActionOrderId && readyActionOrderId === orderId)
       const visibleOrderProducts = Array.isArray(order?.orderProducts)
         ? order.orderProducts
         : []
@@ -784,19 +951,48 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
           </Pressable>
           {!tvMode && (
             <View style={styles.orderActions}>
-              <PrintButton
-                job={{ type: 'order', orderId: parseEntityId(order?.id) || order?.id }}
-                store="orders"
-                label={global.t?.t('display', 'button', 'printOrder')}
-                iconColor={ppcColors.pillTextDark}
-                style={styles.printActionButton}
-                printerSelection={{
-                  enabled: true,
-                  context: 'display',
-                  display,
-                  displayId: display?.id,
-                }}
-              />
+              <View style={styles.orderActionsRow}>
+                <PrintButton
+                  job={{ type: 'order', orderId: resolvedOrderId }}
+                  store="orders"
+                  label={global.t?.t('display', 'button', 'printOrder')}
+                  iconColor={ppcColors.pillTextDark}
+                  style={styles.printActionButtonWrap}
+                  layout={{
+                    mainButtonStyle: styles.printActionButtonMain,
+                  }}
+                  textStyle={styles.printActionButtonText}
+                  printerSelection={{
+                    enabled: true,
+                    context: 'display',
+                    display,
+                    displayId: display?.id,
+                  }}
+                />
+                {canShowReadyButton ? (
+                  <TouchableOpacity
+                    activeOpacity={0.88}
+                    disabled={Boolean(readyActionOrderId)}
+                    onPress={() => {
+                      void handleMarkOrderReady(order)
+                    }}
+                    style={[
+                      styles.readyActionButton,
+                      isReadyActionLoading && styles.readyActionButtonLoading,
+                    ]}>
+                    {isReadyActionLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={styles.readyActionButtonText}>
+                        {global.t?.t('orders', 'button', 'orderReady') || 'Pronto'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </View>
           )}
         </View>
@@ -810,9 +1006,11 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       orderProductsStyles,
       ppcColors,
       route.params?.displayType,
+      readyActionOrderId,
       styles,
       tvMode,
       useCompactTvStyles,
+      handleMarkOrderReady,
     ],
   )
 
@@ -833,77 +1031,17 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
       {!tvMode && (
         <>
-          <View
-            style={styles.summaryCard}
-          >
-            <View style={styles.summaryHeader}>
-              <View style={styles.summaryIdentity}>
-                <View style={styles.summaryIconWrap}>
-                  <MaterialCommunityIcons
-                    name={display?.displayType === 'products' ? 'silverware-fork-knife' : 'receipt-text'}
-                    size={18}
-                    color={display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo}
-                  />
-                </View>
-                <View style={styles.summaryTitleWrap}>
-                  <Text numberOfLines={1} style={styles.summaryTitle}>
-                    {String(display?.display || global.t?.t('display', 'title', 'display'))}
-                  </Text>
-                  <Text style={styles.summarySubtitle}>{global.t?.t('display', 'subtitle', 'ordersInQueue')}</Text>
-                </View>
-              </View>
-
-              <View style={styles.countBubble}>
-                {isInitialOrdersLoading && listCount === 0 ? (
-                  <View style={styles.countBubbleSkeleton} />
-                ) : (
-                  <Text style={styles.countBubbleText}>{topCounterValue}</Text>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.summaryFooter}>
-              <View style={styles.summaryTypePill}>
-                <Text
-                  style={[
-                    styles.summaryTypeText,
-                    { color: display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo },
-                  ]}
-                >
-                  {String(
-                    global.t?.t('display', 'label', String(display?.displayType || 'orders')),
-                  ).toUpperCase()}
-                </Text>
-              </View>
-            </View>
-          </View>
-
           <View style={styles.filtersCard}>
-            <View style={styles.filtersDateRow}>
-              <DateShortcutFilter
-                value={dateFilterKey}
-                onChange={setDateFilterKey}
-                customRange={customDateRange}
-                onCustomRangeChange={setCustomDateRange}
-                colors={ppcColors}
-                dense
-                labelCaption="Período"
-              />
-            </View>
-
-            <View style={styles.filtersOptionsRow}>
-              <View style={styles.filterOptionColumn}>
-                <CompactFilterSelector
-                  accentColor={ppcColors.accentInfo}
+            <View style={styles.filtersRow}>
+              <View style={styles.filterPeriodColumn}>
+                <DateShortcutFilter
+                  value={dateFilterKey}
+                  onChange={setDateFilterKey}
+                  customRange={customDateRange}
+                  onCustomRangeChange={setCustomDateRange}
+                  colors={ppcColors}
                   dense
-                  active
-                  icon="filter"
-                  label={selectedStatusLabel}
-                  labelCaption="Status"
-                  options={DISPLAY_ORDER_STATUS_OPTIONS}
-                  selectedKey={statusFilter}
-                  title="Status"
-                  onSelect={handleStatusFilterChange}
+                  labelCaption="Período"
                 />
               </View>
 
@@ -911,14 +1049,14 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 <CompactFilterSelector
                   accentColor={ppcColors.accentInfo}
                   dense
-                  active={appFilter !== DEFAULT_DISPLAY_ORDER_APP_FILTER}
-                  icon="package"
-                  label={selectedAppLabel}
-                  labelCaption="App"
-                  options={DISPLAY_ORDER_APP_OPTIONS}
-                  selectedKey={appFilter}
-                  title="App"
-                  onSelect={handleAppFilterChange}
+                  active={statusFilter !== 'all'}
+                  icon="filter"
+                  label={selectedStatusLabel}
+                  labelCaption="Status"
+                  options={DISPLAY_ORDER_STATUS_OPTIONS}
+                  selectedKey={statusFilter}
+                  title="Status"
+                  onSelect={handleStatusFilterChange}
                 />
               </View>
             </View>

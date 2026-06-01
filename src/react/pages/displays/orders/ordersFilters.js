@@ -2,7 +2,7 @@ import {getDateRange} from '@controleonline/ui-common/src/react/utils/dateRangeF
 
 const normalizeText = value => String(value ?? '').trim()
 
-export const DISPLAY_ORDER_STATUS_FILTERS = ['open', 'pending', 'closed', 'canceled']
+export const DISPLAY_ORDER_STATUS_FILTERS = ['all', 'open', 'pending', 'closed', 'canceled']
 export const DISPLAY_ORDER_APP_FILTERS = ['all', 'Food99', 'iFood', 'SHOP', 'POS']
 
 export const DEFAULT_DISPLAY_ORDER_STATUS_FILTER = 'open'
@@ -57,12 +57,15 @@ export const buildDisplayOrdersQueueQuery = ({
   const query = {
     provider: companyId,
     orderType: 'sale',
-    status: {
-      realStatus: [normalizedStatus],
-    },
     'order[alterDate]': 'asc',
     page,
     itemsPerPage,
+  }
+
+  if (normalizedStatus !== 'all') {
+    query.status = {
+      realStatus: [normalizedStatus],
+    }
   }
 
   if (normalizedApp !== DEFAULT_DISPLAY_ORDER_APP_FILTER) {

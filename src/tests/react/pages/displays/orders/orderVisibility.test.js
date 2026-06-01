@@ -50,6 +50,28 @@ describe('orderVisibility', () => {
     },
   )
 
+  it('shows every sale order when all statuses are selected', () => {
+    expect(
+      isDisplayVisibleOrder(
+        {
+          status: { realStatus: 'open' },
+          orderType: 'sale',
+        },
+        'all',
+      ),
+    ).toBe(true)
+
+    expect(
+      isDisplayVisibleOrder(
+        {
+          status: { realStatus: 'closed' },
+          orderType: 'sale',
+        },
+        'all',
+      ),
+    ).toBe(true)
+  })
+
   it('falls back to open when the filter value is invalid', () => {
     expect(
       isDisplayVisibleOrder(
