@@ -33,6 +33,7 @@ import {
   hasMoreOrdersPages,
   mergeOrdersPage,
 } from './ordersPagination'
+import { resolveOrdersTopCounterValue } from './ordersTopCounter'
 import createStyles from './index.styles'
 import DisplayDeliveryMap from './DisplayDeliveryMap'
 import DisplayConferenceAutoPrintDispatcher from './DisplayConferenceAutoPrintDispatcher'
@@ -530,6 +531,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   ])
 
   const listCount = sortedOrders.length
+  const topCounterValue = resolveOrdersTopCounterValue(ordersTotalItemsRef.current)
   const shouldRenderDeliveryMap =
     tvMode && hasOrderFeedRefreshed && !showSkeleton && listCount === 0
 
@@ -853,7 +855,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 {isInitialOrdersLoading && listCount === 0 ? (
                   <View style={styles.countBubbleSkeleton} />
                 ) : (
-                  <Text style={styles.countBubbleText}>{listCount}</Text>
+                  <Text style={styles.countBubbleText}>{topCounterValue}</Text>
                 )}
               </View>
             </View>
