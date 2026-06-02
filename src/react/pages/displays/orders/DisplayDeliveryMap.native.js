@@ -53,7 +53,7 @@ const getStatusColor = delivery => {
   const status = getStatusKey(delivery)
   if (status === 'closed') return '#16A34A'
   if (status === 'way' || status === 'away') return '#0EA5E9'
-  return normalizeText(delivery?.status?.color) || '#F59E0B'
+  return normalizeText(delivery?.status?.color)
 }
 
 const getRouteColor = delivery => {
@@ -801,7 +801,7 @@ export default function DisplayDeliveryMap({
   if (isLoading && !payload) {
     return (
       <View style={[styles.emptyWrap, tvMode && styles.tvEmptyWrap]}>
-        <ActivityIndicator color={ppcColors.accentInfo || '#0EA5E9'} />
+        <ActivityIndicator color={ppcColors.accentInfo} />
         <Text style={styles.emptyTitle}>{global.t?.t('display', 'title', 'loadingRecentDeliveries')}</Text>
       </View>
     )
@@ -917,7 +917,7 @@ export default function DisplayDeliveryMap({
             {androidMapState !== 'ready' ? (
               <View style={styles.mapOverlay}>
                 {androidMapState !== 'error' ? (
-                  <ActivityIndicator color={ppcColors.accentInfo || '#0EA5E9'} />
+                  <ActivityIndicator color={ppcColors.accentInfo} />
                 ) : null}
                 <Text style={styles.mapOverlayText}>
                   {androidMapState === 'error'

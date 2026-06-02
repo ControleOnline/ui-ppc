@@ -86,7 +86,7 @@ export default function QueueBlock({
 
     return (
       <View style={styles.statusPill}>
-        <View style={[styles.statusDot, { backgroundColor: statusObj.color || '#64748B' }]} />
+        <View style={[styles.statusDot, { backgroundColor: statusObj.color }]} />
         <Text style={styles.statusText}>{statusLabel}</Text>
         {env.APP_TYPE === 'MANAGER' && (
           <Pressable onPress={() => handleEditClick(statusObj, type)} style={styles.editButton}>
@@ -162,7 +162,7 @@ export default function QueueBlock({
                     <View
                       style={[
                         styles.modalStatusDot,
-                        { backgroundColor: item.color || '#64748B' },
+                        { backgroundColor: item.color },
                       ]}
                     />
                     <RadioButton.Item

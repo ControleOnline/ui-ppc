@@ -7,24 +7,24 @@ import {
 } from '@controleonline/../../src/styles/branding';
 
 export const buildDisplayTheme = (palette = {}, themeColors = {}) => {
-  const accent = themeColors['ppc-accent'] || palette.primary || '#FACC15';
+  const accent = themeColors['ppc-accent'] || palette.primary;
   const secondaryAccent =
-    themeColors['ppc-accent-info'] || palette.secondary || '#38BDF8';
+    themeColors['ppc-accent-info'] || palette.secondary;
 
   return {
-    appBg: palette.background || '#F8FAFC',
-    panelBg: themeColors['ppc-panel-bg-light'] || '#FFFFFF',
-    cardBg: themeColors['ppc-card-bg-light'] || '#FFFFFF',
+    appBg: palette.background,
+    panelBg: themeColors['ppc-panel-bg-light'],
+    cardBg: themeColors['ppc-card-bg-light'],
     cardBgSoft:
       themeColors['ppc-card-bg-soft-light'] || withOpacity(accent, 0.07),
-    modalBg: themeColors['ppc-modal-bg'] || '#FFFFFF',
+    modalBg: themeColors['ppc-modal-bg'],
     textPrimary:
-      themeColors['ppc-text-primary-light'] || palette.text || '#0F172A',
+      themeColors['ppc-text-primary-light'] || palette.text,
     textSecondary:
       themeColors['ppc-text-secondary-light'] ||
       palette.textSecondary ||
       '#475569',
-    textDark: themeColors['ppc-text-dark'] || palette.text || '#0F172A',
+    textDark: themeColors['ppc-text-dark'] || palette.text,
     border:
       themeColors['ppc-border-light'] ||
       withOpacity(palette.primary || accent, 0.16),
@@ -34,10 +34,10 @@ export const buildDisplayTheme = (palette = {}, themeColors = {}) => {
     overlay: themeColors['ppc-overlay-light'] || 'rgba(15,23,42,0.32)',
     accent,
     accentInfo: secondaryAccent,
-    danger: themeColors['ppc-danger'] || '#EF4444',
-    dangerBg: themeColors['ppc-danger-bg-light'] || '#FFF1F2',
-    dangerText: themeColors['ppc-danger-text'] || '#DC2626',
-    pillTextDark: themeColors['ppc-pill-text-dark-light'] || '#0F172A',
+    danger: themeColors['ppc-danger'],
+    dangerBg: themeColors['ppc-danger-bg-light'],
+    dangerText: themeColors['ppc-danger-text'],
+    pillTextDark: themeColors['ppc-pill-text-dark-light'],
     primary: palette.primary || accent,
     mode: 'light',
     isLight: true,
