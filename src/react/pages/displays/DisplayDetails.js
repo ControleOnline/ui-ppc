@@ -45,10 +45,8 @@ const DisplayDetails = () => {
     const effectiveDisplayType = String(display?.displayType || routeDisplayType || '').toLowerCase();
     const isTvDisplay = effectiveDisplayType === 'tv';
     const shouldHideNavigation = isTvDisplay || isForcedDisplay;
-    const displayDetailsTitle = useMemo(
-        () => global.t?.t('configs', 'title', 'displayDetails') || 'Display',
-        [],
-    );
+    const displayDetailsTitle =
+        global.t?.t('configs', 'title', 'displayDetails') || 'Display';
 
     useLayoutEffect(() => {
         navigation.setOptions({
