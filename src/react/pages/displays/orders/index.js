@@ -56,6 +56,11 @@ import {
   resolveResponsiveOrderViewportWidth,
 } from './responsiveColumns'
 import {
+  buildTvTicketGridSlots,
+  resolveTvTicketGridColumns,
+} from './tvTicketGrid'
+import { resolveOrderItemsTotal } from './orderItemsTotal'
+import {
   appendPendingConferenceAutoPrintJob,
   buildConferenceAutoPrintMessageFingerprint,
   isConferenceOrderPrinted,
@@ -558,6 +563,14 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
     return loadedOrders.filter(order => isDisplayVisibleOrder(order, statusFilter))
   }, [ordersPages, statusFilter])
+  const tvTicketSlots = useMemo(
+    () => buildTvTicketGridSlots(sortedOrders),
+    [sortedOrders],
+  )
+  const tvTicketColumns = useMemo(
+    () => resolveTvTicketGridColumns(tvTicketSlots.length),
+    [tvTicketSlots.length],
+  )
 
   const showSkeleton =
     isInitialOrdersLoading &&
@@ -878,17 +891,28 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         ? order.orderProducts
         : []
       const hasVisibleProducts = visibleOrderProducts.length > 0
+      const orderItemsTotal = resolveOrderItemsTotal(
+        visibleOrderProducts,
+        order?.status?.color,
+      )
       const productsContent = hasVisibleProducts ? (
         <View style={[styles.productsContent, compactMode && styles.tvProductsContent]}>
+          {tvMode ? (
+            <View style={styles.orderItemsHeader}>
+              <Text style={styles.orderItemsHeaderText}>
+                {`ITENS DO PEDIDO (${orderItemsTotal})`}
+              </Text>
+            </View>
+          ) : null}
           <OrderProducts
             order={order}
             styles={orderProductsStyles}
             showDetails
+            showDescriptions={!tvMode}
             showPricing={false}
             maxCards={tvMode ? null : 5}
-            showRootQuantityPrefix={false}
             showHierarchyGuides={
-            String(display?.displayType || route.params?.displayType || '').toLowerCase() === 'orders'
+              String(display?.displayType || route.params?.displayType || '').toLowerCase() === 'orders'
             }
           />
         </View>
@@ -1012,6 +1036,16 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       handleMarkOrderReady,
     ],
   )
+  const renderTvTicketSlot = useCallback(
+    ({item}) => {
+      if (!item?.order) {
+        return <View style={[styles.orderCard, styles.tvTicketEmptySlot]} />
+      }
+
+      return renderOrderCard(item.order)
+    },
+    [renderOrderCard, styles],
+  )
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -1112,17 +1146,13 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
           </View>
         ) : (
           <FlatList
-            data={sortedOrders}
-            key={`orders-cols-${columns}`}
-            numColumns={columns}
-            keyExtractor={item => String(item.id)}
-            renderItem={renderOrderCard}
-            columnWrapperStyle={
-              columns > 1
-                ? styles.tvColumnWrapper
-                : null
-            }
-            contentContainerStyle={styles.tvList}
+            data={tvTicketSlots}
+            key={`tv-ticket-cols-${tvTicketColumns}`}
+            numColumns={tvTicketColumns}
+            keyExtractor={item => item.key}
+            renderItem={renderTvTicketSlot}
+            columnWrapperStyle={styles.tvColumnWrapper}
+            contentContainerStyle={styles.tvTicketGrid}
             onEndReached={loadMoreOrders}
             onEndReachedThreshold={0.3}
           />

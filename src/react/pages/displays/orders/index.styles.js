@@ -202,6 +202,14 @@ const createStyles = ppcColors =>
     tvColumnWrapper: {
       gap: 6,
       justifyContent: 'space-between',
+      flex: 1,
+    },
+    tvTicketGrid: {
+      flexGrow: 1,
+      paddingHorizontal: 6,
+      paddingBottom: 6,
+      paddingTop: 4,
+      gap: 6,
     },
     orderCard: {
       flex: 1,
@@ -303,6 +311,9 @@ const createStyles = ppcColors =>
       padding: 6,
       flex: 1,
       minHeight: 0,
+    },
+    tvTicketEmptySlot: {
+      opacity: 0,
     },
     orderTopRow: {
       flexDirection: 'row',
@@ -528,6 +539,22 @@ const createStyles = ppcColors =>
       paddingHorizontal: 6,
       paddingVertical: 6,
       gap: 4,
+    },
+    orderItemsHeader: {
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: withOpacity(ppcColors.accentInfo, 0.26),
+      backgroundColor: withOpacity(ppcColors.accentInfo, 0.08),
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+    },
+    orderItemsHeaderText: {
+      color: ppcColors.textPrimary,
+      fontSize: 10,
+      lineHeight: 13,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: 0,
     },
     tvOrderProductItemRow: {
       paddingHorizontal: 6,
