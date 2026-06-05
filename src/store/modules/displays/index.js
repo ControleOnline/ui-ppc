@@ -53,6 +53,7 @@ export default {
           { label: "displayType.display", value: "display" },
         ],
         sortable: true,
+        translate: true,
         name: "displayType",
         align: "left",
         label: "displayType",
