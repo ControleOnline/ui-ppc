@@ -13,8 +13,8 @@ export const buildDisplayTheme = (palette = {}, themeColors = {}) => {
 
   return {
     appBg: palette.background,
-    panelBg: themeColors['ppc-panel-bg-light'],
-    cardBg: themeColors['ppc-card-bg-light'],
+    panelBg: themeColors['ppc-panel-bg-light'] || '#FFFFFF',
+    cardBg: themeColors['ppc-card-bg-light'] || '#FFFFFF',
     cardBgSoft:
       themeColors['ppc-card-bg-soft-light'] || withOpacity(accent, 0.07),
     modalBg: themeColors['ppc-modal-bg'] || themeColors['ppc-card-bg-light'] || '#FFFFFF',
