@@ -29,7 +29,7 @@ export const writePpcAppearanceMode = (mode) => {
   }
   return nextMode;
 };
-
+//themeColors
 export const resolvePpcColors = (colors = {}, mode = DARK) => {
   const primary = colors.primary;
   const isLight = mode === LIGHT;
@@ -68,6 +68,8 @@ export const resolvePpcColors = (colors = {}, mode = DARK) => {
     cardBgSoft:
       colors[isLight ? 'ppc-card-bg-soft-light' : 'ppc-card-bg-soft'] || defaults.cardBgSoft,
     modalBg: colors['ppc-modal-bg'],
+    //modalBg: themeColors['ppc-modal-bg'] || themeColors['ppc-card-bg-light'] || '#FFFFFF',
+    
     textPrimary: colors[isLight ? 'ppc-text-primary-light' : 'ppc-text-primary'] || defaults.textPrimary,
     textSecondary:
       colors[isLight ? 'ppc-text-secondary-light' : 'ppc-text-secondary'] || defaults.textSecondary,
