@@ -14,6 +14,7 @@ import {
     normalizeEntityId,
     resolveForcedDisplayId,
 } from '@controleonline/ui-ppc/src/react/utils/forcedDisplay';
+import TvDisplay from './tv';
 
 const DisplayDetails = () => {
     const navigation = useNavigation();
@@ -145,12 +146,16 @@ const DisplayDetails = () => {
         }, [isForcedDisplay]),
     );
 
+    if (effectiveDisplayType === 'tv') {
+        return <TvDisplay display={display} />;
+    }
+
     if (effectiveDisplayType === 'products') {
         return <ProductsDisplay display={display} />;
     }
 
-    if (effectiveDisplayType === 'orders' || effectiveDisplayType === 'tv') {
-        return <OrdersDisplay display={display} isTvDisplay={isTvDisplay} />;
+    if (effectiveDisplayType === 'orders') {
+        return <OrdersDisplay display={display} />;
     }
 
     if (!display?.id || !display?.displayType) {
