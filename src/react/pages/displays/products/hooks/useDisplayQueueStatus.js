@@ -154,7 +154,7 @@ export const useDisplayQueueStatus = ({
                     ...orderParams,
                     ...(dateRange?.after ? { 'registerTime[after]': dateRange.after } : {}),
                     ...(dateRange?.before ? { 'registerTime[before]': dateRange.before } : {}),
-                    'order_product.order.provider': companyId,
+                    'order_product.order.provider.id': companyId,
                     queue: queueIds,
                 },
             });

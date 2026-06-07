@@ -1,12 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
-  Alert,
   Dimensions,
   FlatList,
   Pressable,
   Text,
-  TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native'
@@ -16,7 +13,7 @@ import { useStore } from '@store'
 import { api } from '@controleonline/ui-common/src/api'
 import CompactFilterSelector from '@controleonline/ui-default/src/react/components/filters/CompactFilterSelector'
 import DateShortcutFilter from '@controleonline/ui-default/src/react/components/filters/DateShortcutFilter'
-import {
+import OrderHeader, {
   resolveDisplayedOrderStatus,
 } from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import OrderProducts from '@controleonline/ui-orders/src/react/components/OrderProducts'
@@ -29,9 +26,7 @@ import {
   getDateRange,
 } from '@controleonline/ui-common/src/react/utils/dateRangeFilter'
 
-import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton'
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
-import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
 import {
   DISPLAY_ORDERS_PAGE_SIZE,
   extractCollectionItems,
@@ -119,82 +114,6 @@ const getFirstResponseMember = response => {
   if (Array.isArray(response?.member)) return response.member[0] || null
   if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'][0] || null
   return response && typeof response === 'object' ? response : null
-}
-
-const formatApiError = error => {
-  if (!error) {
-    return (
-      global.t?.t('orders', 'message', 'unableCompleteOperation') ||
-      'Nao foi possivel concluir a operacao.'
-    )
-  }
-
-  if (typeof error === 'string') {
-    return error
-  }
-
-  if (Array.isArray(error?.message)) {
-    return error.message
-      .map(item => item?.message || item?.title || String(item))
-      .filter(Boolean)
-      .join('\n')
-  }
-
-  return (
-    error?.message ||
-    error?.description ||
-    error?.errmsg ||
-    global.t?.t('orders', 'message', 'unableCompleteOperation') ||
-    'Nao foi possivel concluir a operacao.'
-  )
-}
-
-const TERMINAL_ORDER_STATUSES = new Set(['closed', 'canceled', 'cancelled'])
-
-const canMarkOrderReady = order => {
-  const realStatus = String(order?.status?.realStatus || '').trim().toLowerCase()
-  const status = String(order?.status?.status || '').trim().toLowerCase()
-  const app = String(order?.app || '').trim().toLowerCase()
-
-  if (TERMINAL_ORDER_STATUSES.has(realStatus)) {
-    return false
-  }
-
-  if (!['pos', 'shop'].includes(app)) {
-    return true
-  }
-
-  return realStatus === 'open' && status === 'preparing'
-}
-
-const replaceOrderInPages = (pagesByNumber, updatedOrder) => {
-  const updatedOrderId = parseEntityId(updatedOrder?.id)
-
-  if (!updatedOrderId) {
-    return null
-  }
-
-  let didReplace = false
-
-  const nextPages = Object.entries(pagesByNumber || {}).reduce(
-    (accumulator, [pageNumber, pageItems]) => {
-      accumulator[pageNumber] = Array.isArray(pageItems)
-        ? pageItems.map(pageOrder => {
-            if (parseEntityId(pageOrder?.id) !== updatedOrderId) {
-              return pageOrder
-            }
-
-            didReplace = true
-            return updatedOrder
-          })
-        : pageItems
-
-      return accumulator
-    },
-    {},
-  )
-
-  return didReplace ? nextPages : null
 }
 
 const getStatusVisual = (order, ppcColors) => {
@@ -322,9 +241,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const [customDateRange, setCustomDateRange] = useState(createEmptyCustomDateRange)
   const [statusFilter, setStatusFilter] = useState(DEFAULT_DISPLAY_ORDER_STATUS_FILTER)
   const [pendingConferenceAutoPrintOrderIds, setPendingConferenceAutoPrintOrderIds] = useState([])
-  const [readyActionOrderId, setReadyActionOrderId] = useState(null)
   const processedConferencePrintEventsRef = useRef(new Map())
-  const readyActionOrderIdRef = useRef(null)
   const ordersPagesRef = useRef({})
   const ordersTotalItemsRef = useRef(0)
   const ordersLoadingPagesRef = useRef(new Map())
@@ -489,7 +406,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         return []
       }
 
-      const response = await api.fetch('/orders-queue', {
+      const response = await api.fetch('/orders', {
         params: query,
       })
 
@@ -722,63 +639,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     return true
   }, [])
 
-  const handleMarkOrderReady = useCallback(
-    async order => {
-      const orderId = parseEntityId(order?.id)
-
-      if (!orderId || readyActionOrderIdRef.current || !canMarkOrderReady(order)) {
-        return
-      }
-
-      readyActionOrderIdRef.current = orderId
-      setReadyActionOrderId(orderId)
-
-      try {
-        const response = await api.fetch(`/orders/${orderId}/ready`, {
-          method: 'POST',
-        })
-
-        const actionResult = response?.result || response
-        if (String(actionResult?.errno ?? '').trim() !== '0') {
-          throw actionResult || response
-        }
-
-        try {
-          const refreshedOrderResponse = await api.fetch(`/orders/${orderId}`)
-          const refreshedOrder = getFirstResponseMember(refreshedOrderResponse)
-
-          if (refreshedOrder) {
-            const nextPages = replaceOrderInPages(
-              ordersPagesRef.current,
-              refreshedOrder,
-            )
-
-            if (nextPages) {
-              ordersPagesRef.current = nextPages
-              setOrdersPages(nextPages)
-            }
-
-            ordersActions.syncOrder?.(refreshedOrder)
-          }
-        } catch {
-        }
-
-        await refreshOrders('manual', `ready-${orderId}`)
-      } catch (error) {
-        Alert.alert(
-          global.t?.t('orders', 'title', 'error') || 'Erro',
-          formatApiError(error),
-        )
-      } finally {
-        if (readyActionOrderIdRef.current === orderId) {
-          readyActionOrderIdRef.current = null
-        }
-        setReadyActionOrderId(current => (current === orderId ? null : current))
-      }
-    },
-    [ordersActions, refreshOrders],
-  )
-
   const hasQueueRefreshMessage = useMemo(
     () =>
       (Array.isArray(queueMessages) ? queueMessages : []).some(message =>
@@ -884,12 +744,50 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       const order = normalizedItem?.order || normalizedItem
       const statusVisual = getStatusVisual(order, ppcColors)
       const orderId = parseEntityId(order?.id)
-      const resolvedOrderId = orderId || order?.id
-      const canShowReadyButton = canMarkOrderReady(order)
-      const isReadyActionLoading = Boolean(readyActionOrderId && readyActionOrderId === orderId)
       const visibleOrderProducts = Array.isArray(order?.orderProducts)
         ? order.orderProducts
         : []
+
+      if (!tvMode) {
+        return (
+          <View
+            key={normalizedItem?.key || `order-card-${orderId || 0}`}
+            style={[
+              styles.orderCard,
+              cardStyle,
+            ]}
+          >
+            <Pressable
+              style={styles.orderCardPressable}
+              onPress={() => {
+                navigation.navigate('DisplayOrderConference', {
+                  id: orderId,
+                  displayId: parseEntityId(display?.id) || parseEntityId(displayId),
+                  displayType: 'orders',
+                  kds: true,
+                  hideBottomToolBar: true,
+                })
+              }}
+            >
+              <View
+                style={[
+                  styles.orderAccentBar,
+                  { backgroundColor: statusVisual.textColor },
+                ]}
+              />
+              <View style={styles.orderCardInner}>
+                <OrderHeader
+                  order={order}
+                  isKds={false}
+                  showWaitingTime={false}
+                  metaText={order?.client?.name || ''}
+                />
+              </View>
+            </Pressable>
+          </View>
+        )
+      }
+
       const hasVisibleProducts = visibleOrderProducts.length > 0
       const orderItemsTotal = resolveOrderItemsTotal(
         visibleOrderProducts,
@@ -928,16 +826,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
         >
           <Pressable
             style={styles.orderCardPressable}
-            onPress={() => {
-              ordersActions.syncOrder?.(order)
-              navigation.navigate('OrderDetails', {
-                ...buildOrderDetailsRouteParams(order),
-                kds: true,
-                displayType: display?.displayType || route.params?.displayType,
-                displayId: parseEntityId(display?.id) || parseEntityId(displayId),
-                hideBottomToolBar: tvMode,
-              })
-            }}
           >
             <View
               style={[
@@ -973,51 +861,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               )}
             </View>
           </Pressable>
-          {!tvMode && (
-            <View style={styles.orderActions}>
-              <View style={styles.orderActionsRow}>
-                <PrintButton
-                  job={{ type: 'order', orderId: resolvedOrderId }}
-                  store="orders"
-                  label={global.t?.t('display', 'button', 'printOrder')}
-                  iconColor={ppcColors.pillTextDark}
-                  style={styles.printActionButtonWrap}
-                  layout={{
-                    mainButtonStyle: styles.printActionButtonMain,
-                  }}
-                  textStyle={styles.printActionButtonText}
-                  printerSelection={{
-                    enabled: true,
-                    context: 'display',
-                    display,
-                    displayId: display?.id,
-                  }}
-                />
-                <TouchableOpacity
-                  activeOpacity={0.88}
-                  disabled={Boolean(readyActionOrderId) || !canShowReadyButton}
-                  onPress={() => {
-                    void handleMarkOrderReady(order)
-                  }}
-                  style={[
-                    styles.readyActionButton,
-                    !canShowReadyButton && styles.readyActionButtonDisabled,
-                    isReadyActionLoading && styles.readyActionButtonLoading,
-                  ]}>
-                  {isReadyActionLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      style={styles.readyActionButtonText}>
-                      {global.t?.t('orders', 'button', 'orderReady') || 'Pronto'}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
         </View>
       );
     },
@@ -1029,11 +872,9 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       orderProductsStyles,
       ppcColors,
       route.params?.displayType,
-      readyActionOrderId,
       styles,
       tvMode,
       useCompactTvStyles,
-      handleMarkOrderReady,
     ],
   )
   const renderTvTicketSlot = useCallback(
