@@ -1,3 +1,10 @@
+/*
+ * Regra do display `orders`
+ * - Este fluxo precisa reagir a novos pedidos em tempo real, sem refresh manual.
+ * - O runtime compartilhado e o store de pedidos sao a fonte de verdade.
+ * - O aviso sonoro operacional vem do contrato central do websocket.
+ */
+
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Dimensions,
@@ -200,10 +207,6 @@ const DISPLAY_ORDER_STATUS_OPTIONS = [
   { key: 'closed', label: 'Fechado' },
   { key: 'canceled', label: 'Cancelado' },
 ]
-
-// Display exibe pedidos de venda do fluxo do display; o filtro de status pode
-// alternar entre uma fase específica ou todos os status.
-
 
 const Orders = ({ display = {}, isTvDisplay = false }) => {
   const route = useRoute()

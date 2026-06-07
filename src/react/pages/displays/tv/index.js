@@ -1,3 +1,10 @@
+/*
+ * Regra dos displays de pedidos
+ * - Este fluxo faz parte do contrato transversal: novos pedidos devem aparecer
+ *   aqui em tempo real pelo runtime compartilhado.
+ * - Nao criar websocket, refresh manual ou audio paralelo neste arquivo.
+ */
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Dimensions, FlatList, Text, View, useWindowDimensions } from 'react-native'
 import { Card } from 'react-native-paper'
