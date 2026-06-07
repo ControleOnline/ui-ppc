@@ -262,6 +262,7 @@ export const TvOrderCard = ({
         <OrderHeader
           order={order}
           isKds={false}
+          showPricing={false}
           showWaitingTime={false}
           metaText={order?.client?.name || ''}
         />
@@ -280,7 +281,7 @@ export const TvOrderCard = ({
               styles={orderProductsStyles}
               showDetails
               showDescriptions
-              showPricing
+              showPricing={false}
               showImages={false}
               showRootQuantityPrefix
               showQueuePresentation

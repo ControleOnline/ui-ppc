@@ -779,6 +779,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 <OrderHeader
                   order={order}
                   isKds={false}
+                  showPricing={false}
                   showWaitingTime={false}
                   metaText={order?.client?.name || ''}
                 />

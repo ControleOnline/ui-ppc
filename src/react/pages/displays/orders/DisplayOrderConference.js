@@ -369,6 +369,7 @@ const DisplayOrderConference = () => {
           <OrderHeader
             order={order}
             isKds
+            showPricing={false}
             showWaitingTime={false}
             metaText={order?.client?.name || ''}
           />
