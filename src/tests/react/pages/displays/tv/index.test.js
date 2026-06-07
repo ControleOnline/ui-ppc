@@ -170,6 +170,7 @@ describe('TvOrderCard', () => {
     expect(global.__orderHeaderProps).toMatchObject({
       order,
       isKds: false,
+      showPricing: false,
       showWaitingTime: false,
       metaText: 'ROGÉRIO',
     })
@@ -178,7 +179,7 @@ describe('TvOrderCard', () => {
       order,
       showDetails: true,
       showDescriptions: true,
-      showPricing: true,
+      showPricing: false,
       showImages: false,
       showRootQuantityPrefix: true,
       showQueuePresentation: true,
