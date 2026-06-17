@@ -173,7 +173,6 @@ export default function DisplayCard({
       if (!displayId) return [];
       const linked = await displayQueuesStore.actions.getItems({
         display: `/displays/${displayId}`,
-        itemsPerPage: 1000,
         pagination: false,
       });
       return normalizeDisplayQueues(linked);
@@ -327,7 +326,6 @@ export default function DisplayCard({
       const companyIri = `/people/${currentCompany.id}`;
       let resultByIri = await queuesStore.actions.getItems({
         company: companyIri,
-        itemsPerPage: 1000,
         pagination: false,
       });
       let optionsByIri = Array.isArray(resultByIri) ? resultByIri : [];
@@ -335,14 +333,12 @@ export default function DisplayCard({
       // Fallback for APIs that still filter by numeric id.
       let resultById = await queuesStore.actions.getItems({
         company: currentCompany.id,
-        itemsPerPage: 1000,
         pagination: false,
       });
       let optionsById = Array.isArray(resultById) ? resultById : [];
 
       // Keep previous behavior as last fallback: load all queues.
       let resultAll = await queuesStore.actions.getItems({
-        itemsPerPage: 1000,
         pagination: false,
       });
       let optionsAll = Array.isArray(resultAll) ? resultAll : [];

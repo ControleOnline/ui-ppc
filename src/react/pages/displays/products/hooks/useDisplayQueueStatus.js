@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@controleonline/ui-common/src/api';
 
-const DISPLAY_QUEUE_STATUS_PAGE_SIZE = 6;
-
 const STAGE_STATUS_IDS_KEY = {
     status_in: 'inIds',
     status_working: 'workingIds',
@@ -82,7 +80,6 @@ export const useDisplayQueueStatus = ({
     dateRange = null,
     refreshToken = 0,
     enabled = true,
-    itemsPerPage = DISPLAY_QUEUE_STATUS_PAGE_SIZE,
     onSnapshotChange = null,
 }) => {
     const [items, setItems] = useState([]);
@@ -149,7 +146,6 @@ export const useDisplayQueueStatus = ({
             const response = await api.fetch('order_product_queues', {
                 params: {
                     status: statusIds,
-                    itemsPerPage,
                     page,
                     ...orderParams,
                     ...(dateRange?.after ? { 'registerTime[after]': dateRange.after } : {}),
@@ -165,10 +161,8 @@ export const useDisplayQueueStatus = ({
 
             const nextItems = getResponseItems(response);
             const nextTotal = getResponseTotal(response, nextItems.length);
-            const nextHasMore = page * itemsPerPage < nextTotal;
 
             pageRef.current = page;
-            hasMoreRef.current = nextHasMore;
 
             setItems(currentItems =>
                 append ? mergeQueueItems(currentItems, nextItems) : nextItems
@@ -180,7 +174,7 @@ export const useDisplayQueueStatus = ({
                 items: nextItems,
                 total: nextTotal,
                 page,
-                hasMore: nextHasMore,
+                hasMore: hasMoreRef.current,
             };
         } catch (error) {
             if (requestId === requestIdRef.current) {
@@ -193,7 +187,7 @@ export const useDisplayQueueStatus = ({
                 setLoadingMore(false);
             }
         }
-    }, [companyId, dateRange?.after, dateRange?.before, enabled, itemsPerPage, orderParams, queueIds, resetSnapshot, statusIds]);
+    }, [companyId, dateRange?.after, dateRange?.before, enabled, orderParams, queueIds, resetSnapshot, statusIds]);
 
     const reload = useCallback(() => loadPage(1), [loadPage]);
 
@@ -241,6 +235,8 @@ export const useDisplayQueueStatus = ({
     }, [companyId, dateRange?.after, dateRange?.before, enabled, loadPage, queueBindings, refreshToken, resetSnapshot, queueIds.length, statusIds.length]);
 
     useEffect(() => {
+        hasMoreRef.current = loaded && total > items.length;
+
         if (typeof onSnapshotChange !== 'function') {
             return;
         }
@@ -270,3 +266,4 @@ export const useDisplayQueueStatus = ({
 };
 
 export default useDisplayQueueStatus;
+// TODO(store-first): quando este arquivo for mexido, mover a leitura para stores, remover api.fetch e evitar repassar dados em objetos quando o store ja resolver isso.

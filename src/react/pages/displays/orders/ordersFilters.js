@@ -43,7 +43,6 @@ export const buildDisplayOrdersQueueQuery = ({
   customDateRange = null,
   statusFilter = DEFAULT_DISPLAY_ORDER_STATUS_FILTER,
   appFilter = DEFAULT_DISPLAY_ORDER_APP_FILTER,
-  itemsPerPage = 5,
   page = 1,
 } = {}) => {
   if (!companyId) {
@@ -59,7 +58,6 @@ export const buildDisplayOrdersQueueQuery = ({
     orderType: 'sale',
     'order[alterDate]': 'asc',
     page,
-    itemsPerPage,
   }
 
   if (normalizedStatus !== 'all') {

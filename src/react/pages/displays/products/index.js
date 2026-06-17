@@ -394,7 +394,6 @@ const DisplayProducts = ({ display = {} }) => {
 
         const result = await displayQueueActions.getItems({
             display: displayId,
-            itemsPerPage: 1000,
             pagination: false,
         });
 

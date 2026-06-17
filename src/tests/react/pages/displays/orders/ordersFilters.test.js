@@ -37,7 +37,6 @@ describe('ordersFilters', () => {
         realStatus: ['open'],
       },
       page: 1,
-      itemsPerPage: 5,
       'order[alterDate]': 'asc',
       'alterDate[after]': '2026-05-31 00:00:00',
       'alterDate[before]': '2026-05-31 13:45:12',
@@ -51,7 +50,6 @@ describe('ordersFilters', () => {
       dateFilterKey: 'today',
       statusFilter: 'closed',
       appFilter: 'iFood',
-      itemsPerPage: 10,
       page: 3,
     })
 
@@ -63,7 +61,6 @@ describe('ordersFilters', () => {
       },
       app: 'iFood',
       page: 3,
-      itemsPerPage: 10,
       'order[alterDate]': 'asc',
     })
   })
@@ -78,7 +75,6 @@ describe('ordersFilters', () => {
       provider: 22,
       orderType: 'sale',
       page: 1,
-      itemsPerPage: 5,
       'order[alterDate]': 'asc',
     })
     expect(query.status).toBeUndefined()

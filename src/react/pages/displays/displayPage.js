@@ -93,7 +93,7 @@ const DisplaysPage = () => {
       }
     }
 
-    const displays = await actions.getItems({ company: currentCompany.id, itemsPerPage: 50 });
+    const displays = await actions.getItems({ company: currentCompany.id});
     const displayIds = (Array.isArray(displays) ? displays : [])
       .map(row => normalizeEntityId(row?.id || row?.['@id'] || row))
       .filter(Boolean);
@@ -104,7 +104,6 @@ const DisplaysPage = () => {
     }
 
     const linked = await displayQueuesActions.getItems({
-      itemsPerPage: 1000,
       pagination: false,
     });
     const linkedRows = Array.isArray(linked) ? linked : [];
@@ -252,3 +251,4 @@ const DisplaysPage = () => {
 
 
 export default DisplaysPage;
+// TODO(store-first): quando este arquivo for mexido, mover a leitura para stores, remover api.fetch e evitar repassar dados em objetos quando o store ja resolver isso.

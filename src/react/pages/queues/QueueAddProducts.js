@@ -30,7 +30,6 @@ export default function QueueAddProducts({ route }) {
             if (currentCompany) {
                 productActions.getItems({
                     company: currentCompany.id,
-                    itemsPerPage: 50,
                 });
             }
         }, [currentCompany]),
