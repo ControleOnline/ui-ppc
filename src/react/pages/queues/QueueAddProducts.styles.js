@@ -17,7 +17,14 @@ const createStyles = (ppcColors) => StyleSheet.create({
         justifyContent: 'space-between',
         gap: 10,
     },
-    input: { marginVertical: 12, backgroundColor: ppcColors.cardBg },
+    input: {
+        minHeight: 48,
+        marginVertical: 12,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        borderRadius: 8,
+        fontSize: 16,
+    },
     section: {
         marginTop: 16,
         color: ppcColors.textSecondary,
@@ -25,8 +32,8 @@ const createStyles = (ppcColors) => StyleSheet.create({
     },
     errorText: { marginTop: 8, color: ppcColors.dangerText, fontWeight: '700' },
     searchList: {
-        maxHeight: 220,
-        borderRadius: 12,
+        maxHeight: 260,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: ppcColors.border,
         backgroundColor: ppcColors.cardBg,
@@ -36,8 +43,9 @@ const createStyles = (ppcColors) => StyleSheet.create({
         borderBottomColor: ppcColors.border,
     },
     queueList: {
+        flex: 1,
         marginTop: 8,
-        borderRadius: 12,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: ppcColors.border,
         backgroundColor: ppcColors.cardBg,
@@ -49,6 +57,16 @@ const createStyles = (ppcColors) => StyleSheet.create({
     listItemTitle: {
         color: ppcColors.textPrimary,
         fontWeight: '700',
+    },
+    emptyListContent: {
+        minHeight: 72,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+    },
+    emptyText: {
+        color: ppcColors.textSecondary,
+        textAlign: 'center',
     },
 });
 
