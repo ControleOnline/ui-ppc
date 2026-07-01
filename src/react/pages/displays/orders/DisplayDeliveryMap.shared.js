@@ -11,32 +11,8 @@ const resolveAddressCoordinates = address => {
     return null;
   }
 
-  const latitude = [
-    address.latitude,
-    address.lat,
-    address.location?.latitude,
-    address.location?.lat,
-    address.coords?.latitude,
-    address.coords?.lat,
-    address.coordinate?.latitude,
-    address.coordinate?.lat,
-  ]
-    .map(normalizeCoordinate)
-    .find(value => value !== null);
-
-  const longitude = [
-    address.longitude,
-    address.lng,
-    address.lon,
-    address.location?.longitude,
-    address.location?.lng,
-    address.coords?.longitude,
-    address.coords?.lng,
-    address.coordinate?.longitude,
-    address.coordinate?.lng,
-  ]
-    .map(normalizeCoordinate)
-    .find(value => value !== null);
+  const latitude = normalizeCoordinate(address.latitude);
+  const longitude = normalizeCoordinate(address.longitude);
 
   if (latitude === null || longitude === null) {
     return null;
@@ -70,13 +46,11 @@ const getRouteColor = delivery => {
 
 export const buildDisplayDeliveryMapConfig = payload => {
   const deliveries = Array.isArray(payload?.deliveries) ? payload.deliveries : [];
-  const providerAddress = resolveAddressCoordinates(
-    payload?.provider?.address || payload?.provider || payload?.address || null,
-  );
+  const providerAddress = resolveAddressCoordinates(payload?.provider?.address || null);
 
   const markers = deliveries
     .map((delivery, index) => {
-      const address = resolveAddressCoordinates(delivery?.address || delivery);
+      const address = resolveAddressCoordinates(delivery?.address || null);
 
       if (!address) {
         return null;
@@ -93,7 +67,7 @@ export const buildDisplayDeliveryMapConfig = payload => {
           normalizeText(delivery?.client?.alias || delivery?.client?.name) ||
           normalizeText(payload?.provider?.alias || payload?.provider?.name) ||
           'Entrega',
-        addressLine: normalizeText(address.formatted || address.streetLine || address.searchFor),
+        addressLine: normalizeText(address.formatted || address.streetLine || address.nickname),
         addressExtra: normalizeText(
           [delivery?.status?.status || delivery?.status, delivery?.client?.name]
             .filter(Boolean)
