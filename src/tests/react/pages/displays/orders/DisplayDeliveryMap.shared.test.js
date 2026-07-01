@@ -44,7 +44,7 @@ describe('DisplayDeliveryMap.shared', () => {
     });
     expect(config.paths).toHaveLength(1);
     expect(config.paths[0]).toMatchObject({
-      color: '#0EA5E9',
+      color: '#0369A1',
     });
   });
 });
