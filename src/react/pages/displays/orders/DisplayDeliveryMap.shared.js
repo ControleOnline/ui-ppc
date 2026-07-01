@@ -99,6 +99,7 @@ export const buildDisplayDeliveryMapConfig = payload => {
             .filter(Boolean)
             .join(' • '),
         ),
+        routeColor: getRouteColor(delivery),
         distanceLabel: '',
         openingHours: '',
         phoneLabel: '',
@@ -112,7 +113,7 @@ export const buildDisplayDeliveryMapConfig = payload => {
       id: `${normalizeText(providerAddress.id || 'provider')}-${marker.id}`,
       from: providerAddress,
       to: marker,
-      color: getRouteColor(deliveries.find(item => normalizeText(item?.id) === marker.id) || marker),
+      color: marker.routeColor,
     }));
 
   return {
