@@ -1,45 +1,50 @@
 const {
-  resolveDisplayDeliveryAndroidWebViewApiKey,
-  resolveDisplayDeliveryWebApiKey,
-} = require('../../../../../react/pages/displays/orders/DisplayDeliveryMap.shared')
+  buildDisplayDeliveryMapConfig,
+} = require('../../../../../react/pages/displays/orders/DisplayDeliveryMap.shared');
 
-const {describe, expect, it} = global
+const {describe, expect, it} = global;
 
 describe('DisplayDeliveryMap.shared', () => {
-  it('prefers the dedicated web key and falls back to the legacy payload key', () => {
-    expect(
-      resolveDisplayDeliveryWebApiKey({
-        webGoogleMapsApiKey: 'web-key',
-        googleMapsApiKey: 'legacy-key',
-      }),
-    ).toBe('web-key')
+  it('builds a pure map config from delivery payload data', () => {
+    const config = buildDisplayDeliveryMapConfig({
+      provider: {
+        address: {
+          id: 'store-1',
+          latitude: -15.59,
+          longitude: -56.09,
+          nickname: 'Loja Centro',
+        },
+      },
+      deliveries: [
+        {
+          id: 'delivery-1',
+          status: {
+            status: 'way',
+            color: '#0EA5E9',
+          },
+          address: {
+            id: 'addr-1',
+            latitude: -15.6,
+            longitude: -56.1,
+            nickname: 'Cliente 1',
+          },
+        },
+      ],
+    });
 
-    expect(
-      resolveDisplayDeliveryWebApiKey({
-        googleMapsApiKey: 'legacy-key',
-      }),
-    ).toBe('legacy-key')
-  })
-
-  it('uses the web-compatible key first on Android WebView', () => {
-    expect(
-      resolveDisplayDeliveryAndroidWebViewApiKey({
-        webGoogleMapsApiKey: 'web-key',
-        androidGoogleMapsApiKey: 'android-key',
-      }),
-    ).toBe('web-key')
-
-    expect(
-      resolveDisplayDeliveryAndroidWebViewApiKey({
-        googleMapsApiKey: 'legacy-key',
-        androidGoogleMapsApiKey: 'android-key',
-      }),
-    ).toBe('legacy-key')
-
-    expect(
-      resolveDisplayDeliveryAndroidWebViewApiKey({
-        androidGoogleMapsApiKey: 'android-key',
-      }),
-    ).toBe('android-key')
-  })
-})
+    expect(config.addresses.origin).toMatchObject({
+      latitude: -15.59,
+      longitude: -56.09,
+    });
+    expect(config.addresses.markers).toHaveLength(1);
+    expect(config.addresses.markers[0]).toMatchObject({
+      latitude: -15.6,
+      longitude: -56.1,
+      title: '#delivery-1',
+    });
+    expect(config.paths).toHaveLength(1);
+    expect(config.paths[0]).toMatchObject({
+      color: '#0EA5E9',
+    });
+  });
+});
