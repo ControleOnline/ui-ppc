@@ -1,20 +1,50 @@
 import React from 'react';
-import { View, TouchableOpacity, Text } from 'react-native';
-import { inlineStyle_6_10 } from './PPCToolbar.styles';
+import {Text, TouchableOpacity, View} from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
+import {useNavigationState} from '@react-navigation/native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import createStyles from './PPCToolbar.styles';
 
-export default function PPCToolbar({ navigation }) {
+export default function PPCToolbar({navigation}) {
+  const state = useNavigationState(currentState => currentState);
+  const activeTab = state?.routes?.[state.index]?.name || 'HomePage';
+  const insets = useSafeAreaInsets();
+  const styles = createStyles(insets);
+  const primaryColor = '#0EA5E9';
+  const inactiveColor = '#64748B';
+
   return (
-    <View style={inlineStyle_6_10}>
-      <TouchableOpacity onPress={() => navigation.navigate('HomePage')}>
-        <Text>Home</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('ProfilePage')}>
-        <Text>Profile</Text>
-      </TouchableOpacity>
-      {/* depois quando existir a rota */}
-      {/* <TouchableOpacity onPress={() => navigation.navigate('Kitchen')}> */}
-      {/*   <Text>Cozinha</Text> */}
-      {/* </TouchableOpacity> */}
+    <View pointerEvents="box-none" style={styles.overlay}>
+      <View accessibilityRole="navigation" style={styles.toolbar} testID="bottom-navigation">
+        <TouchableOpacity
+          activeOpacity={0.78}
+          onPress={() => navigation.navigate('HomePage')}
+          style={styles.button}
+        >
+          <Icon
+            name="home"
+            size={18}
+            color={activeTab === 'HomePage' ? primaryColor : inactiveColor}
+          />
+          <Text style={[styles.buttonText, activeTab === 'HomePage' && styles.activeText]}>
+            Home
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.78}
+          onPress={() => navigation.navigate('ProfilePage')}
+          style={styles.button}
+        >
+          <Icon
+            name="user"
+            size={18}
+            color={activeTab === 'ProfilePage' ? primaryColor : inactiveColor}
+          />
+          <Text style={[styles.buttonText, activeTab === 'ProfilePage' && styles.activeText]}>
+            Profile
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
