@@ -88,7 +88,7 @@ export default function QueueBlock({
       <View style={styles.statusPill}>
         <View style={[styles.statusDot, { backgroundColor: statusObj.color }]} />
         <Text style={styles.statusText}>{statusLabel}</Text>
-        {env.APP_TYPE === 'MANAGER' && (
+        {app_type === 'MANAGER' && (
           <Pressable onPress={() => handleEditClick(statusObj, type)} style={styles.editButton}>
             <MaterialCommunityIcons
               name="pencil"
@@ -105,7 +105,7 @@ export default function QueueBlock({
     <View style={styles.queueBlock}>
       <View style={styles.titleRow}>
         <Text style={styles.queueTitle}>{queue.queue}</Text>
-        {env.APP_TYPE === 'MANAGER' && (
+        {app_type === 'MANAGER' && (
           <Pressable
             style={styles.addButton}
             onPress={() =>

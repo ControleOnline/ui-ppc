@@ -669,7 +669,7 @@ export default function DisplayCard({
     '#FACC15';
   const accentSoft = isDark ? withOpacity(accent, 0.75) : withOpacity(accent, 0.54);
   const titleSizing = getTitleStyleByName(item.display);
-  const canManageQueue = env.APP_TYPE === 'MANAGER' && item.displayType === 'products';
+  const canManageQueue = app_type === 'MANAGER' && item.displayType === 'products';
   const hasLinkedQueue = Array.isArray(queues) && queues.length > 0;
 
   return (
@@ -692,7 +692,7 @@ export default function DisplayCard({
               </View>
               <View style={styles.titleRow}>
                 <PaperText style={[styles.displayTitle, titleSizing]}>{item.display}</PaperText>
-                {env.APP_TYPE === 'MANAGER' && (
+                {app_type === 'MANAGER' && (
                   <View style={styles.cardActions}>
                     <TouchableOpacity
                       onPress={(event) => {
@@ -872,7 +872,7 @@ export default function DisplayCard({
           </View>
         </View>
       </AnimatedModal>
-      {env.APP_TYPE === 'MANAGER' && (
+      {app_type === 'MANAGER' && (
         <AnimatedModal
           visible={modalVisible}
           onRequestClose={() => setModalVisible(false)}

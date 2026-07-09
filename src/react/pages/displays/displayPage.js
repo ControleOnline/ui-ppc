@@ -167,7 +167,7 @@ const DisplaysPage = () => {
           ppcColorsOverride={ppcColors}
           onPress={() => openDisplay(item)}
           onLinked={refreshDisplays}
-          editable={env.APP_TYPE === 'MANAGER'}
+          editable={app_type === 'MANAGER'}
         />
       </View>
     ),
@@ -196,7 +196,7 @@ const DisplaysPage = () => {
               <Text style={styles.countNumber}>{items?.length || 0} {global.t?.t('products','label','enabled')}</Text>
             </View>
 
-            {env.APP_TYPE === 'MANAGER' && (
+            {app_type === 'MANAGER' && (
               <Pressable style={styles.addButton} onPress={addDisplay}>
                 <Icon name="plus" size={24} color={ppcColors.pillTextDark} />
               </Pressable>
