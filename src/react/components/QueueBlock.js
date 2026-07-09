@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import { env } from '@env';
+import {app_type} from '@appType';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import createStyles from './QueueBlock.styles';
