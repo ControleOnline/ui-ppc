@@ -7,7 +7,6 @@ import { useStore } from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
 import DisplayCard from '@controleonline/ui-ppc/src/react/components/DisplayCard';
 import { api } from '@controleonline/ui-common/src/api';
-import { env } from '@env';
 import {app_type} from '@appType';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import createStyles from './displayPage.styles';
