@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useStore } from '@store';
-import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
+import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import DisplayCard from '@controleonline/ui-ppc/src/react/components/DisplayCard';
 import { api } from '@controleonline/ui-common/src/api';
 import {app_type} from '@appType';
