@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import {app_type} from '@appType';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
-import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
+import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import createStyles from './QueueBlock.styles';
 import { inlineStyle_131_8 } from './QueueBlock.styles';
 
