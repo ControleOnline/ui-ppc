@@ -4,7 +4,19 @@ const {
   extractOperationalInsightsPayload,
 } = require('../../../../../react/pages/displays/orders/operationalInsights.utils')
 
-const { describe, expect, it } = global
+const {afterAll, beforeAll, describe, expect, it} = global
+
+const originalTranslator = global.t
+
+beforeAll(() => {
+  global.t = {
+    t: (...args) => args.join('.'),
+  }
+})
+
+afterAll(() => {
+  global.t = originalTranslator
+})
 
 describe('operationalInsights.utils', () => {
   it('extracts the nested operational insights payload from report summaries', () => {
@@ -73,7 +85,7 @@ describe('operationalInsights.utils', () => {
       key: 'totals',
       insightKey: 'totals',
       type: 'kpi',
-      title: 'Resumo operacional',
+      title: 'display.title.operationalSummary',
       subtitle: 'Hoje',
     })
     expect(slides[1]).toMatchObject({
