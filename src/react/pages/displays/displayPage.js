@@ -17,6 +17,7 @@ import {
   normalizeEntityId,
   resolveForcedDisplayId,
 } from '@controleonline/ui-ppc/src/react/utils/forcedDisplay';
+import { DISPLAY_TYPE_PRODUCTION } from '@controleonline/ui-ppc/src/react/utils/displayTypes';
 
 const BRAND_LOGO = require('@assets/ppc/logo 512x512 r.png');
 
@@ -154,7 +155,7 @@ const DisplaysPage = () => {
   const addDisplay = useCallback(() => {
     navigation.navigate('DisplayForm', {
       display: null,
-      display_type: 'orders',
+      display_type: DISPLAY_TYPE_PRODUCTION,
     });
   }, [navigation]);
 

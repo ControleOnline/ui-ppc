@@ -1,4 +1,7 @@
+import { normalizeDisplayType } from '@controleonline/ui-ppc/src/react/utils/displayTypes';
+
 export const DISPLAY_DEVICE_LINK_CONFIG_KEY = 'display-id';
+
 const normalizeDeviceId = value =>
   String(value?.device || value?.id || value || '').trim();
 
@@ -121,7 +124,7 @@ export const buildForcedDisplayParams = display => {
 
   return {
     id: String(displayId),
-    displayType: String(display?.displayType || '').trim(),
+    displayType: normalizeDisplayType(display?.displayType),
     forcedDisplay: true,
     hideBottomToolBar: true,
   };

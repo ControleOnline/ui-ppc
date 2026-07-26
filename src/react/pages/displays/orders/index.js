@@ -32,6 +32,12 @@ import {
   DEFAULT_DATE_FILTER_KEY,
   getDateRange,
 } from '@controleonline/ui-common/src/react/utils/dateRangeFilter'
+import {
+  DISPLAY_TYPE_CONFERENCE,
+  isConferenceDisplayType,
+  isTrackingDisplayType,
+  normalizeDisplayType,
+} from '@controleonline/ui-ppc/src/react/utils/displayTypes'
 
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
 import {
@@ -249,8 +255,8 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const ordersTotalItemsRef = useRef(0)
   const ordersLoadingPagesRef = useRef(new Map())
   const ordersFeedGenerationRef = useRef(0)
-  const tvMode =
-    Boolean(isTvDisplay) || String(display?.displayType || '').toLowerCase() === 'tv'
+  const currentDisplayType = normalizeDisplayType(display?.displayType || route.params?.displayType)
+  const tvMode = Boolean(isTvDisplay) || isTrackingDisplayType(currentDisplayType)
 
   const effectiveWidth = useMemo(() => {
     const screenWidth = Number(Dimensions.get('screen')?.width || 0)
@@ -765,7 +771,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 navigation.navigate('DisplayOrderConference', {
                   id: orderId,
                   displayId: parseEntityId(display?.id) || parseEntityId(displayId),
-                  displayType: 'orders',
+                  displayType: DISPLAY_TYPE_CONFERENCE,
                   kds: true,
                   hideBottomToolBar: true,
                 })
@@ -813,7 +819,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             showPricing={false}
             maxCards={tvMode ? null : 5}
             showHierarchyGuides={
-              String(display?.displayType || route.params?.displayType || '').toLowerCase() === 'orders'
+              isConferenceDisplayType(currentDisplayType)
             }
           />
         </View>

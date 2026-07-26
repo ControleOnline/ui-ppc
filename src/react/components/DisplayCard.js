@@ -12,6 +12,14 @@ import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import { withOpacity } from '@controleonline/../../src/styles/branding';
 import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
+import {
+  DISPLAY_TYPE_CONFERENCE,
+  DISPLAY_TYPE_OPTIONS,
+  isConferenceDisplayType,
+  isProductionDisplayType,
+  normalizeDisplayType,
+  resolveDisplayTypeLabel,
+} from '@controleonline/ui-ppc/src/react/utils/displayTypes';
 import createStyles from './DisplayCard.styles';
 
 import {
@@ -22,13 +30,15 @@ import {
 } from './DisplayCard.styles';
 
 const iconByType = {
-  products: 'silverware-fork-knife',
-  orders: 'receipt-text',
+  production: 'silverware-fork-knife',
+  conference: 'receipt-text',
+  tracking: 'map-clock-outline',
 };
 
 const typeAccentByType = {
-  products: '#FACC15',
-  orders: '#38BDF8',
+  production: '#FACC15',
+  conference: '#38BDF8',
+  tracking: '#10B981',
 };
 
 const getTitleStyleByName = (name) => {
@@ -120,7 +130,8 @@ export default function DisplayCard({
   );
   const [modalVisible, setModalVisible] = useState(false);
   const [editDisplay, setEditDisplay] = useState(item.display);
-  const [editType, setEditType] = useState(item.displayType);
+  const displayType = normalizeDisplayType(item.displayType);
+  const [editType, setEditType] = useState(displayType);
 
   const [linkingQueue, setLinkingQueue] = useState(false);
   const [linkModalVisible, setLinkModalVisible] = useState(false);
@@ -183,7 +194,7 @@ export default function DisplayCard({
   const shapeQueuesForCard = useCallback(
     (rows) => {
       const normalized = normalizeDisplayQueues(rows);
-      if (item.displayType === 'products') return normalized.slice(0, 1);
+      if (isProductionDisplayType(item.displayType)) return normalized.slice(0, 1);
       return normalized;
     },
     [item.displayType]
@@ -399,7 +410,7 @@ export default function DisplayCard({
       const displayId = getId(item);
       if (!displayId || !selectedQueue) return;
 
-      if (item.displayType === 'products' && queues.length > 0) {
+      if (isProductionDisplayType(item.displayType) && queues.length > 0) {
         const existingQueue = queues[0]?.queue;
         setLinkModalVisible(false);
         navigation.navigate('QueueAddProducts', {
@@ -664,12 +675,12 @@ export default function DisplayCard({
   ]);
 
   const accent =
-    (item.displayType === 'orders' ? ppcColors.accentInfo : ppcColors.accent) ||
-    typeAccentByType[item.displayType] ||
+    (isConferenceDisplayType(displayType) ? ppcColors.accentInfo : ppcColors.accent) ||
+    typeAccentByType[displayType] ||
     '#FACC15';
   const accentSoft = isDark ? withOpacity(accent, 0.75) : withOpacity(accent, 0.54);
   const titleSizing = getTitleStyleByName(item.display);
-  const canManageQueue = app_type === 'MANAGER' && item.displayType === 'products';
+  const canManageQueue = app_type === 'MANAGER' && isProductionDisplayType(displayType);
   const hasLinkedQueue = Array.isArray(queues) && queues.length > 0;
 
   return (
@@ -685,7 +696,7 @@ export default function DisplayCard({
             <View style={styles.headerRow}>
               <View style={styles.iconWrap}>
                 <MaterialCommunityIcons
-                  name={iconByType[item.displayType] || 'monitor'}
+                  name={iconByType[displayType] || 'monitor'}
                   size={22}
                   color={accent}
                 />
@@ -721,7 +732,7 @@ export default function DisplayCard({
             <View style={styles.footerRow}>
               <View style={styles.typePill}>
                 <PaperText style={[styles.displayType, { color: accent }]}>
-                  {String(item.displayType || '').toUpperCase()}
+                  {resolveDisplayTypeLabel(displayType).toUpperCase()}
                 </PaperText>
               </View>
 
@@ -900,37 +911,25 @@ export default function DisplayCard({
               />
 
               <Text style={styles.modalLabel}>{global.t?.t('products','label','displayType')}</Text>
-              <RadioButton.Group onValueChange={setEditType} value={editType}>
-                <View
-                  style={[
-                    styles.radioItemWrap,
-                    editType === 'orders' && styles.radioItemWrapSelected,
-                  ]}
-                >
-                  <RadioButton.Item
-                    label="Orders"
-                    value="orders"
-                    color={ppcColors.accentInfo}
-                    uncheckedColor={ppcColors.borderSoft}
-                    labelStyle={styles.radioLabel}
-                    style={styles.radioItem}
-                  />
-                </View>
-                <View
-                  style={[
-                    styles.radioItemWrap,
-                    editType === 'products' && styles.radioItemWrapSelected,
-                  ]}
-                >
-                  <RadioButton.Item
-                    label="Products"
-                    value="products"
-                    color={ppcColors.accent}
-                    uncheckedColor={ppcColors.borderSoft}
-                    labelStyle={styles.radioLabel}
-                    style={styles.radioItem}
-                  />
-                </View>
+              <RadioButton.Group onValueChange={value => setEditType(normalizeDisplayType(value))} value={editType}>
+                {DISPLAY_TYPE_OPTIONS.map(option => (
+                  <View
+                    key={option.value}
+                    style={[
+                      styles.radioItemWrap,
+                      editType === option.value && styles.radioItemWrapSelected,
+                    ]}
+                  >
+                    <RadioButton.Item
+                      label={option.label}
+                      value={option.value}
+                      color={option.value === DISPLAY_TYPE_CONFERENCE ? ppcColors.accentInfo : ppcColors.accent}
+                      uncheckedColor={ppcColors.borderSoft}
+                      labelStyle={styles.radioLabel}
+                      style={styles.radioItem}
+                    />
+                  </View>
+                ))}
               </RadioButton.Group>
 
               <TouchableOpacity

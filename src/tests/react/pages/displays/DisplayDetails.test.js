@@ -78,6 +78,24 @@ jest.mock('@controleonline/ui-ppc/src/react/utils/forcedDisplay', () => ({
   resolveForcedDisplayId: jest.fn(() => null),
 }))
 
+jest.mock('../../../../react/utils/displayTypes', () => {
+  const legacy = {
+    products: 'production',
+    orders: 'conference',
+    tv: 'tracking',
+  }
+  const normalizeDisplayType = value => {
+    const type = String(value || '').trim().toLowerCase()
+    return legacy[type] || type || 'production'
+  }
+  return {
+    isConferenceDisplayType: value => normalizeDisplayType(value) === 'conference',
+    isProductionDisplayType: value => normalizeDisplayType(value) === 'production',
+    isTrackingDisplayType: value => normalizeDisplayType(value) === 'tracking',
+    normalizeDisplayType,
+  }
+})
+
 jest.mock('../../../../react/pages/displays/orders', () => {
   const React = require('react')
   return function MockOrdersDisplay(props) {
@@ -132,8 +150,8 @@ describe('DisplayDetails routing', () => {
     }
   })
 
-  it('opens the TV screen when displayType is tv', () => {
-    mockRouteParams = { id: 22, displayType: 'tv' }
+  it('opens the tracking screen when displayType is tracking', () => {
+    mockRouteParams = { id: 22, displayType: 'tracking' }
 
     ReactDOMServer.renderToStaticMarkup(React.createElement(DisplayDetails))
 
@@ -143,19 +161,27 @@ describe('DisplayDetails routing', () => {
     })
   })
 
-  it('keeps orders on the compact orders screen', () => {
-    mockRouteParams = { id: 22, displayType: 'orders' }
+  it('keeps conference on the compact conference screen', () => {
+    mockRouteParams = { id: 22, displayType: 'conference' }
 
     ReactDOMServer.renderToStaticMarkup(React.createElement(DisplayDetails))
 
     expect(global.__renderedDisplay).toBe('orders')
   })
 
-  it('keeps products on the products monitor', () => {
-    mockRouteParams = { id: 22, displayType: 'products' }
+  it('keeps production on the production monitor', () => {
+    mockRouteParams = { id: 22, displayType: 'production' }
 
     ReactDOMServer.renderToStaticMarkup(React.createElement(DisplayDetails))
 
     expect(global.__renderedDisplay).toBe('products')
+  })
+
+  it('keeps legacy display types routable', () => {
+    mockRouteParams = { id: 22, displayType: 'tv' }
+
+    ReactDOMServer.renderToStaticMarkup(React.createElement(DisplayDetails))
+
+    expect(global.__renderedDisplay).toBe('tv')
   })
 })

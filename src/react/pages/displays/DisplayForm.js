@@ -4,6 +4,12 @@ import { useStore } from '@store';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
+import {
+  DISPLAY_TYPE_OPTIONS,
+  DISPLAY_TYPE_PRODUCTION,
+  isProductionDisplayType,
+  normalizeDisplayType,
+} from '@controleonline/ui-ppc/src/react/utils/displayTypes';
 import createStyles from './DisplayForm.styles';
 
 export default function DisplayForm() {
@@ -22,7 +28,9 @@ export default function DisplayForm() {
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
 
   const [displayValue, setDisplayValue] = useState(display?.display || '');
-  const [type, setType] = useState(display?.display_type || display_type || 'orders');
+  const [type, setType] = useState(
+    normalizeDisplayType(display?.displayType || display?.display_type || display_type),
+  );
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -133,7 +141,7 @@ export default function DisplayForm() {
         company: `/people/${currentCompany.id}`,
       });
 
-      if (!display?.id && type === 'products') {
+      if (!display?.id && isProductionDisplayType(type)) {
         try {
           await ensureProductQueueLink(savedDisplay);
         } catch {
@@ -185,14 +193,14 @@ export default function DisplayForm() {
 
         <Text style={styles.label}>Tipo</Text>
         <View style={styles.typesWrapper}>
-          {['orders', 'products', 'tv'].map((t) => (
+          {DISPLAY_TYPE_OPTIONS.map((option) => (
             <Pressable
-              key={t}
-              style={[styles.typeButton, type === t && styles.typeButtonSelected]}
-              onPress={() => setType(t)}
+              key={option.value}
+              style={[styles.typeButton, type === option.value && styles.typeButtonSelected]}
+              onPress={() => setType(option.value)}
             >
-              <Text style={type === t ? styles.typeTextSelected : styles.typeText}>
-                {t}
+              <Text style={type === option.value ? styles.typeTextSelected : styles.typeText}>
+                {option.label}
               </Text>
             </Pressable>
           ))}
@@ -213,7 +221,7 @@ export default function DisplayForm() {
 
         {!!formError && <Text style={styles.errorText}>{formError}</Text>}
 
-        {type === 'products' && (
+        {type === DISPLAY_TYPE_PRODUCTION && (
           <View style={styles.hintBox}>
             <Text style={styles.hintText}>
               Dica: displays de produtos dependem de fila/status vinculados para liberar o botao de adicionar produtos.

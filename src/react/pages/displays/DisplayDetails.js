@@ -14,12 +14,18 @@ import {
     normalizeEntityId,
     resolveForcedDisplayId,
 } from '@controleonline/ui-ppc/src/react/utils/forcedDisplay';
+import {
+    isConferenceDisplayType,
+    isProductionDisplayType,
+    isTrackingDisplayType,
+    normalizeDisplayType,
+} from '@controleonline/ui-ppc/src/react/utils/displayTypes';
 import TvDisplay from './tv';
 
 const DisplayDetails = () => {
     const navigation = useNavigation();
     const route = useRoute();
-    const routeDisplayType = String(route.params?.displayType || '').toLowerCase();
+    const routeDisplayType = normalizeDisplayType(route.params?.displayType);
     const displayId = normalizeEntityId(route.params?.id);
     const { ppcColors, currentCompany } = useDisplayTheme();
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
@@ -43,8 +49,8 @@ const DisplayDetails = () => {
         [currentCompany?.id, currentDevice?.device, currentDevice?.id, deviceConfig],
     );
     const isForcedDisplay = forcedDisplayId !== null && displayId === forcedDisplayId;
-    const effectiveDisplayType = String(display?.displayType || routeDisplayType || '').toLowerCase();
-    const isTvDisplay = effectiveDisplayType === 'tv';
+    const effectiveDisplayType = normalizeDisplayType(display?.displayType || routeDisplayType);
+    const isTvDisplay = isTrackingDisplayType(effectiveDisplayType);
     const shouldHideNavigation = isTvDisplay || isForcedDisplay;
     const displayDetailsTitle =
         global.t?.t('configs', 'title', 'displayDetails') || 'Display';
@@ -146,15 +152,15 @@ const DisplayDetails = () => {
         }, [isForcedDisplay]),
     );
 
-    if (effectiveDisplayType === 'tv') {
+    if (isTrackingDisplayType(effectiveDisplayType)) {
         return <TvDisplay display={display} />;
     }
 
-    if (effectiveDisplayType === 'products') {
+    if (isProductionDisplayType(effectiveDisplayType)) {
         return <ProductsDisplay display={display} />;
     }
 
-    if (effectiveDisplayType === 'orders') {
+    if (isConferenceDisplayType(effectiveDisplayType)) {
         return <OrdersDisplay display={display} />;
     }
 
