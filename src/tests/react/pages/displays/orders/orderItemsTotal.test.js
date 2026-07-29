@@ -18,7 +18,7 @@ describe('display order items total', () => {
         quantity: 2,
         product: {
           id: 102,
-          product: 'Combo Zetta Gyros',
+          product: 'Combo Zetta Produto Exemplo',
         },
       },
       {
@@ -33,7 +33,7 @@ describe('display order items total', () => {
           productGroup: 'Escolha o queijo',
           parentProduct: {
             id: 102,
-            product: 'Combo Zetta Gyros',
+            product: 'Combo Zetta Produto Exemplo',
           },
         },
       },

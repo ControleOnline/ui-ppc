@@ -137,7 +137,7 @@ describe('TvOrderCard', () => {
           quantity: 1,
           product: {
             id: 10,
-            product: 'Alpha Gyros',
+            product: 'Alpha Produto Exemplo',
           },
         },
       ],

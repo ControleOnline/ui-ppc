@@ -140,7 +140,7 @@ describe('orderConference', () => {
       createProduct({
         id: 17,
         productId: '/products/300',
-        name: 'Alpha Gyros',
+        name: 'Alpha Produto Exemplo',
         sku: 'ALPHA',
       }),
       createProduct({
@@ -159,7 +159,7 @@ describe('orderConference', () => {
       createProduct({
         id: 19,
         productId: '/products/400',
-        name: 'Beta Gyros',
+        name: 'Beta Produto Exemplo',
         sku: 'BETA',
       }),
       createProduct({
