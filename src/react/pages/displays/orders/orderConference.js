@@ -1,4 +1,5 @@
 import {
+  buildOperationalOrderProductCards,
   buildOrderProductCards,
   getOrderProductQueues,
   normalizeOrderProductQuantity,
@@ -141,6 +142,91 @@ export const buildConferenceTargets = (orderProducts, fallbackColor = '#334155')
     return targets
   }, [])
 }
+
+export const buildConferencePresentationCards = (
+  orderProducts,
+  fallbackColor = '#334155',
+) => buildOperationalOrderProductCards(
+  normalizeConferenceOrderProducts(orderProducts),
+  {
+    fallbackColor,
+    resolveItemColor: item => getOrderProductStatusColor(item, fallbackColor),
+  },
+)
+
+const findConferenceEntryPath = (groups, targetEntry, path = []) => {
+  const normalizedGroups = Array.isArray(groups) ? groups : []
+
+  for (let groupIndex = 0; groupIndex < normalizedGroups.length; groupIndex += 1) {
+    const items = Array.isArray(normalizedGroups[groupIndex]?.items)
+      ? normalizedGroups[groupIndex].items
+      : []
+
+    for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
+      const item = items[itemIndex]
+      const itemPath = [...path, { groupIndex, itemIndex }]
+
+      if (item === targetEntry) return itemPath
+
+      const childPath = findConferenceEntryPath(item?.groups, targetEntry, itemPath)
+      if (childPath) return childPath
+    }
+  }
+
+  return null
+}
+
+const resolveConferenceEntryAtPath = (groups, path) => {
+  let currentGroups = Array.isArray(groups) ? groups : []
+  let currentEntry = null
+
+  for (const segment of Array.isArray(path) ? path : []) {
+    currentEntry = currentGroups?.[segment.groupIndex]?.items?.[segment.itemIndex] || null
+    if (!currentEntry) return null
+    currentGroups = Array.isArray(currentEntry.groups) ? currentEntry.groups : []
+  }
+
+  return currentEntry
+}
+
+export const resolveConferencePresentationTargets = (
+  { card, entry = null, entryType = 'root' },
+  targets,
+) => {
+  const sourceCards = Array.isArray(card?.sourceCards) && card.sourceCards.length
+    ? card.sourceCards
+    : [card]
+  const orderProductIds = new Set()
+
+  if (entryType === 'root') {
+    sourceCards.forEach(sourceCard => {
+      const orderProductId = parseConferenceEntityId(
+        sourceCard?.rootItem?.id || sourceCard?.rootItem?.['@id'],
+      )
+      if (orderProductId) orderProductIds.add(orderProductId)
+    })
+  } else {
+    const entryPath = findConferenceEntryPath(card?.groups, entry)
+
+    sourceCards.forEach(sourceCard => {
+      const sourceEntry = entryPath
+        ? resolveConferenceEntryAtPath(sourceCard?.groups, entryPath)
+        : entry
+      const sourceOrderProduct = sourceEntry?.orderProduct || null
+      const orderProductId = parseConferenceEntityId(
+        sourceOrderProduct?.id || sourceOrderProduct?.['@id'],
+      )
+      if (orderProductId) orderProductIds.add(orderProductId)
+    })
+  }
+
+  return (Array.isArray(targets) ? targets : []).filter(target =>
+    orderProductIds.has(target.orderProductId),
+  )
+}
+
+export const resolveConferencePresentationProgress = (targets, state) =>
+  resolveConferenceProgress(targets, state)
 
 export const initializeConferenceState = targets => {
   const countsByOrderProductId = {}

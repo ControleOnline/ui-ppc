@@ -10,9 +10,9 @@ const createStyles = ppcColors => StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 12,
+    padding: 8,
     paddingBottom: 120,
-    gap: 10,
+    gap: 8,
   },
   headerCard: {
     borderRadius: 16,
@@ -22,11 +22,11 @@ const createStyles = ppcColors => StyleSheet.create({
     padding: 10,
   },
   productsCard: {
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: ppcColors.borderSoft,
-    backgroundColor: ppcColors.cardBgSoft,
-    padding: 8,
+    backgroundColor: ppcColors.cardBg,
+    padding: 4,
   },
   loadingWrap: {
     flex: 1,
@@ -47,13 +47,16 @@ const createStyles = ppcColors => StyleSheet.create({
     paddingVertical: 20,
   },
   itemRow: {
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: ppcColors.border,
     backgroundColor: ppcColors.cardBg,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    marginBottom: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    marginBottom: 4,
+  },
+  rootFamilySeparator: {
+    borderTopColor: withOpacity(ppcColors.textPrimary, 0.28),
   },
   itemMainRow: {
     flexDirection: 'row',
@@ -67,12 +70,12 @@ const createStyles = ppcColors => StyleSheet.create({
   },
   text: {
     color: ppcColors.textPrimary,
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '900',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '800',
   },
   qtyText: {
-    color: ppcColors.textPrimary,
+    color: ppcColors.accentInfo,
     fontWeight: '900',
   },
   statusMarker: {
@@ -145,13 +148,13 @@ const createStyles = ppcColors => StyleSheet.create({
     display: 'none',
   },
   progressPill: {
-    minWidth: 54,
+    minWidth: 48,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: withOpacity(ppcColors.accentInfo, 0.36),
     backgroundColor: withOpacity(ppcColors.accentInfo, 0.1),
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     alignItems: 'center',
   },
   progressPillComplete: {
@@ -160,8 +163,8 @@ const createStyles = ppcColors => StyleSheet.create({
   },
   progressPillText: {
     color: ppcColors.accentInfo,
-    fontSize: 12,
-    lineHeight: 15,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: '900',
   },
   progressPillTextComplete: {
@@ -181,6 +184,9 @@ const createStyles = ppcColors => StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 999,
+  },
+  queueBadgeDotHidden: {
+    display: 'none',
   },
   queueBadgeText: {
     fontSize: 9,

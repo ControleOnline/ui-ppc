@@ -20,8 +20,8 @@ import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayT
 import createStyles from './DisplayOrderConference.styles'
 import {
   applyConferenceScan,
+  buildConferencePresentationCards,
   buildConferenceTargets,
-  getConferenceTargetProgress,
   getHydraItems,
   getOrderProductStatusColor,
   initializeConferenceState,
@@ -29,6 +29,8 @@ import {
   normalizeScanCode,
   parseConferenceEntityId,
   resolveConferenceProgress,
+  resolveConferencePresentationProgress,
+  resolveConferencePresentationTargets,
 } from './orderConference'
 
 const SCAN_IDLE_TIMEOUT_MS = 90
@@ -82,6 +84,10 @@ const DisplayOrderConference = () => {
     () => buildConferenceTargets(orderProducts, order?.status?.color),
     [order?.status?.color, orderProducts],
   )
+  const presentationCards = useMemo(
+    () => buildConferencePresentationCards(orderProducts, order?.status?.color),
+    [order?.status?.color, orderProducts],
+  )
   const progress = useMemo(
     () => resolveConferenceProgress(targets, conferenceState),
     [conferenceState, targets],
@@ -108,8 +114,9 @@ const DisplayOrderConference = () => {
     itemActions: styles.itemActions,
     groupItemActions: styles.groupItemActions,
     queueBadge: styles.queueBadge,
-    queueBadgeDot: styles.queueBadgeDot,
+    queueBadgeDot: styles.queueBadgeDotHidden,
     queueBadgeText: styles.queueBadgeText,
+    rootFamilySeparator: styles.rootFamilySeparator,
   }), [styles])
 
   const reloadOrder = useCallback(async () => {
@@ -324,27 +331,33 @@ const DisplayOrderConference = () => {
     }
   }, [navigation, orderId, progress.complete, readyLoading])
 
-  const renderConferenceAction = useCallback(({ orderProduct }) => {
-    const targetId = parseConferenceEntityId(orderProduct?.id || orderProduct?.['@id'])
-    const target = targets.find(item => item.orderProductId === targetId)
-    if (!target) return null
+  const renderConferenceAction = useCallback(({ card, entry, entryType }) => {
+    const presentationTargets = resolveConferencePresentationTargets(
+      { card, entry, entryType },
+      targets,
+    )
+    if (!presentationTargets.length) return null
 
-    const checked = getConferenceTargetProgress(target, conferenceState)
-    const complete = checked >= target.required
-    const persisting = Boolean(persistingIds[target.orderProductId])
+    const itemProgress = resolveConferencePresentationProgress(
+      presentationTargets,
+      conferenceState,
+    )
+    const persisting = presentationTargets.some(target =>
+      Boolean(persistingIds[target.orderProductId]),
+    )
 
     return (
-      <View style={[styles.progressPill, complete && styles.progressPillComplete]}>
+      <View style={[styles.progressPill, itemProgress.complete && styles.progressPillComplete]}>
         {persisting ? (
-          <ActivityIndicator size="small" color={complete ? '#16A34A' : ppcColors.accentInfo} />
+          <ActivityIndicator size="small" color={itemProgress.complete ? '#16A34A' : ppcColors.accentInfo} />
         ) : (
           <Text
             style={[
               styles.progressPillText,
-              complete && styles.progressPillTextComplete,
+              itemProgress.complete && styles.progressPillTextComplete,
             ]}
           >
-            {`${checked}/${target.required}`}
+            {`${itemProgress.checked}/${itemProgress.total}`}
           </Text>
         )}
       </View>
@@ -380,12 +393,16 @@ const DisplayOrderConference = () => {
             <OrderProducts
               order={order}
               orderProducts={orderProducts}
+              productCards={presentationCards}
               styles={orderProductsStyles}
               showDetails
-              showDescriptions
+              showDescriptions={false}
               showPricing={false}
               showHierarchyGuides
+              showRootStatusMarker={false}
               showGroupStatusMarker={false}
+              hierarchyGuideColor={ppcColors.border}
+              compact
               renderActions={renderConferenceAction}
               resolveItemColor={getOrderProductStatusColor}
             />

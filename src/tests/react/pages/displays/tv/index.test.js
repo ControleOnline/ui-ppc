@@ -116,15 +116,26 @@ jest.mock(
     },
 )
 
-const { TvOrderCard } =
+const { api } = require('@controleonline/ui-common/src/api')
+const { TvOrderCard, countOperationalOrderItems, fetchTrackingOrdersPage } =
   require('../../../../../react/pages/displays/tv')
 
 describe('TvOrderCard', () => {
   beforeEach(() => {
+    api.fetch.mockReset()
     global.__orderHeaderProps = null
     global.__orderProductsProps = null
     global.__displayDeliveryMapProps = null
     global.__operationalInsightsProps = null
+  })
+
+  it('loads the complete Tracking page through one collection request', async () => {
+    api.fetch.mockResolvedValueOnce({member: []})
+    const query = {provider: 3, page: 1}
+
+    await expect(fetchTrackingOrdersPage(query)).resolves.toEqual({member: []})
+    expect(api.fetch).toHaveBeenCalledTimes(1)
+    expect(api.fetch).toHaveBeenCalledWith('/orders-tracking', {params: query})
   })
 
   it('renders full order details for TV cards', () => {
@@ -153,14 +164,22 @@ describe('TvOrderCard', () => {
         ppcColors: {
           accentInfo: '#0EA5E9',
           cardBg: '#FFFFFF',
+          border: '#CBD5E1',
           borderSoft: '#E2E8F0',
         },
         styles: {
+          incorporatedProductText: {
+            fontWeight: '500',
+          },
           loadingInlineText: {},
           loadingInlineWrap: {},
           orderAccentBar: {},
           orderCard: {},
           orderCardContent: {},
+          orderNumberText: {
+            fontSize: 18,
+            lineHeight: 22,
+          },
           productsWrap: {},
         },
         orderStyles: {},
@@ -173,17 +192,87 @@ describe('TvOrderCard', () => {
       showPricing: false,
       showWaitingTime: false,
       metaText: 'ROGÉRIO',
+      orderIdStyle: {
+        fontSize: 18,
+        lineHeight: 22,
+      },
+      itemCount: 1,
     })
 
     expect(global.__orderProductsProps).toMatchObject({
       order,
       showDetails: true,
-      showDescriptions: true,
+      showDescriptions: false,
       showPricing: false,
       showImages: false,
       showRootQuantityPrefix: true,
       showQueuePresentation: true,
       showHierarchyGuides: true,
+      showRootStatusMarker: false,
+      showGroupStatusMarker: false,
+      hierarchyGuideColor: '#CBD5E1',
+      compact: true,
     })
+    expect(global.__orderProductsProps.productCards).toHaveLength(1)
+    expect(global.__orderProductsProps.productCards[0]).toMatchObject({
+      name: 'Alpha Produto Exemplo',
+      parentCardKey: '',
+      originGroup: null,
+      quantity: 1,
+    })
+    expect(global.__orderProductsProps.styles.groupItemText).toEqual([
+      undefined,
+      {fontWeight: '500'},
+    ])
+  })
+
+  it('counts only operational cards and respects their quantities', () => {
+    const orderProducts = [
+      {
+        id: 1,
+        quantity: 1,
+        product: {id: 10, product: 'Combo'},
+        orderProductComponents: [
+          {
+            id: 11,
+            quantity: 1,
+            product: {id: 110, product: 'Queijo incorporado'},
+            showInParentQueue: true,
+            productGroup: {
+              id: 100,
+              productGroup: 'Escolha seu queijo',
+            },
+          },
+          {
+            id: 12,
+            quantity: 2,
+            product: {id: 120, product: 'Batata operacional'},
+            showInParentQueue: false,
+            productGroup: {
+              id: 200,
+              productGroup: 'Escolha sua batata',
+            },
+          },
+        ],
+      },
+      {
+        id: 12,
+        quantity: 2,
+        product: {id: 120, product: 'Batata operacional'},
+        showInParentQueue: false,
+        orderProduct: '/order_products/1',
+        productGroup: {
+          id: 200,
+          productGroup: 'Escolha sua batata',
+        },
+      },
+      {
+        id: 20,
+        quantity: 1,
+        product: {id: 200, product: 'Produto avulso'},
+      },
+    ]
+
+    expect(countOperationalOrderItems(orderProducts)).toBe(4)
   })
 })

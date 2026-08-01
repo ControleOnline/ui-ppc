@@ -36,6 +36,13 @@ const createStyles = ppcColors =>
       paddingTop: 12,
       paddingBottom: 12,
     },
+    orderNumberText: {
+      fontSize: 18,
+      lineHeight: 22,
+    },
+    incorporatedProductText: {
+      fontWeight: '500',
+    },
     productsWrap: {
       marginTop: 10,
     },

@@ -13,7 +13,10 @@ import { useStore } from '@store'
 import { api } from '@controleonline/ui-common/src/api'
 import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import OrderProducts from '@controleonline/ui-orders/src/react/components/OrderProducts'
-import { needsDetailedOrderProductsFetch } from '@controleonline/ui-orders/src/react/utils/orderProductsFetchPolicy'
+import {
+  buildOperationalOrderProductCards,
+  normalizeOrderProductQuantity,
+} from '@controleonline/ui-orders/src/react/components/OrderProducts.utils'
 import createOrderStyles from '@controleonline/ui-ppc/src/react/pages/displays/orders/index.styles'
 import DisplayDeliveryMap from '@controleonline/ui-ppc/src/react/pages/displays/orders/DisplayDeliveryMap'
 import OperationalInsightsDock from '@controleonline/ui-ppc/src/react/pages/displays/orders/OperationalInsightsDock'
@@ -41,8 +44,10 @@ import {
 } from '@controleonline/ui-common/src/react/utils/dateRangeFilter'
 import createStyles from './index.styles'
 
-const orderDetailsCache = new Map()
-const pendingOrderDetailsRequests = new Map()
+export const TRACKING_ORDERS_ENDPOINT = '/orders-tracking'
+
+export const fetchTrackingOrdersPage = query =>
+  api.fetch(TRACKING_ORDERS_ENDPOINT, {params: query})
 
 const normalizeEntityId = value => {
   if (!value) return null
@@ -76,130 +81,6 @@ const getFirstResponseMember = response => {
   return response && typeof response === 'object' ? response : null
 }
 
-const resolveCollectionValue = (...candidates) => {
-  for (const candidate of candidates) {
-    const collectionItems = getHydraCollection(candidate)
-    if (collectionItems) {
-      return collectionItems
-    }
-  }
-
-  return null
-}
-
-const mergeNestedEntity = (baseEntity, nextEntity) => {
-  if (!baseEntity || typeof baseEntity !== 'object') {
-    return nextEntity || baseEntity
-  }
-
-  if (!nextEntity || typeof nextEntity !== 'object') {
-    return baseEntity
-  }
-
-  return {
-    ...baseEntity,
-    ...nextEntity,
-  }
-}
-
-const mergeOrderPayload = (baseOrder, detailedOrder) => {
-  if (!detailedOrder || typeof detailedOrder !== 'object') {
-    return baseOrder
-  }
-
-  const mergedOrder = {
-    ...baseOrder,
-    ...detailedOrder,
-    client: mergeNestedEntity(baseOrder?.client, detailedOrder?.client),
-    provider: mergeNestedEntity(baseOrder?.provider, detailedOrder?.provider),
-    status: mergeNestedEntity(baseOrder?.status, detailedOrder?.status),
-    payer: mergeNestedEntity(baseOrder?.payer, detailedOrder?.payer),
-    mainOrder: mergeNestedEntity(baseOrder?.mainOrder, detailedOrder?.mainOrder),
-    deliveryContact: mergeNestedEntity(
-      baseOrder?.deliveryContact,
-      detailedOrder?.deliveryContact,
-    ),
-    addressOrigin: mergeNestedEntity(
-      baseOrder?.addressOrigin,
-      detailedOrder?.addressOrigin,
-    ),
-    addressDestination: mergeNestedEntity(
-      baseOrder?.addressDestination,
-      detailedOrder?.addressDestination,
-    ),
-  }
-
-  const orderProducts = resolveCollectionValue(
-    detailedOrder?.orderProducts,
-    detailedOrder?.order_product,
-    detailedOrder?.order_products,
-    baseOrder?.orderProducts,
-    baseOrder?.order_product,
-    baseOrder?.order_products,
-  )
-
-  if (orderProducts) {
-    mergedOrder.orderProducts = orderProducts
-    mergedOrder.order_product = orderProducts
-    mergedOrder.order_products = orderProducts
-  }
-
-  return mergedOrder
-}
-
-const cacheDetailedOrder = order => {
-  const orderId = normalizeEntityId(order?.id || order?.['@id'])
-  if (!orderId || !order || typeof order !== 'object') {
-    return order
-  }
-
-  orderDetailsCache.set(String(orderId), order)
-  return order
-}
-
-const loadDetailedOrder = async orderId => {
-  const cacheKey = String(orderId)
-
-  if (orderDetailsCache.has(cacheKey)) {
-    return orderDetailsCache.get(cacheKey)
-  }
-
-  if (pendingOrderDetailsRequests.has(cacheKey)) {
-    return pendingOrderDetailsRequests.get(cacheKey)
-  }
-
-  const request = api
-    .fetch(`orders/${orderId}`)
-    .then(async baseOrder => {
-      if (!baseOrder || typeof baseOrder !== 'object') {
-        return null
-      }
-
-      const orderProducts = normalizeOrderProductCollection(baseOrder)
-
-      if (
-        orderProducts.length === 0 ||
-        !needsDetailedOrderProductsFetch(orderProducts)
-      ) {
-        return cacheDetailedOrder(baseOrder)
-      }
-
-      try {
-        const detailedOrder = await api.fetch(`orders/${orderId}/conference`)
-        return cacheDetailedOrder(mergeOrderPayload(baseOrder, detailedOrder))
-      } catch {
-        return cacheDetailedOrder(baseOrder)
-      }
-    })
-    .catch(() => null)
-    .finally(() => {
-      pendingOrderDetailsRequests.delete(cacheKey)
-    })
-
-  pendingOrderDetailsRequests.set(cacheKey, request)
-  return request
-}
-
 const normalizeOrderProductCollection = order => {
   const collections = [
     order?.orderProducts,
@@ -217,12 +98,18 @@ const normalizeOrderProductCollection = order => {
   return []
 }
 
+export const countOperationalOrderItems = orderProducts =>
+  buildOperationalOrderProductCards(orderProducts).reduce(
+    (total, card) =>
+      total + normalizeOrderProductQuantity(card?.quantity),
+    0,
+  )
+
 export const TvOrderCard = ({
   order,
   ppcColors,
   styles,
   orderStyles,
-  isLoadingDetails = false,
 }) => {
   const orderProductsStyles = useMemo(
     () => ({
@@ -236,7 +123,7 @@ export const TvOrderCard = ({
       itemContent: orderStyles.orderProductItemContent,
       metaWrap: orderStyles.orderProductMetaWrap,
       queueBadge: orderStyles.orderProductQueueBadge,
-      queueBadgeDot: orderStyles.orderProductQueueBadgeDot,
+      queueBadgeDot: orderStyles.orderProductQueueBadgeDotHidden,
       queueBadgeText: orderStyles.orderProductQueueBadgeText,
       itemActions: orderStyles.orderProductItemActions,
       priceRow: orderStyles.orderProductPriceRow,
@@ -252,15 +139,26 @@ export const TvOrderCard = ({
       groupItemContent: orderStyles.orderProductGroupItemContent,
       groupItemMetaWrap: orderStyles.orderProductGroupItemMetaWrap,
       groupItemActions: orderStyles.orderProductGroupItemActions,
-      groupItemText: orderStyles.groupItemText,
+      groupItemText: [
+        orderStyles.groupItemText,
+        styles.incorporatedProductText,
+      ],
       groupItemMetaText: orderStyles.orderProductGroupItemMetaText,
       groupItemPriceText: orderStyles.orderProductGroupItemPriceText,
+      rootFamilySeparator: orderStyles.orderProductRootFamilySeparator,
     }),
-    [orderStyles],
+    [orderStyles, styles.incorporatedProductText],
   )
 
   const statusColor = order?.status?.color || ppcColors.accentInfo
   const orderProducts = normalizeOrderProductCollection(order)
+  const operationalProductCards = useMemo(
+    () => buildOperationalOrderProductCards(orderProducts, {
+      fallbackColor: statusColor,
+    }),
+    [orderProducts, statusColor],
+  )
+  const itemCount = countOperationalOrderItems(orderProducts)
 
   return (
     <Card style={styles.orderCard}>
@@ -272,27 +170,27 @@ export const TvOrderCard = ({
           showPricing={false}
           showWaitingTime={false}
           metaText={order?.client?.name || ''}
+          orderIdStyle={styles.orderNumberText}
+          itemCount={itemCount}
         />
-
-        {isLoadingDetails ? (
-          <View style={styles.loadingInlineWrap}>
-            <ActivityIndicator size="small" color={ppcColors.accentInfo} />
-            <Text style={styles.loadingInlineText}>Carregando detalhes...</Text>
-          </View>
-        ) : null}
 
         {orderProducts.length > 0 ? (
           <View style={styles.productsWrap}>
             <OrderProducts
               order={order}
+              productCards={operationalProductCards}
               styles={orderProductsStyles}
               showDetails
-              showDescriptions
+              showDescriptions={false}
               showPricing={false}
               showImages={false}
               showRootQuantityPrefix
               showQueuePresentation
               showHierarchyGuides
+              showRootStatusMarker={false}
+              showGroupStatusMarker={false}
+              hierarchyGuideColor={ppcColors.border}
+              compact
             />
           </View>
         ) : null}
@@ -317,7 +215,6 @@ const TvDisplay = ({ display = {} }) => {
     [screenWidth, width],
   )
   const [ordersPages, setOrdersPages] = useState({})
-  const [detailedOrdersById, setDetailedOrdersById] = useState({})
   const [isInitialOrdersLoading, setIsInitialOrdersLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasOrdersFeedRefreshed, setHasOrdersFeedRefreshed] = useState(false)
@@ -335,7 +232,6 @@ const TvDisplay = ({ display = {} }) => {
     ordersTotalItemsRef.current = 0
     ordersLoadingPagesRef.current.clear()
     setOrdersPages({})
-    setDetailedOrdersById({})
     setHasOrdersFeedRefreshed(false)
     setDeliveryMapPayload(null)
     setDeliveryMapLoading(false)
@@ -376,9 +272,7 @@ const TvDisplay = ({ display = {} }) => {
         return []
       }
 
-      const response = await api.fetch('/orders', {
-        params: query,
-      })
+      const response = await fetchTrackingOrdersPage(query)
 
       if (requestGeneration !== ordersFeedGenerationRef.current) {
         return []
@@ -529,76 +423,22 @@ const TvDisplay = ({ display = {} }) => {
     return () => clearInterval(interval)
   }, [currentCompany?.id, isFocused, refreshOrders])
 
-  useEffect(() => {
-    if (!sortedOrders.length) {
-      return undefined
-    }
-
-    let cancelled = false
-
-    Promise.all(
-      sortedOrders.map(async order => {
-        const orderId = normalizeEntityId(order?.id || order?.['@id'])
-        if (!orderId) {
-          return null
-        }
-
-        const detailedOrder = await loadDetailedOrder(orderId)
-        if (!detailedOrder) {
-          return null
-        }
-
-        return [String(orderId), detailedOrder]
-      }),
-    ).then(results => {
-      if (cancelled) {
-        return
-      }
-
-      setDetailedOrdersById(currentDetails => {
-        const nextDetails = {
-          ...currentDetails,
-        }
-
-        results.forEach(entry => {
-          if (!entry) {
-            return
-          }
-
-          const [orderId, detailedOrder] = entry
-          nextDetails[orderId] = detailedOrder
-        })
-
-        return nextDetails
-      })
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [sortedOrders])
-
   const showSkeleton =
     isInitialOrdersLoading &&
     sortedOrders.length === 0
 
   const renderOrderCard = useCallback(
     ({ item: order }) => {
-      const orderId = normalizeEntityId(order)
-      const detailedOrder = orderId ? detailedOrdersById[String(orderId)] || order : order
-      const isLoadingDetails = Boolean(orderId) && !detailedOrdersById[String(orderId)]
-
       return (
         <TvOrderCard
-          order={detailedOrder}
+          order={order}
           ppcColors={ppcColors}
           styles={tvStyles}
           orderStyles={orderStyles}
-          isLoadingDetails={isLoadingDetails}
         />
       )
     },
-    [detailedOrdersById, orderStyles, ppcColors, tvStyles],
+    [orderStyles, ppcColors, tvStyles],
   )
 
   return (

@@ -594,6 +594,9 @@ const createStyles = ppcColors =>
       paddingVertical: 7,
       marginBottom: 6,
     },
+    orderProductRootFamilySeparator: {
+      borderTopColor: withOpacity(ppcColors.textPrimary, 0.28),
+    },
     orderProductItemMainRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -622,6 +625,9 @@ const createStyles = ppcColors =>
       width: 6,
       height: 6,
       borderRadius: 999,
+    },
+    orderProductQueueBadgeDotHidden: {
+      display: 'none',
     },
     orderProductQueueBadgeText: {
       fontSize: 9,

@@ -1,7 +1,10 @@
 const {
   applyConferenceScan,
+  buildConferencePresentationCards,
   buildConferenceTargets,
   initializeConferenceState,
+  resolveConferencePresentationProgress,
+  resolveConferencePresentationTargets,
   resolveConferenceProgress,
 } = require('../../../../../react/pages/displays/orders/orderConference')
 
@@ -12,9 +15,15 @@ const createProduct = overrides => ({
     id: overrides.productId || `/products/${overrides.id}`,
     product: overrides.name || `Produto ${overrides.id}`,
     sku: overrides.sku || '',
+    ...(overrides.trackingCategory
+      ? { trackingCategory: overrides.trackingCategory }
+      : {}),
   },
   status: overrides.status || { status: 'open', color: '#64748B' },
   ...(overrides.orderProductQueues ? { orderProductQueues: overrides.orderProductQueues } : {}),
+  ...(overrides.orderProductComponents
+    ? { orderProductComponents: overrides.orderProductComponents }
+    : {}),
   ...(overrides.productGroup ? { productGroup: overrides.productGroup } : {}),
 })
 
@@ -216,6 +225,115 @@ describe('orderConference', () => {
       checked: 1,
       total: 2,
       complete: false,
+    })
+  })
+
+  it('keeps a detached combo child independently scannable', () => {
+    const targets = buildConferenceTargets([
+      createProduct({
+        id: 30,
+        productId: '/products/600',
+        name: 'Combo Alpha',
+        sku: 'COMBO-ALPHA',
+        orderProductQueues: [{ id: 880 }],
+        orderProductComponents: [{ id: 31 }],
+      }),
+      {
+        ...createProduct({
+          id: 31,
+          productId: '/products/601',
+          name: 'Mini Churros',
+          sku: 'CHURROS',
+          orderProductQueues: [{ id: 881 }],
+          productGroup: {
+            id: 990,
+            productGroup: 'Sobremesa',
+          },
+        }),
+        showInParentQueue: false,
+      },
+    ])
+
+    expect(targets.map(target => target.orderProductId)).toEqual(['30', '31'])
+    expect(targets[1].card).toMatchObject({
+      parentCardKey: '30',
+      originGroup: {
+        key: '990',
+        label: 'Sobremesa',
+      },
+    })
+
+    const state = initializeConferenceState(targets)
+    const result = applyConferenceScan(targets, state, '881')
+
+    expect(result.target.orderProductId).toBe('31')
+    expect(resolveConferenceProgress(targets, result.state)).toMatchObject({
+      checked: 1,
+      total: 2,
+      complete: false,
+    })
+  })
+
+  it('orders and consolidates the conference presentation without merging scan targets', () => {
+    const orderProducts = [
+      createProduct({
+        id: 40,
+        productId: '/products/700',
+        name: 'Maionese Verde',
+        sku: 'MOLHO-VERDE',
+        trackingCategory: { id: 274, rank: 4 },
+      }),
+      createProduct({
+        id: 41,
+        productId: '/products/800',
+        name: 'Agua sem gas',
+        sku: 'AGUA',
+        trackingCategory: { id: 276, rank: 6 },
+      }),
+      createProduct({
+        id: 42,
+        productId: '/products/700',
+        name: 'Maionese Verde',
+        sku: 'MOLHO-VERDE',
+        trackingCategory: { id: 274, rank: 4 },
+      }),
+      createProduct({
+        id: 43,
+        productId: '/products/600',
+        name: 'Batata Frita Media',
+        sku: 'BATATA',
+        trackingCategory: { id: 271, rank: 3 },
+      }),
+    ]
+
+    const cards = buildConferencePresentationCards(orderProducts)
+    const targets = buildConferenceTargets(orderProducts)
+    const sauceCard = cards[1]
+    const sauceTargets = resolveConferencePresentationTargets({
+      card: sauceCard,
+      entryType: 'root',
+    }, targets)
+
+    expect(cards.map(card => [card.name, card.quantity])).toEqual([
+      ['Batata Frita Media', 1],
+      ['Maionese Verde', 2],
+      ['Agua sem gas', 1],
+    ])
+    expect(sauceTargets.map(target => target.orderProductId)).toEqual(['40', '42'])
+
+    const initialState = initializeConferenceState(targets)
+    const firstScan = applyConferenceScan(targets, initialState, 'MOLHO-VERDE')
+    const secondScan = applyConferenceScan(targets, firstScan.state, 'MOLHO-VERDE')
+
+    expect(resolveConferencePresentationProgress(sauceTargets, firstScan.state)).toEqual({
+      checked: 1,
+      total: 2,
+      complete: false,
+    })
+    expect(resolveConferencePresentationProgress(sauceTargets, secondScan.state)).toEqual({
+      checked: 2,
+      total: 2,
+      complete: true,
     })
   })
 })
