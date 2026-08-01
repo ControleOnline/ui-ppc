@@ -21,6 +21,9 @@ import {
     normalizeDisplayType,
 } from '@controleonline/ui-ppc/src/react/utils/displayTypes';
 import TvDisplay from './tv';
+import useBrowserVisibilityRefresh from '@controleonline/ui-ppc/src/react/utils/useBrowserVisibilityRefresh';
+
+export const DISPLAY_CONFIGURATION_REFRESH_INTERVAL_MS = 30000;
 
 const DisplayDetails = () => {
     const navigation = useNavigation();
@@ -54,6 +57,14 @@ const DisplayDetails = () => {
     const shouldHideNavigation = isTvDisplay || isForcedDisplay;
     const displayDetailsTitle =
         global.t?.t('configs', 'title', 'displayDetails') || 'Display';
+    const refreshDisplay = useCallback(() => {
+        if (!displayId) return Promise.resolve(null);
+
+        return actions.get({
+            id: displayId,
+            __storeMeta: { preserveItem: true },
+        }).catch(() => null);
+    }, [actions, displayId]);
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -83,9 +94,27 @@ const DisplayDetails = () => {
         shouldHideNavigation,
     ]);
 
+    useFocusEffect(
+        useCallback(() => {
+            refreshDisplay();
+            return undefined;
+        }, [refreshDisplay]),
+    );
+
+    useBrowserVisibilityRefresh(refreshDisplay, Boolean(displayId));
+
     useEffect(() => {
-        if (displayId) actions.get(displayId);
-    }, [actions, displayId]);
+        if (!displayId) {
+            return undefined;
+        }
+
+        const interval = setInterval(
+            refreshDisplay,
+            DISPLAY_CONFIGURATION_REFRESH_INTERVAL_MS,
+        );
+
+        return () => clearInterval(interval);
+    }, [displayId, refreshDisplay]);
 
     useEffect(() => {
         if (

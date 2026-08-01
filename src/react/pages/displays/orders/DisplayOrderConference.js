@@ -16,6 +16,10 @@ import { api } from '@controleonline/ui-common/src/api'
 import OrderHeader from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import OrderProducts from '@controleonline/ui-orders/src/react/components/OrderProducts'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
+import {
+  normalizeQueueIdentificationMode,
+  normalizeStatusIndicatorMode,
+} from '@controleonline/ui-ppc/src/react/utils/displayPresentation'
 
 import createStyles from './DisplayOrderConference.styles'
 import {
@@ -63,6 +67,14 @@ const DisplayOrderConference = () => {
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
 
   const orderId = parseConferenceEntityId(route.params?.orderId || route.params?.id)
+  const queueIdentificationMode = normalizeQueueIdentificationMode(
+    route.params?.queueIdentificationMode,
+  )
+  const statusIndicatorMode = normalizeStatusIndicatorMode(
+    route.params?.statusIndicatorMode,
+  )
+  const showUnitQuantity = route.params?.showUnitQuantity === true
+  const showGroupNames = route.params?.showGroupNames === true
 
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -402,6 +414,10 @@ const DisplayOrderConference = () => {
               showRootStatusMarker={false}
               showGroupStatusMarker={false}
               hierarchyGuideColor={ppcColors.border}
+              queueIdentificationMode={queueIdentificationMode}
+              statusIndicatorMode={statusIndicatorMode}
+              showUnitQuantity={showUnitQuantity}
+              showGroupNames={showGroupNames}
               compact
               renderActions={renderConferenceAction}
               resolveItemColor={getOrderProductStatusColor}

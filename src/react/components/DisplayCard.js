@@ -21,6 +21,11 @@ import {
   resolveDisplayTypeLabel,
 } from '@controleonline/ui-ppc/src/react/utils/displayTypes';
 import createStyles from './DisplayCard.styles';
+import {
+  QUEUE_IDENTIFICATION_OPTIONS,
+  STATUS_INDICATOR_OPTIONS,
+  resolveDisplayPresentation,
+} from '@controleonline/ui-ppc/src/react/utils/displayPresentation';
 
 import {
   inlineStyle_778_8,
@@ -132,6 +137,19 @@ export default function DisplayCard({
   const [editDisplay, setEditDisplay] = useState(item.display);
   const displayType = normalizeDisplayType(item.displayType);
   const [editType, setEditType] = useState(displayType);
+  const initialPresentation = resolveDisplayPresentation(item);
+  const [editQueueIdentificationMode, setEditQueueIdentificationMode] = useState(
+    initialPresentation.queueIdentificationMode,
+  );
+  const [editStatusIndicatorMode, setEditStatusIndicatorMode] = useState(
+    initialPresentation.statusIndicatorMode,
+  );
+  const [editShowUnitQuantity, setEditShowUnitQuantity] = useState(
+    initialPresentation.showUnitQuantity,
+  );
+  const [editShowGroupNames, setEditShowGroupNames] = useState(
+    initialPresentation.showGroupNames,
+  );
 
   const [linkingQueue, setLinkingQueue] = useState(false);
   const [linkModalVisible, setLinkModalVisible] = useState(false);
@@ -144,6 +162,17 @@ export default function DisplayCard({
   const [deletingDisplay, setDeletingDisplay] = useState(false);
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
   const [confirmUnlinkVisible, setConfirmUnlinkVisible] = useState(false);
+
+  const openDisplayEditor = useCallback(() => {
+    const presentation = resolveDisplayPresentation(item);
+    setEditDisplay(item.display);
+    setEditType(normalizeDisplayType(item.displayType));
+    setEditQueueIdentificationMode(presentation.queueIdentificationMode);
+    setEditStatusIndicatorMode(presentation.statusIndicatorMode);
+    setEditShowUnitQuantity(presentation.showUnitQuantity);
+    setEditShowGroupNames(presentation.showGroupNames);
+    setModalVisible(true);
+  }, [item]);
 
   const getId = (value) => {
     return extractDisplayId(value);
@@ -288,13 +317,34 @@ export default function DisplayCard({
 
   const saveDisplay = useCallback(async () => {
     try {
-      await actions.save({ id: item.id, display: editDisplay, displayType: editType });
+      await actions.save({
+        id: item.id,
+        display: editDisplay,
+        displayType: editType,
+        queueIdentificationMode: editQueueIdentificationMode,
+        statusIndicatorMode: editStatusIndicatorMode,
+        showUnitQuantity: editShowUnitQuantity,
+        showGroupNames: editShowGroupNames,
+      });
+      await Promise.resolve(onLinked?.()).catch(() => null);
       setModalVisible(false);
       showSuccessToast('Display atualizado com sucesso.');
     } catch (err) {
       showErrorToast(getApiErrorMessage(err, 'Nao foi possivel salvar o display.'));
     }
-  }, [actions, editDisplay, editType, item.id, showErrorToast, showSuccessToast]);
+  }, [
+    actions,
+    editDisplay,
+    editQueueIdentificationMode,
+    editShowUnitQuantity,
+    editShowGroupNames,
+    editStatusIndicatorMode,
+    editType,
+    item.id,
+    onLinked,
+    showErrorToast,
+    showSuccessToast,
+  ]);
 
   const deleteDisplay = useCallback(async () => {
     const displayId = getId(item);
@@ -708,7 +758,7 @@ export default function DisplayCard({
                     <TouchableOpacity
                       onPress={(event) => {
                         event?.stopPropagation?.();
-                        setModalVisible(true);
+                        openDisplayEditor();
                       }}
                       style={styles.editIcon}
                     >
@@ -900,7 +950,7 @@ export default function DisplayCard({
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
+            <ScrollView style={styles.modalBody}>
               <Text style={styles.modalLabel}>{global.t?.t('products','label','displayName')}</Text>
               <TextInput
                 style={styles.modalInput}
@@ -932,6 +982,34 @@ export default function DisplayCard({
                 ))}
               </RadioButton.Group>
 
+              {!isProductionDisplayType(editType) && (
+                <>
+                  <Text style={styles.modalLabel}>Apresentação operacional</Text>
+                  <Text style={styles.modalLabel}>Identificação da fila</Text>
+                  <RadioButton.Group onValueChange={setEditQueueIdentificationMode} value={editQueueIdentificationMode}>
+                    {QUEUE_IDENTIFICATION_OPTIONS.map(option => (
+                      <RadioButton.Item key={option.value} label={option.label} value={option.value} color={ppcColors.accent} />
+                    ))}
+                  </RadioButton.Group>
+                  <Text style={styles.modalLabel}>Indicador do status</Text>
+                  <RadioButton.Group onValueChange={setEditStatusIndicatorMode} value={editStatusIndicatorMode}>
+                    {STATUS_INDICATOR_OPTIONS.map(option => (
+                      <RadioButton.Item key={option.value} label={option.label} value={option.value} color={ppcColors.accent} />
+                    ))}
+                  </RadioButton.Group>
+                  <Text style={styles.modalLabel}>Quantidade quando houver 1 unidade</Text>
+                  <RadioButton.Group onValueChange={value => setEditShowUnitQuantity(value === 'show')} value={editShowUnitQuantity ? 'show' : 'hide'}>
+                    <RadioButton.Item label="Ocultar 1x" value="hide" color={ppcColors.accent} />
+                    <RadioButton.Item label="Mostrar 1x" value="show" color={ppcColors.accent} />
+                  </RadioButton.Group>
+                  <Text style={styles.modalLabel}>Nomes dos grupos</Text>
+                  <RadioButton.Group onValueChange={value => setEditShowGroupNames(value === 'groups')} value={editShowGroupNames ? 'groups' : 'hide'}>
+                    <RadioButton.Item label="Ocultar todos" value="hide" color={ppcColors.accent} />
+                    <RadioButton.Item label="Respeitar configuração de cada grupo" value="groups" color={ppcColors.accent} />
+                  </RadioButton.Group>
+                </>
+              )}
+
               <TouchableOpacity
                 style={[styles.dangerOutlineButton, deletingDisplay && styles.buttonDisabled]}
                 onPress={confirmDeleteDisplay}
@@ -941,7 +1019,7 @@ export default function DisplayCard({
                   {deletingDisplay ? 'Excluindo...' : 'Excluir display'}
                 </Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
 
             <View style={styles.modalFooter}>
               <TouchableOpacity

@@ -51,6 +51,8 @@ import {
 } from './ordersPagination'
 import { resolveOrdersTopCounterValue } from './ordersTopCounter'
 import createStyles from './index.styles'
+import { resolveDisplayPresentation } from '@controleonline/ui-ppc/src/react/utils/displayPresentation'
+import useBrowserVisibilityRefresh from '@controleonline/ui-ppc/src/react/utils/useBrowserVisibilityRefresh'
 import DisplayDeliveryMap from './DisplayDeliveryMap'
 import DisplayConferenceAutoPrintDispatcher from './DisplayConferenceAutoPrintDispatcher'
 import TvAutoScrollView from './TvAutoScrollView'
@@ -256,6 +258,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const ordersLoadingPagesRef = useRef(new Map())
   const ordersFeedGenerationRef = useRef(0)
   const currentDisplayType = normalizeDisplayType(display?.displayType || route.params?.displayType)
+  const displayPresentation = useMemo(
+    () => resolveDisplayPresentation(display),
+    [display],
+  )
   const tvMode = Boolean(isTvDisplay) || isTrackingDisplayType(currentDisplayType)
 
   const effectiveWidth = useMemo(() => {
@@ -471,6 +477,15 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
   const refreshOrders = useCallback(
     (source = 'manual', detail = '') => loadOrdersPage(1, source, detail),
     [loadOrdersPage],
+  )
+  const refreshOrdersOnVisibility = useCallback(
+    () => refreshOrders('visibility', 'browser-focus'),
+    [refreshOrders],
+  )
+
+  useBrowserVisibilityRefresh(
+    refreshOrdersOnVisibility,
+    Boolean(isFocused && currentCompany?.id),
   )
 
   const loadMoreOrders = useCallback(() => {
@@ -774,6 +789,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                   displayType: DISPLAY_TYPE_CONFERENCE,
                   kds: true,
                   hideBottomToolBar: true,
+                  queueIdentificationMode: displayPresentation.queueIdentificationMode,
+                  statusIndicatorMode: displayPresentation.statusIndicatorMode,
+                  showUnitQuantity: displayPresentation.showUnitQuantity,
+                  showGroupNames: displayPresentation.showGroupNames,
                 })
               }}
             >
@@ -821,6 +840,10 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             showHierarchyGuides={
               isConferenceDisplayType(currentDisplayType)
             }
+            queueIdentificationMode={displayPresentation.queueIdentificationMode}
+            statusIndicatorMode={displayPresentation.statusIndicatorMode}
+            showUnitQuantity={displayPresentation.showUnitQuantity}
+            showGroupNames={displayPresentation.showGroupNames}
           />
         </View>
       ) : null
@@ -877,6 +900,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       display?.displayType,
       display?.id,
       displayId,
+      displayPresentation,
       navigation,
       orderProductsStyles,
       ppcColors,

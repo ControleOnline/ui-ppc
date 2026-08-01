@@ -29,6 +29,15 @@ const createStyles = (ppcColors) =>
       justifyContent: 'center',
       marginLeft: 6,
     },
+    editQueueButton: {
+      width: 24,
+      height: 24,
+      borderRadius: 999,
+      backgroundColor: ppcColors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 6,
+    },
     statusPillsRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -150,6 +159,13 @@ const createStyles = (ppcColors) =>
       paddingHorizontal: 10,
       paddingVertical: 12,
     },
+    queueForm: { maxHeight: 440, paddingHorizontal: 24, paddingVertical: 12 },
+    fieldLabel: { color: ppcColors.textSecondary, fontSize: 12, fontWeight: '800', marginTop: 10, marginBottom: 6 },
+    input: { borderWidth: 1, borderColor: ppcColors.border, borderRadius: 10, color: ppcColors.textPrimary, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: ppcColors.cardBgSoft },
+    iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+    iconOption: { width: 104, minHeight: 72, borderWidth: 1, borderColor: ppcColors.border, borderRadius: 10, alignItems: 'center', justifyContent: 'center', padding: 8, gap: 4 },
+    iconOptionSelected: { borderColor: ppcColors.accent, backgroundColor: ppcColors.cardBgSoft },
+    iconOptionLabel: { color: ppcColors.textSecondary, fontSize: 10, fontWeight: '700', textAlign: 'center' },
     modalFooter: {
       flexDirection: 'row',
       padding: 20,
@@ -178,6 +194,7 @@ const createStyles = (ppcColors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    buttonDisabled: { opacity: 0.55 },
     saveButtonText: {
       fontSize: 16,
       fontWeight: '600',
@@ -190,4 +207,3 @@ export default createStyles;
 export const inlineStyle_131_8 = {
   justifyContent: 'flex-end',
 };
-

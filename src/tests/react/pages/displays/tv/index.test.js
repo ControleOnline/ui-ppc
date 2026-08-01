@@ -117,7 +117,12 @@ jest.mock(
 )
 
 const { api } = require('@controleonline/ui-common/src/api')
-const { TvOrderCard, countOperationalOrderItems, fetchTrackingOrdersPage } =
+const {
+  TvOrderCard,
+  countOperationalOrderItems,
+  fetchTrackingOrdersPage,
+  isTrackingMessageForCompany,
+} =
   require('../../../../../react/pages/displays/tv')
 
 describe('TvOrderCard', () => {
@@ -136,6 +141,12 @@ describe('TvOrderCard', () => {
     await expect(fetchTrackingOrdersPage(query)).resolves.toEqual({member: []})
     expect(api.fetch).toHaveBeenCalledTimes(1)
     expect(api.fetch).toHaveBeenCalledWith('/orders-tracking', {params: query})
+  })
+
+  it('accepts realtime mutations only for the current company when identified', () => {
+    expect(isTrackingMessageForCompany({company: '/people/3'}, 3)).toBe(true)
+    expect(isTrackingMessageForCompany({company: {id: 4}}, 3)).toBe(false)
+    expect(isTrackingMessageForCompany({store: 'order_products'}, 3)).toBe(true)
   })
 
   it('renders full order details for TV cards', () => {
@@ -211,6 +222,11 @@ describe('TvOrderCard', () => {
       showRootStatusMarker: false,
       showGroupStatusMarker: false,
       hierarchyGuideColor: '#CBD5E1',
+      queueIdentificationMode: 'short_label',
+      statusIndicatorMode: 'bullet',
+      showUnitQuantity: false,
+      showGroupNames: false,
+      showConferenceCheck: true,
       compact: true,
     })
     expect(global.__orderProductsProps.productCards).toHaveLength(1)

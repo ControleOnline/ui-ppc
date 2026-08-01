@@ -11,6 +11,11 @@ import {
   normalizeDisplayType,
 } from '@controleonline/ui-ppc/src/react/utils/displayTypes';
 import createStyles from './DisplayForm.styles';
+import {
+  QUEUE_IDENTIFICATION_OPTIONS,
+  STATUS_INDICATOR_OPTIONS,
+  resolveDisplayPresentation,
+} from '@controleonline/ui-ppc/src/react/utils/displayPresentation';
 
 export default function DisplayForm() {
   const route = useRoute();
@@ -30,6 +35,19 @@ export default function DisplayForm() {
   const [displayValue, setDisplayValue] = useState(display?.display || '');
   const [type, setType] = useState(
     normalizeDisplayType(display?.displayType || display?.display_type || display_type),
+  );
+  const initialPresentation = resolveDisplayPresentation(display);
+  const [queueIdentificationMode, setQueueIdentificationMode] = useState(
+    initialPresentation.queueIdentificationMode,
+  );
+  const [statusIndicatorMode, setStatusIndicatorMode] = useState(
+    initialPresentation.statusIndicatorMode,
+  );
+  const [showUnitQuantity, setShowUnitQuantity] = useState(
+    initialPresentation.showUnitQuantity,
+  );
+  const [showGroupNames, setShowGroupNames] = useState(
+    initialPresentation.showGroupNames,
   );
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -138,6 +156,10 @@ export default function DisplayForm() {
         id: display?.id,
         display: displayValue.trim(),
         displayType: type,
+        queueIdentificationMode,
+        statusIndicatorMode,
+        showUnitQuantity,
+        showGroupNames,
         company: `/people/${currentCompany.id}`,
       });
 
@@ -168,6 +190,10 @@ export default function DisplayForm() {
     navigation,
     showErrorToast,
     showWarningToast,
+    queueIdentificationMode,
+    showUnitQuantity,
+    showGroupNames,
+    statusIndicatorMode,
     type,
   ]);
 
@@ -205,6 +231,89 @@ export default function DisplayForm() {
             </Pressable>
           ))}
         </View>
+
+        {!isProductionDisplayType(type) && (
+          <View>
+            <Text style={styles.label}>Apresentação operacional</Text>
+            <Text style={styles.label}>Identificação da fila</Text>
+            <View style={styles.typesWrapper}>
+              {QUEUE_IDENTIFICATION_OPTIONS.map(option => (
+                <Pressable
+                  key={option.value}
+                  style={[
+                    styles.typeButton,
+                    queueIdentificationMode === option.value && styles.typeButtonSelected,
+                  ]}
+                  onPress={() => setQueueIdentificationMode(option.value)}
+                >
+                  <Text style={queueIdentificationMode === option.value ? styles.typeTextSelected : styles.typeText}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Indicador do status</Text>
+            <View style={styles.typesWrapper}>
+              {STATUS_INDICATOR_OPTIONS.map(option => (
+                <Pressable
+                  key={option.value}
+                  style={[
+                    styles.typeButton,
+                    statusIndicatorMode === option.value && styles.typeButtonSelected,
+                  ]}
+                  onPress={() => setStatusIndicatorMode(option.value)}
+                >
+                  <Text style={statusIndicatorMode === option.value ? styles.typeTextSelected : styles.typeText}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Quantidade quando houver 1 unidade</Text>
+            <View style={styles.typesWrapper}>
+              {[
+                { value: false, label: 'Ocultar 1x' },
+                { value: true, label: 'Mostrar 1x' },
+              ].map(option => (
+                <Pressable
+                  key={String(option.value)}
+                  style={[
+                    styles.typeButton,
+                    showUnitQuantity === option.value && styles.typeButtonSelected,
+                  ]}
+                  onPress={() => setShowUnitQuantity(option.value)}
+                >
+                  <Text style={showUnitQuantity === option.value ? styles.typeTextSelected : styles.typeText}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Nomes dos grupos</Text>
+            <View style={styles.typesWrapper}>
+              {[
+                { value: false, label: 'Ocultar todos' },
+                { value: true, label: 'Respeitar configuração de cada grupo' },
+              ].map(option => (
+                <Pressable
+                  key={String(option.value)}
+                  style={[
+                    styles.typeButton,
+                    showGroupNames === option.value && styles.typeButtonSelected,
+                  ]}
+                  onPress={() => setShowGroupNames(option.value)}
+                >
+                  <Text style={showGroupNames === option.value ? styles.typeTextSelected : styles.typeText}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
 
         <Pressable
           style={[

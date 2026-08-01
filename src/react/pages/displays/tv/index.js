@@ -43,6 +43,8 @@ import {
   getDateRange,
 } from '@controleonline/ui-common/src/react/utils/dateRangeFilter'
 import createStyles from './index.styles'
+import { resolveDisplayPresentation } from '@controleonline/ui-ppc/src/react/utils/displayPresentation'
+import useBrowserVisibilityRefresh from '@controleonline/ui-ppc/src/react/utils/useBrowserVisibilityRefresh'
 
 export const TRACKING_ORDERS_ENDPOINT = '/orders-tracking'
 
@@ -67,6 +69,22 @@ const normalizeEntityId = value => {
 
   return null
 }
+
+export const isTrackingMessageForCompany = (message, companyId) => {
+  if (!message) return false
+
+  const expectedCompanyId = normalizeEntityId(companyId)
+  const messageCompanyId = normalizeEntityId(
+    message?.company?.id || message?.companyId || message?.company,
+  )
+
+  return !expectedCompanyId || !messageCompanyId || expectedCompanyId === messageCompanyId
+}
+
+const removeConsumedTrackingMessages = (messages, companyId) =>
+  (Array.isArray(messages) ? messages : []).filter(
+    message => !isTrackingMessageForCompany(message, companyId),
+  )
 
 const getHydraCollection = value => {
   if (Array.isArray(value)) return value
@@ -110,6 +128,12 @@ export const TvOrderCard = ({
   ppcColors,
   styles,
   orderStyles,
+  displayPresentation = {
+    queueIdentificationMode: 'short_label',
+    statusIndicatorMode: 'bullet',
+    showUnitQuantity: false,
+    showGroupNames: false,
+  },
 }) => {
   const orderProductsStyles = useMemo(
     () => ({
@@ -190,6 +214,11 @@ export const TvOrderCard = ({
               showRootStatusMarker={false}
               showGroupStatusMarker={false}
               hierarchyGuideColor={ppcColors.border}
+              queueIdentificationMode={displayPresentation.queueIdentificationMode}
+              statusIndicatorMode={displayPresentation.statusIndicatorMode}
+              showUnitQuantity={displayPresentation.showUnitQuantity}
+              showGroupNames={displayPresentation.showGroupNames}
+              showConferenceCheck
               compact
             />
           </View>
@@ -201,10 +230,24 @@ export const TvOrderCard = ({
 
 const TvDisplay = ({ display = {} }) => {
   const isFocused = useIsFocused()
-  const { currentCompany } = useStore('people').getters
+  const peopleStore = useStore('people')
+  const ordersStore = useStore('orders')
+  const orderProductsStore = useStore('order_products')
+  const orderProductQueuesStore = useStore('order_products_queue')
+  const { currentCompany } = peopleStore.getters
+  const orderMessages = ordersStore?.getters?.messages
+  const orderProductMessages = orderProductsStore?.getters?.messages
+  const orderProductQueueMessages = orderProductQueuesStore?.getters?.messages
+  const ordersActions = ordersStore?.actions
+  const orderProductsActions = orderProductsStore?.actions
+  const orderProductQueuesActions = orderProductQueuesStore?.actions
   const { ppcColors } = useDisplayTheme()
   const tvStyles = useMemo(() => createStyles(ppcColors), [ppcColors])
   const orderStyles = useMemo(() => createOrderStyles(ppcColors), [ppcColors])
+  const displayPresentation = useMemo(
+    () => resolveDisplayPresentation(display),
+    [display],
+  )
   const { width } = useWindowDimensions()
   const screenWidth = Number(Dimensions.get('screen')?.width || 0)
   const columns = useMemo(
@@ -225,6 +268,7 @@ const TvDisplay = ({ display = {} }) => {
   const ordersTotalItemsRef = useRef(0)
   const ordersLoadingPagesRef = useRef(new Map())
   const ordersFeedGenerationRef = useRef(0)
+  const realtimeRefreshTimeoutRef = useRef(null)
 
   const resetOrdersFeed = useCallback(() => {
     ordersFeedGenerationRef.current += 1
@@ -309,6 +353,70 @@ const TvDisplay = ({ display = {} }) => {
     resetOrdersFeed()
     return loadOrdersPage(1)
   }, [loadOrdersPage, resetOrdersFeed])
+
+  const hasRealtimeRefreshMessage = useMemo(
+    () => [orderMessages, orderProductMessages, orderProductQueueMessages]
+      .some(messages =>
+        (Array.isArray(messages) ? messages : []).some(message =>
+          isTrackingMessageForCompany(message, currentCompany?.id),
+        ),
+      ),
+    [
+      currentCompany?.id,
+      orderMessages,
+      orderProductMessages,
+      orderProductQueueMessages,
+    ],
+  )
+
+  useEffect(() => {
+    if (!isFocused || !hasRealtimeRefreshMessage) {
+      return undefined
+    }
+
+    ordersActions?.setMessages?.(
+      removeConsumedTrackingMessages(orderMessages, currentCompany?.id),
+    )
+    orderProductsActions?.setMessages?.(
+      removeConsumedTrackingMessages(orderProductMessages, currentCompany?.id),
+    )
+    orderProductQueuesActions?.setMessages?.(
+      removeConsumedTrackingMessages(orderProductQueueMessages, currentCompany?.id),
+    )
+
+    if (realtimeRefreshTimeoutRef.current) {
+      clearTimeout(realtimeRefreshTimeoutRef.current)
+    }
+    realtimeRefreshTimeoutRef.current = setTimeout(() => {
+      realtimeRefreshTimeoutRef.current = null
+      refreshOrders()
+    }, 220)
+
+    return undefined
+  }, [
+    currentCompany?.id,
+    hasRealtimeRefreshMessage,
+    isFocused,
+    orderMessages,
+    orderProductMessages,
+    orderProductQueueMessages,
+    orderProductQueuesActions,
+    orderProductsActions,
+    ordersActions,
+    refreshOrders,
+  ])
+
+  useEffect(() => () => {
+    if (realtimeRefreshTimeoutRef.current) {
+      clearTimeout(realtimeRefreshTimeoutRef.current)
+      realtimeRefreshTimeoutRef.current = null
+    }
+  }, [])
+
+  useBrowserVisibilityRefresh(
+    refreshOrders,
+    Boolean(isFocused && currentCompany?.id),
+  )
 
   const loadMoreOrders = useCallback(() => {
     if (!hasMoreOrdersPages(ordersPagesRef.current, ordersTotalItemsRef.current)) {
@@ -435,10 +543,11 @@ const TvDisplay = ({ display = {} }) => {
           ppcColors={ppcColors}
           styles={tvStyles}
           orderStyles={orderStyles}
+          displayPresentation={displayPresentation}
         />
       )
     },
-    [orderStyles, ppcColors, tvStyles],
+    [displayPresentation, orderStyles, ppcColors, tvStyles],
   )
 
   return (
