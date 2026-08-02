@@ -8,6 +8,43 @@ const createStyles = ppcColors =>
       flex: 1,
       backgroundColor: ppcColors.appBg,
     },
+    headerTitleWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minWidth: 0,
+      flexShrink: 1,
+      gap: 8,
+    },
+    headerTitleText: {
+      color: ppcColors.textPrimary,
+      fontSize: 16,
+      lineHeight: 20,
+      fontWeight: '900',
+      flexShrink: 1,
+    },
+    headerCountBubble: {
+      minWidth: 30,
+      height: 26,
+      paddingHorizontal: 9,
+      borderRadius: 999,
+      backgroundColor: ppcColors.accentInfo,
+      borderWidth: 1,
+      borderColor: withOpacity(ppcColors.accentInfo, 0.55),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerCountText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      lineHeight: 16,
+      fontWeight: '900',
+    },
+    headerCountSkeleton: {
+      width: 14,
+      height: 8,
+      borderRadius: 999,
+      backgroundColor: withOpacity('#FFFFFF', 0.45),
+    },
     summaryCard: {
       marginHorizontal: 12,
       marginTop: 10,
@@ -90,6 +127,29 @@ const createStyles = ppcColors =>
       borderTopWidth: 1,
       borderTopColor: withOpacity(ppcColors.border, 0.7),
     },
+    filtersCard: {
+      marginHorizontal: 12,
+      marginTop: 10,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: ppcColors.borderSoft,
+      backgroundColor: ppcColors.cardBg,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    filtersRow: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: 8,
+    },
+    filterPeriodColumn: {
+      flex: 1.35,
+      minWidth: 0,
+    },
+    filterOptionColumn: {
+      flex: 1,
+      minWidth: 0,
+    },
     summaryTypePill: {
       alignSelf: 'flex-start',
       borderRadius: 999,
@@ -142,6 +202,14 @@ const createStyles = ppcColors =>
     tvColumnWrapper: {
       gap: 6,
       justifyContent: 'space-between',
+      flex: 1,
+    },
+    tvTicketGrid: {
+      flexGrow: 1,
+      paddingHorizontal: 6,
+      paddingBottom: 6,
+      paddingTop: 4,
+      gap: 6,
     },
     orderCard: {
       flex: 1,
@@ -176,7 +244,18 @@ const createStyles = ppcColors =>
       borderTopColor: ppcColors.border,
       backgroundColor: ppcColors.cardBg,
     },
-    printActionButton: {
+    orderActionsRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    printActionButtonWrap: {
+      flex: 1,
+      minWidth: 0,
+      marginHorizontal: 0,
+      padding: 0,
+      backgroundColor: 'transparent',
+    },
+    printActionButtonMain: {
       minHeight: 40,
       borderRadius: 10,
       borderWidth: 1,
@@ -188,9 +267,40 @@ const createStyles = ppcColors =>
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
+      flex: 1,
+      minWidth: 0,
     },
     printActionButtonText: {
       color: ppcColors.pillTextDark,
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: 0.3,
+    },
+    readyActionButton: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 40,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: withOpacity('#16A34A', 0.4),
+      backgroundColor: '#16A34A',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    readyActionButtonDisabled: {
+      opacity: 0.55,
+    },
+    readyActionButtonLoading: {
+      opacity: 0.8,
+    },
+    readyActionButtonText: {
+      color: '#FFFFFF',
       fontSize: 12,
       lineHeight: 16,
       fontWeight: '900',
@@ -201,6 +311,9 @@ const createStyles = ppcColors =>
       padding: 6,
       flex: 1,
       minHeight: 0,
+    },
+    tvTicketEmptySlot: {
+      opacity: 0,
     },
     orderTopRow: {
       flexDirection: 'row',
@@ -427,6 +540,22 @@ const createStyles = ppcColors =>
       paddingVertical: 6,
       gap: 4,
     },
+    orderItemsHeader: {
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: withOpacity(ppcColors.accentInfo, 0.26),
+      backgroundColor: withOpacity(ppcColors.accentInfo, 0.08),
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+    },
+    orderItemsHeaderText: {
+      color: ppcColors.textPrimary,
+      fontSize: 10,
+      lineHeight: 13,
+      fontWeight: '900',
+      textTransform: 'uppercase',
+      letterSpacing: 0,
+    },
     tvOrderProductItemRow: {
       paddingHorizontal: 6,
       paddingVertical: 5,
@@ -465,6 +594,9 @@ const createStyles = ppcColors =>
       paddingVertical: 7,
       marginBottom: 6,
     },
+    orderProductRootFamilySeparator: {
+      borderTopColor: withOpacity(ppcColors.textPrimary, 0.28),
+    },
     orderProductItemMainRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -493,6 +625,9 @@ const createStyles = ppcColors =>
       width: 6,
       height: 6,
       borderRadius: 999,
+    },
+    orderProductQueueBadgeDotHidden: {
+      display: 'none',
     },
     orderProductQueueBadgeText: {
       fontSize: 9,
@@ -823,6 +958,10 @@ const createStyles = ppcColors =>
       paddingTop: 6,
       paddingBottom: 6,
       overflow: 'hidden',
+    },
+    tvMapStage: {
+      flex: 1,
+      position: 'relative',
     },
     tvPageGrid: {
       width: '100%',

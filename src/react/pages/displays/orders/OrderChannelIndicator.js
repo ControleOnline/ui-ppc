@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React from 'react'
 import { Image, Text, View } from 'react-native'
 
 import {
@@ -15,10 +15,9 @@ const OrderChannelIndicator = ({
   fallbackWrapStyle = null,
   fallbackTextStyle = null,
 }) => {
-  const channelLogo = useMemo(() => getOrderChannelLogo(order), [order])
-  const channelLabel = useMemo(
-    () => normalizeLabel(getOrderChannelLabel(order) || 'Balcao'),
-    [order],
+  const channelLogo = getOrderChannelLogo(order)
+  const channelLabel = normalizeLabel(
+    getOrderChannelLabel(order) || global.t?.t('display', 'label', 'counter'),
   )
 
   if (channelLogo) {

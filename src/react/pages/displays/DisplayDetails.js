@@ -14,11 +14,21 @@ import {
     normalizeEntityId,
     resolveForcedDisplayId,
 } from '@controleonline/ui-ppc/src/react/utils/forcedDisplay';
+import {
+    isConferenceDisplayType,
+    isProductionDisplayType,
+    isTrackingDisplayType,
+    normalizeDisplayType,
+} from '@controleonline/ui-ppc/src/react/utils/displayTypes';
+import TvDisplay from './tv';
+import useBrowserVisibilityRefresh from '@controleonline/ui-ppc/src/react/utils/useBrowserVisibilityRefresh';
+
+export const DISPLAY_CONFIGURATION_REFRESH_INTERVAL_MS = 30000;
 
 const DisplayDetails = () => {
     const navigation = useNavigation();
     const route = useRoute();
-    const routeDisplayType = String(route.params?.displayType || '').toLowerCase();
+    const routeDisplayType = normalizeDisplayType(route.params?.displayType);
     const displayId = normalizeEntityId(route.params?.id);
     const { ppcColors, currentCompany } = useDisplayTheme();
     const styles = useMemo(() => createStyles(ppcColors), [ppcColors]);
@@ -42,13 +52,19 @@ const DisplayDetails = () => {
         [currentCompany?.id, currentDevice?.device, currentDevice?.id, deviceConfig],
     );
     const isForcedDisplay = forcedDisplayId !== null && displayId === forcedDisplayId;
-    const effectiveDisplayType = String(display?.displayType || routeDisplayType || '').toLowerCase();
-    const isTvDisplay = effectiveDisplayType === 'tv';
+    const effectiveDisplayType = normalizeDisplayType(display?.displayType || routeDisplayType);
+    const isTvDisplay = isTrackingDisplayType(effectiveDisplayType);
     const shouldHideNavigation = isTvDisplay || isForcedDisplay;
-    const displayDetailsTitle = useMemo(
-        () => global.t?.t('configs', 'title', 'displayDetails') || 'Display',
-        [],
-    );
+    const displayDetailsTitle =
+        global.t?.t('configs', 'title', 'displayDetails') || 'Display';
+    const refreshDisplay = useCallback(() => {
+        if (!displayId) return Promise.resolve(null);
+
+        return actions.get({
+            id: displayId,
+            __storeMeta: { preserveItem: true },
+        }).catch(() => null);
+    }, [actions, displayId]);
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -78,9 +94,27 @@ const DisplayDetails = () => {
         shouldHideNavigation,
     ]);
 
+    useFocusEffect(
+        useCallback(() => {
+            refreshDisplay();
+            return undefined;
+        }, [refreshDisplay]),
+    );
+
+    useBrowserVisibilityRefresh(refreshDisplay, Boolean(displayId));
+
     useEffect(() => {
-        if (displayId) actions.get(displayId);
-    }, [actions, displayId]);
+        if (!displayId) {
+            return undefined;
+        }
+
+        const interval = setInterval(
+            refreshDisplay,
+            DISPLAY_CONFIGURATION_REFRESH_INTERVAL_MS,
+        );
+
+        return () => clearInterval(interval);
+    }, [displayId, refreshDisplay]);
 
     useEffect(() => {
         if (
@@ -147,12 +181,16 @@ const DisplayDetails = () => {
         }, [isForcedDisplay]),
     );
 
-    if (effectiveDisplayType === 'products') {
+    if (isTrackingDisplayType(effectiveDisplayType)) {
+        return <TvDisplay display={display} />;
+    }
+
+    if (isProductionDisplayType(effectiveDisplayType)) {
         return <ProductsDisplay display={display} />;
     }
 
-    if (effectiveDisplayType === 'orders' || effectiveDisplayType === 'tv') {
-        return <OrdersDisplay display={display} isTvDisplay={isTvDisplay} />;
+    if (isConferenceDisplayType(effectiveDisplayType)) {
+        return <OrdersDisplay display={display} />;
     }
 
     if (!display?.id || !display?.displayType) {
@@ -183,3 +221,4 @@ const DisplayDetails = () => {
 
 
 export default DisplayDetails;
+// TODO(store-first): quando este arquivo for mexido, mover a leitura para stores, remover api.fetch e evitar repassar dados em objetos quando o store ja resolver isso.

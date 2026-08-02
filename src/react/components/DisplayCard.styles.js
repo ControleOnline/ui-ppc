@@ -189,6 +189,7 @@ const createStyles = (ppcColors) =>
     justifyContent: 'center',
   },
   modalBody: {
+    flexShrink: 1,
     paddingHorizontal: 24,
     paddingVertical: 16,
   },
@@ -364,4 +365,3 @@ export const inlineStyle_964_8 = {
 export const inlineStyle_1004_8 = {
   justifyContent: 'flex-end',
 };
-

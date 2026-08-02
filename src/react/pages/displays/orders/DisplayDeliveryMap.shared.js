@@ -1,0 +1,102 @@
+const normalizeText = value => String(value || '').trim();
+
+const normalizeCoordinate = value => {
+  const coordinate = Number(String(value || '').replace(',', '.'));
+
+  return Number.isFinite(coordinate) ? coordinate : null;
+};
+
+const resolveAddressCoordinates = address => {
+  if (!address || typeof address !== 'object') {
+    return null;
+  }
+
+  const latitude = normalizeCoordinate(address.latitude);
+  const longitude = normalizeCoordinate(address.longitude);
+
+  if (latitude === null || longitude === null) {
+    return null;
+  }
+
+  return {
+    ...address,
+    latitude,
+    longitude,
+  };
+};
+
+const getDeliveryTitle = delivery => {
+  const displayCode = normalizeText(delivery?.displayCode);
+  const id = normalizeText(delivery?.id);
+
+  return displayCode ? `#${displayCode}` : id ? `#${id}` : 'Entrega';
+};
+
+const getStatusKey = delivery =>
+  normalizeText(delivery?.status?.status || delivery?.status).toLowerCase();
+
+const getRouteColor = delivery => {
+  const status = getStatusKey(delivery);
+
+  if (status === 'closed') return '#15803D';
+  if (status === 'way' || status === 'away') return '#0369A1';
+
+  return normalizeText(delivery?.status?.color) || '#0EA5E9';
+};
+
+export const buildDisplayDeliveryMapConfig = payload => {
+  const deliveries = Array.isArray(payload?.deliveries) ? payload.deliveries : [];
+  const providerAddress = resolveAddressCoordinates(payload?.provider?.address || null);
+
+  const markers = deliveries
+    .map((delivery, index) => {
+      const address = resolveAddressCoordinates(delivery?.address || null);
+
+      if (!address) {
+        return null;
+      }
+
+      return {
+        ...address,
+        id:
+          normalizeText(delivery?.id) ||
+          normalizeText(delivery?.displayCode) ||
+          `delivery-${index}`,
+        title: getDeliveryTitle(delivery),
+        companyName:
+          normalizeText(delivery?.client?.alias || delivery?.client?.name) ||
+          normalizeText(payload?.provider?.alias || payload?.provider?.name) ||
+          'Entrega',
+        addressLine: normalizeText(address.formatted || address.streetLine || address.nickname),
+        addressExtra: normalizeText(
+          [delivery?.status?.status || delivery?.status, delivery?.client?.name]
+            .filter(Boolean)
+            .join(' • '),
+        ),
+        routeColor: getRouteColor(delivery),
+        distanceLabel: '',
+        openingHours: '',
+        phoneLabel: '',
+      };
+    })
+    .filter(Boolean);
+
+  const paths = markers
+    .filter(marker => providerAddress && Number.isFinite(marker.latitude) && Number.isFinite(marker.longitude))
+    .map(marker => ({
+      id: `${normalizeText(providerAddress.id || 'provider')}-${marker.id}`,
+      from: providerAddress,
+      to: marker,
+      color: marker.routeColor,
+    }));
+
+  return {
+    ...payload,
+    addresses: {
+      origin: providerAddress,
+      markers,
+      user: null,
+    },
+    paths,
+  };
+};

@@ -100,7 +100,7 @@ const InOut = ({
         return (
             <Card key={order.id} style={styles.orderCard}>
                 <Card.Content style={styles.orderContent}>
-                    <OrderHeader order={orderHeaderPayload} isKds />
+                    <OrderHeader order={orderHeaderPayload} isKds showPricing={false} />
                 </Card.Content>
 
                 <OrderProductComponents

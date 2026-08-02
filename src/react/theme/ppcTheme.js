@@ -29,9 +29,9 @@ export const writePpcAppearanceMode = (mode) => {
   }
   return nextMode;
 };
-
+//themeColors
 export const resolvePpcColors = (colors = {}, mode = DARK) => {
-  const primary = colors.primary || '#1B5587';
+  const primary = colors.primary;
   const isLight = mode === LIGHT;
   const darkDefaults = {
     appBg: '#060A11',
@@ -67,19 +67,21 @@ export const resolvePpcColors = (colors = {}, mode = DARK) => {
     cardBg: colors[isLight ? 'ppc-card-bg-light' : 'ppc-card-bg'] || defaults.cardBg,
     cardBgSoft:
       colors[isLight ? 'ppc-card-bg-soft-light' : 'ppc-card-bg-soft'] || defaults.cardBgSoft,
-    modalBg: colors['ppc-modal-bg'] || '#FBFCFF',
+    modalBg: colors['ppc-modal-bg'],
+    //modalBg: themeColors['ppc-modal-bg'] || themeColors['ppc-card-bg-light'] || '#FFFFFF',
+    
     textPrimary: colors[isLight ? 'ppc-text-primary-light' : 'ppc-text-primary'] || defaults.textPrimary,
     textSecondary:
       colors[isLight ? 'ppc-text-secondary-light' : 'ppc-text-secondary'] || defaults.textSecondary,
-    textDark: colors['ppc-text-dark'] || '#0F172A',
+    textDark: colors['ppc-text-dark'],
     border: colors[isLight ? 'ppc-border-light' : 'ppc-border'] || defaults.border,
     borderSoft: colors[isLight ? 'ppc-border-soft-light' : 'ppc-border-soft'] || defaults.borderSoft,
     overlay: colors[isLight ? 'ppc-overlay-light' : 'ppc-overlay'] || defaults.overlay,
-    accent: colors['ppc-accent'] || '#FACC15',
-    accentInfo: colors['ppc-accent-info'] || '#38BDF8',
-    danger: colors['ppc-danger'] || '#EF4444',
+    accent: colors['ppc-accent'],
+    accentInfo: colors['ppc-accent-info'],
+    danger: colors['ppc-danger'],
     dangerBg: colors[isLight ? 'ppc-danger-bg-light' : 'ppc-danger-bg'] || defaults.dangerBg,
-    dangerText: colors['ppc-danger-text'] || '#FCA5A5',
+    dangerText: colors['ppc-danger-text'],
     pillTextDark: colors[isLight ? 'ppc-pill-text-dark-light' : 'ppc-pill-text-dark'] || defaults.pillTextDark,
     primary,
     isLight,

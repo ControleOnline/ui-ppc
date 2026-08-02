@@ -1,39 +1,75 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Dimensions, FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native'
+/*
+ * Regra do display `orders`
+ * - Este fluxo precisa reagir a novos pedidos em tempo real, sem refresh manual.
+ * - O runtime compartilhado e o store de pedidos sao a fonte de verdade.
+ * - O aviso sonoro operacional vem do contrato central do websocket.
+ */
+
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  Dimensions,
+  FlatList,
+  Pressable,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native'
 import { useStore } from '@store'
 import { api } from '@controleonline/ui-common/src/api'
-import {
-  DISPLAY_SIZE_DEFAULT,
-  isDisplaySideBreakEnabled,
-  parseConfigsObject,
-  resolveDisplaySize,
-} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
-import {
+import CompactFilterSelector from '@controleonline/ui-default/src/react/components/filters/CompactFilterSelector'
+import DateShortcutFilter from '@controleonline/ui-default/src/react/components/filters/DateShortcutFilter'
+import OrderHeader, {
   resolveDisplayedOrderStatus,
 } from '@controleonline/ui-orders/src/react/components/OrderHeader'
 import OrderProducts from '@controleonline/ui-orders/src/react/components/OrderProducts'
 import OrderStackedTopBar from '@controleonline/ui-orders/src/react/pages/orders/sales/components/OrderStackedTopBar'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
 import { withOpacity } from '@controleonline/../../src/styles/branding'
-import { DISPLAY_DEVICE_TYPE } from '@controleonline/ui-common/src/react/utils/printerDevices'
-
+import { normalizeEntityId } from '@controleonline/ui-common/src/react/utils/paymentDevices'
 import {
-  filterDeviceConfigsByCompany,
-  normalizeDeviceId,
-  normalizeEntityId,
-} from '@controleonline/ui-common/src/react/utils/paymentDevices'
+  DEFAULT_DATE_FILTER_KEY,
+  getDateRange,
+} from '@controleonline/ui-common/src/react/utils/dateRangeFilter'
+import {
+  DISPLAY_TYPE_CONFERENCE,
+  isConferenceDisplayType,
+  isTrackingDisplayType,
+  normalizeDisplayType,
+} from '@controleonline/ui-ppc/src/react/utils/displayTypes'
 
-import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton'
 import RealtimeDebugBar from '@controleonline/ui-ppc/src/react/components/RealtimeDebugBar'
-import { buildOrderDetailsRouteParams } from '@controleonline/ui-orders/src/react/utils/orderRoute'
-import { resolveDisplayTicketSummary } from '@controleonline/ui-ppc/src/react/pages/displays/products/displayPrintRules'
+import {
+  DISPLAY_ORDERS_PAGE_SIZE,
+  extractCollectionItems,
+  extractCollectionTotalItems,
+  flattenOrdersPages,
+  getNextOrdersPageNumber,
+  hasMoreOrdersPages,
+  mergeOrdersPage,
+} from './ordersPagination'
+import { resolveOrdersTopCounterValue } from './ordersTopCounter'
 import createStyles from './index.styles'
+import { resolveDisplayPresentation } from '@controleonline/ui-ppc/src/react/utils/displayPresentation'
+import useBrowserVisibilityRefresh from '@controleonline/ui-ppc/src/react/utils/useBrowserVisibilityRefresh'
 import DisplayDeliveryMap from './DisplayDeliveryMap'
 import DisplayConferenceAutoPrintDispatcher from './DisplayConferenceAutoPrintDispatcher'
 import TvAutoScrollView from './TvAutoScrollView'
+import {
+  buildDisplayOrdersQueueQuery,
+  DEFAULT_DISPLAY_ORDER_STATUS_FILTER,
+  resolveDisplayOrderStatusFilter,
+} from './ordersFilters'
+import {
+  resolveResponsiveOrderColumns,
+  resolveResponsiveOrderViewportWidth,
+} from './responsiveColumns'
+import {
+  buildTvTicketGridSlots,
+  resolveTvTicketGridColumns,
+} from './tvTicketGrid'
+import { resolveOrderItemsTotal } from './orderItemsTotal'
 import {
   appendPendingConferenceAutoPrintJob,
   buildConferenceAutoPrintMessageFingerprint,
@@ -41,52 +77,9 @@ import {
   isRelevantConferenceAutoPrintMessage,
   removePendingConferenceAutoPrintJob,
 } from './conferenceAutoPrint'
-
-import {
-  DISPLAY_DEVICE_LINK_CONFIG_KEY,
-  DISPLAY_MIN_COLUMNS_CONFIG_KEY,
-} from '@controleonline/ui-ppc/src/react/utils/forcedDisplay'
+import OperationalInsightsDock from './OperationalInsightsDock'
 
 const { isDisplayVisibleOrder } = require('./orderVisibility')
-const normalizeText = value => String(value || '').trim()
-
-const normalizeQuantity = value => {
-  const numericValue = Number(value || 0)
-  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 1
-}
-
-const formatQuantityPrefix = value => {
-  const quantity = normalizeQuantity(value)
-  return quantity >= 2 ? `${quantity}x ` : ''
-}
-
-const getOrderProductCategoryLabel = item =>
-  normalizeText(
-    item?.product?.category?.name ||
-    item?.product?.category?.category ||
-    item?.category?.name ||
-    item?.category?.category ||
-    item?.product?.productCategory?.category?.name ||
-    item?.product?.productCategory?.category?.category ||
-    item?.product?.productCategories?.[0]?.category?.name ||
-    item?.product?.productCategories?.[0]?.category?.category ||
-    item?.productCategory?.category?.name ||
-    item?.productCategory?.category?.category ||
-    item?.product?.categoryName ||
-    '',
-  )
-
-const getOrderProductGroupLabel = item =>
-  normalizeText(
-    item?.productGroup?.productGroup ||
-    item?.productGroup?.name ||
-    item?.productGroupName ||
-    item?.groupName ||
-    '',
-  )
-
-const getOrderProductBucketLabel = item =>
-  getOrderProductCategoryLabel(item) || getOrderProductGroupLabel(item) || 'Outros'
 
 const formatDebugClock = value => {
   const date = new Date(value)
@@ -96,67 +89,7 @@ const formatDebugClock = value => {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
-
-const parsePositiveInteger = value => {
-  const normalized = String(value || '').replace(/\D+/g, '').trim()
-  if (!normalized) return null
-
-  const parsed = Number(normalized)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
-}
-
-const resolveDisplayLayoutScale = sizeLevel =>
-  clamp(
-    1 + ((Number(sizeLevel || DISPLAY_SIZE_DEFAULT) - DISPLAY_SIZE_DEFAULT) * 0.09),
-    0.64,
-    1.45,
-  )
-
-const TV_LAYOUT_GAP = 8
-const TV_MIN_CARD_WIDTH = 300
-const TV_SIDE_BREAK_MIN_COLUMNS = 4
-const TV_BASE_PAGE_ROTATION_MS = 9000
-const TV_MAX_PAGE_ROTATION_MS = 22000
 const MAX_PROCESSED_CONFERENCE_PRINT_EVENTS = 200
-
-const resolveDisplayDeviceConfig = ({
-  deviceConfigs = [],
-  companyId,
-  currentDeviceId,
-  displayId,
-}) => {
-  const normalizedDisplayId = normalizeEntityId(displayId)
-  if (!normalizedDisplayId) {
-    return null
-  }
-
-  const matchingConfigs = filterDeviceConfigsByCompany(deviceConfigs, companyId)
-    .filter(deviceConfig => {
-      const deviceType = String(deviceConfig?.type || deviceConfig?.device?.type || '')
-        .trim()
-        .toUpperCase()
-
-      if (deviceType !== DISPLAY_DEVICE_TYPE) {
-        return false
-      }
-
-      const configs = parseConfigsObject(deviceConfig?.configs)
-      return normalizeEntityId(configs?.[DISPLAY_DEVICE_LINK_CONFIG_KEY]) === normalizedDisplayId
-    })
-
-  if (matchingConfigs.length === 0) {
-    return null
-  }
-
-  return (
-    matchingConfigs.find(
-      deviceConfig =>
-        normalizeDeviceId(deviceConfig?.device?.device) ===
-        normalizeDeviceId(currentDeviceId),
-    ) || matchingConfigs[0]
-  )
-}
 
 const parseEntityId = value => {
   if (!value) return null
@@ -198,17 +131,6 @@ const getFirstResponseMember = response => {
   return response && typeof response === 'object' ? response : null
 }
 
-const resolveOrderDateValue = order =>
-  normalizeText(order?.alterDate || order?.alter_date || order?.orderDate)
-
-const estimateTextUnits = (value, charsPerLine = 28) => {
-  const normalized = normalizeText(value)
-  if (!normalized) return 0
-
-  const safeCharsPerLine = Math.max(12, Math.round(Number(charsPerLine || 0)))
-  return Math.max(1, Math.ceil(normalized.length / safeCharsPerLine))
-}
-
 const getStatusVisual = (order, ppcColors) => {
   const statusPresentation = resolveDisplayedOrderStatus(order, ppcColors.textSecondary)
 
@@ -220,214 +142,104 @@ const getStatusVisual = (order, ppcColors) => {
   }
 }
 
-const getOrderProductsPreview = (order, maxItems = 5) => {
-  const items = Array.isArray(order?.orderProducts) ? order.orderProducts : []
-
-  const map = new Map()
-
-  items.forEach(item => {
-    if (
-      item?.productGroup &&
-      (
-        item?.showInParentQueue === false ||
-        item?.show_in_parent_queue === false ||
-        item?.showProductGroupInQueue === false ||
-        item?.show_product_group_in_queue === false
-      )
-    ) {
-      return
-    }
-
-    const product = item?.product || {}
-    const parentId =
-      item?.productGroup?.parentProduct?.id || product?.id
-
-    if (!map.has(parentId)) {
-      map.set(parentId, {
-        id: parentId,
-        name: normalizeText(product?.product),
-        description: normalizeText(product?.description),
-        quantity: 0,
-        groups: {},
-      })
-    }
-
-    const parent = map.get(parentId)
-
-    // soma quantidade do principal
-    if (!item?.productGroup) {
-      parent.quantity += Number(item?.quantity || 1)
-    }
-
-    // se tiver grupo → organizar
-    if (item?.productGroup) {
-      const groupName = getOrderProductBucketLabel(item)
-
-      if (!parent.groups[groupName]) {
-        parent.groups[groupName] = []
-      }
-
-      parent.groups[groupName].push({
-        id: item?.id,
-        name: normalizeText(product?.product),
-        quantity: Number(item?.quantity || 1),
-      })
-    }
-  })
-
-  const products = Array.from(map.values())
-
-  return Number.isFinite(maxItems)
-    ? products.slice(0, Math.max(0, maxItems))
-    : products
-}
-
-const estimateTvProductUnits = (product, charsPerLine = 28) => {
-  const groupEntries = Object.entries(product?.groups || {})
-  let units = 1
-
-  units += estimateTextUnits(product?.name, charsPerLine)
-  units += estimateTextUnits(product?.description, charsPerLine + 8)
-
-  groupEntries.forEach(([groupName, items]) => {
-    units += estimateTextUnits(groupName, charsPerLine + 10)
-
-    ;(Array.isArray(items) ? items : []).forEach(child => {
-      units += estimateTextUnits(
-        `${formatQuantityPrefix(child?.quantity)}${normalizeText(child?.name)}`.trim(),
-        charsPerLine,
-      )
-    })
-  })
-
-  return Math.max(3, units)
-}
-
-const estimateTvOrderUnits = (order, charsPerLine = 28) => {
-  const products = getOrderProductsPreview(order, Number.POSITIVE_INFINITY)
-
-  return products.reduce(
-    (totalUnits, product) => totalUnits + estimateTvProductUnits(product, charsPerLine),
-    0,
-  )
-}
-
-const buildTvPageItems = (orders, charsPerLine = 28) =>
-  (Array.isArray(orders) ? orders : []).map((order, index) => ({
-    key: `tv-order-${parseEntityId(order?.id) || index}`,
-    order,
-    totalUnits: estimateTvOrderUnits(order, charsPerLine),
-  }))
-
-const chunkItems = (items, size) => {
-  const safeItems = Array.isArray(items) ? items : []
-  const safeSize = Math.max(1, Number(size) || 1)
-  const chunks = []
-
-  for (let index = 0; index < safeItems.length; index += safeSize) {
-    chunks.push(safeItems.slice(index, index + safeSize))
-  }
-
-  return chunks
-}
-
-const getTvBaseColumns = width => {
-  if (width > 1920) return 6
-  if (width >= 1600) return 5
-  if (width >= 1200) return 4
-  if (width >= 800) return 3
-  if (width >= 600) return 2
-  return 1
-}
-
-const resolveTvLayoutMetrics = ({
-  width,
-  height,
-  summaryHeight,
-  sectionHeight,
-  footerHeight = 0,
-  sizeScale = 1,
-}) => {
-  const contentWidth = Math.max(220, Math.round(width - 24))
-  const availableHeight = Math.max(
-    140,
-    Math.round(height - summaryHeight - sectionHeight - footerHeight - 20),
-  )
-  const minCardWidth = Math.max(
-    220,
-    Math.round(TV_MIN_CARD_WIDTH * Number(sizeScale || 1)),
-  )
-  let columns = Math.max(
-    TV_SIDE_BREAK_MIN_COLUMNS,
-    getTvBaseColumns(width),
-  )
-  while (
-    columns > TV_SIDE_BREAK_MIN_COLUMNS &&
-    Math.floor((contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / columns) < minCardWidth
-  ) {
-    columns -= 1
-  }
-
-  const rows = 1
-
-  const cardWidth = Math.floor(
-    (contentWidth - (TV_LAYOUT_GAP * (columns - 1))) / Math.max(1, columns),
-  )
-  const cardHeight = availableHeight
-  const charsPerLine = clamp(
-    Math.floor((cardWidth - 92) / 7),
-    16,
-    42,
-  )
-
-  return {
-    columns,
-    rows,
-    cardWidth,
-    cardHeight,
-    contentWidth,
-    availableHeight,
-    cardsPerPage: Math.max(1, columns * rows),
-    charsPerLine,
+const translateRefreshDebugToken = value => {
+  switch (String(value || '').trim()) {
+    case 'boot':
+      return global.t?.t('display', 'label', 'boot')
+    case 'startup':
+      return global.t?.t('display', 'label', 'startup')
+    case 'manual':
+      return global.t?.t('display', 'label', 'manual')
+    case 'scroll':
+      return global.t?.t('display', 'label', 'scroll')
+    case 'load-more':
+      return global.t?.t('display', 'label', 'loadMore')
+    case 'socket':
+      return global.t?.t('display', 'label', 'socket')
+    case 'queues':
+      return global.t?.t('display', 'label', 'queues')
+    case 'orders':
+      return global.t?.t('display', 'label', 'orders')
+    case 'focus':
+      return global.t?.t('display', 'label', 'focus')
+    case 'screen-focus':
+      return global.t?.t('display', 'label', 'screenFocus')
+    case 'interval':
+      return global.t?.t('display', 'label', 'interval')
+    case 'connected-poll':
+      return global.t?.t('display', 'label', 'connectedPoll')
+    case 'fallback-poll':
+      return global.t?.t('display', 'label', 'fallbackPoll')
+    default:
+      return value
   }
 }
 
-// Display exibe apenas pedidos em produção com workflow ainda aberto.
+const formatRefreshDebugDetail = detail => {
+  const normalizedDetail = String(detail || '').trim()
+  if (!normalizedDetail) return ''
 
+  const pageFailedMatch = normalizedDetail.match(/^page (\d+) failed$/)
+  if (pageFailedMatch?.[1]) {
+    return `${global.t?.t('display', 'label', 'page')} ${pageFailedMatch[1]} ${global.t?.t('display', 'label', 'failed')}`
+  }
+
+  const pageMatch = normalizedDetail.match(/^page (\d+)(?: \((.+)\))?$/)
+  if (pageMatch?.[1]) {
+    const nextDetail = pageMatch[2]
+      ? ` (${translateRefreshDebugToken(pageMatch[2])})`
+      : ''
+
+    return `${global.t?.t('display', 'label', 'page')} ${pageMatch[1]}${nextDetail}`
+  }
+
+  if (normalizedDetail.includes('+')) {
+    return normalizedDetail
+      .split('+')
+      .map(translateRefreshDebugToken)
+      .join(' + ')
+  }
+
+  return translateRefreshDebugToken(normalizedDetail)
+}
+
+const createEmptyCustomDateRange = () => ({
+  from: '',
+  to: '',
+})
+
+const DISPLAY_ORDER_STATUS_OPTIONS = [
+  { key: 'all', label: 'Todos' },
+  { key: 'open', label: 'Aberto' },
+  { key: 'pending', label: 'Pendente' },
+  { key: 'closed', label: 'Fechado' },
+  { key: 'canceled', label: 'Cancelado' },
+]
 
 const Orders = ({ display = {}, isTvDisplay = false }) => {
   const route = useRoute()
   const navigation = useNavigation()
-  const { width, height } = useWindowDimensions()
+  const isFocused = useIsFocused()
+  const { width } = useWindowDimensions()
   const displayId = decodeURIComponent(route.params?.id || '')
 
   const peopleStore = useStore('people')
   const queuesStore = useStore('queues')
   const ordersStore = useStore('orders')
-  const orderProductsStore = useStore('order_products')
-  const deviceConfigStore = useStore('device_config')
-  const deviceStore = useStore('device')
   const websocketStore = useStore('websocket')
   const runtimeDebugStore = useStore('runtime_debug')
   const { getters, actions } = queuesStore
   const runtimeDebugActions = runtimeDebugStore.actions
-  const { isLoading, messages: queueMessages } = getters
+  const { messages: queueMessages } = getters
   const ordersActions = ordersStore.actions
-  const orderProductsActions = orderProductsStore.actions
   const ordersMessages = ordersStore?.getters?.messages
-  const companyDeviceConfigs = deviceConfigStore?.getters?.items || []
-  const currentDevice = deviceStore?.getters?.item || {}
   const websocketStatus = websocketStore?.getters?.summary || {}
   const websocketConnected = Boolean(websocketStatus?.connected)
   const { currentCompany } = peopleStore.getters
   const { ppcColors } = useDisplayTheme()
 
-  const [orders, setOrders] = useState([])
-  const [visibleCount, setVisibleCount] = useState(50)
-  const [summaryHeight] = useState(0)
-  const [sectionTitleHeight] = useState(0)
-  const [debugBarHeight] = useState(0)
-  const [tvCurrentPage, setTvCurrentPage] = useState(0)
+  const [ordersPages, setOrdersPages] = useState({})
+  const [isInitialOrdersLoading, setIsInitialOrdersLoading] = useState(false)
   const [deliveryMapPayload, setDeliveryMapPayload] = useState(null)
   const [deliveryMapLoading, setDeliveryMapLoading] = useState(false)
   const [deliveryMapError, setDeliveryMapError] = useState('')
@@ -436,112 +248,39 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     lastSource: 'boot',
     lastDetail: 'startup',
   })
+  const [dateFilterKey, setDateFilterKey] = useState(DEFAULT_DATE_FILTER_KEY)
+  const [customDateRange, setCustomDateRange] = useState(createEmptyCustomDateRange)
+  const [statusFilter, setStatusFilter] = useState(DEFAULT_DISPLAY_ORDER_STATUS_FILTER)
   const [pendingConferenceAutoPrintOrderIds, setPendingConferenceAutoPrintOrderIds] = useState([])
   const processedConferencePrintEventsRef = useRef(new Map())
-  const tvMode =
-    Boolean(isTvDisplay) || String(display?.displayType || '').toLowerCase() === 'tv'
+  const ordersPagesRef = useRef({})
+  const ordersTotalItemsRef = useRef(0)
+  const ordersLoadingPagesRef = useRef(new Map())
+  const ordersFeedGenerationRef = useRef(0)
+  const currentDisplayType = normalizeDisplayType(display?.displayType || route.params?.displayType)
+  const displayPresentation = useMemo(
+    () => resolveDisplayPresentation(display),
+    [display],
+  )
+  const tvMode = Boolean(isTvDisplay) || isTrackingDisplayType(currentDisplayType)
 
   const effectiveWidth = useMemo(() => {
     const screenWidth = Number(Dimensions.get('screen')?.width || 0)
-    const windowWidth = Number(width || 0)
-    return Math.max(windowWidth, screenWidth)
+    return resolveResponsiveOrderViewportWidth(width, screenWidth)
   }, [width])
-
-  const effectiveHeight = useMemo(() => {
-    const screenHeight = Number(Dimensions.get('screen')?.height || 0)
-    const windowHeight = Number(height || 0)
-    return Math.max(windowHeight, screenHeight)
-  }, [height])
 
   const selectedDisplayId = useMemo(
     () => normalizeEntityId(display?.id || display?.['@id'] || displayId),
     [display, displayId],
   )
 
-  const linkedDisplayDeviceConfig = useMemo(
-    () =>
-      resolveDisplayDeviceConfig({
-        deviceConfigs: companyDeviceConfigs,
-        companyId: currentCompany?.id,
-        currentDeviceId: currentDevice?.id || currentDevice?.device,
-        displayId: selectedDisplayId,
-      }),
-    [
-      companyDeviceConfigs,
-      currentCompany?.id,
-      currentDevice?.device,
-      currentDevice?.id,
-      selectedDisplayId,
-    ],
+  const columns = useMemo(
+    () => resolveResponsiveOrderColumns(effectiveWidth),
+    [effectiveWidth],
   )
-
-  const linkedDisplayConfigs = useMemo(
-    () => parseConfigsObject(linkedDisplayDeviceConfig?.configs),
-    [linkedDisplayDeviceConfig?.configs],
-  )
-
-  const displaySize = useMemo(
-    () => (tvMode ? resolveDisplaySize(linkedDisplayConfigs) : DISPLAY_SIZE_DEFAULT),
-    [linkedDisplayConfigs, tvMode],
-  )
-
-  const displaySideBreakEnabled = useMemo(
-    () => tvMode && isDisplaySideBreakEnabled(linkedDisplayConfigs),
-    [linkedDisplayConfigs, tvMode],
-  )
-
-  const tvLayoutScale = useMemo(
-    () => resolveDisplayLayoutScale(displaySize),
-    [displaySize],
-  )
-
-  const useTvPagedLayout = displaySideBreakEnabled
-
-  const tvLayout = useMemo(() => {
-    if (!useTvPagedLayout) return null
-
-    return resolveTvLayoutMetrics({
-      width: effectiveWidth,
-      height: effectiveHeight,
-      summaryHeight,
-      sectionHeight: sectionTitleHeight,
-      footerHeight: tvMode ? debugBarHeight : 0,
-      sizeScale: tvLayoutScale,
-    })
-  }, [
-    debugBarHeight,
-    effectiveHeight,
-    effectiveWidth,
-    sectionTitleHeight,
-    summaryHeight,
-    tvLayoutScale,
-    tvMode,
-    useTvPagedLayout,
-  ])
-
-  const configuredMinColumns = useMemo(() => {
-    return parsePositiveInteger(linkedDisplayConfigs?.[DISPLAY_MIN_COLUMNS_CONFIG_KEY])
-  }, [linkedDisplayConfigs])
-
-  const columns = useMemo(() => {
-    const responsiveColumns = useTvPagedLayout
-      ? (tvLayout?.columns || 1)
-      : getTvBaseColumns(Math.round(effectiveWidth / tvLayoutScale))
-
-    return Math.max(responsiveColumns, configuredMinColumns || 1)
-  }, [configuredMinColumns, effectiveWidth, tvLayout?.columns, tvLayoutScale, useTvPagedLayout])
-  const tvCardMaxHeight = useMemo(() => {
-    if (!tvMode) return null
-
-    if (useTvPagedLayout && tvLayout?.cardHeight) {
-      return tvLayout.cardHeight
-    }
-
-    return Math.max(220, Math.round(effectiveHeight - 12))
-  }, [effectiveHeight, tvLayout?.cardHeight, tvMode, useTvPagedLayout])
 
   const styles = useMemo(() => createStyles(ppcColors), [ppcColors])
-  const useCompactTvStyles = tvMode || useTvPagedLayout
+  const useCompactTvStyles = false
   const orderProductsStyles = useMemo(() => ({
     itemRow: [
       styles.orderProductItemRow,
@@ -603,10 +342,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     ],
   }), [styles, useCompactTvStyles])
   const hasOrderFeedRefreshed = Boolean(refreshDebug.lastAt)
-  const showSkeleton =
-    isLoading &&
-    (!Array.isArray(orders) || orders.length === 0) &&
-    !(tvMode && hasOrderFeedRefreshed)
 
   const noteRefresh = useCallback((source, detail = '') => {
     const updatedAt = new Date().toISOString()
@@ -620,7 +355,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       order: 20,
       updatedAt,
       lines: [
-        `ultimo refresh: ${formatDebugClock(updatedAt)} | origem: ${source || 'manual'}${detail ? ` (${detail})` : ''}`,
+        `${global.t?.t('display', 'label', 'lastRefresh')}: ${formatDebugClock(updatedAt)} | ${global.t?.t('display', 'label', 'source')}: ${translateRefreshDebugToken(source || 'manual')}${detail ? ` (${formatRefreshDebugDetail(detail)})` : ''}`,
       ],
     })
   }, [runtimeDebugActions])
@@ -630,6 +365,17 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       runtimeDebugActions.clearFooterEntry('screen-refresh')
     }
   }, [runtimeDebugActions])
+
+  const resetOrdersFeed = useCallback(() => {
+    ordersFeedGenerationRef.current += 1
+    ordersPagesRef.current = {}
+    ordersTotalItemsRef.current = 0
+    ordersLoadingPagesRef.current.clear()
+    setOrdersPages({})
+    setIsInitialOrdersLoading(false)
+    processedConferencePrintEventsRef.current.clear()
+    setPendingConferenceAutoPrintOrderIds([])
+  }, [])
 
   const markProcessedConferencePrintKeys = useCallback(keys => {
     keys.forEach(key => {
@@ -645,91 +391,76 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     })
   }, [])
 
-  const loadDetailedOrderProductsForOrders = useCallback(async queueOrders => {
-    const orderIds = [
-      ...new Set(
-        (Array.isArray(queueOrders) ? queueOrders : [])
-          .map(order => parseEntityId(order?.id || order?.['@id']))
-          .filter(Boolean),
-      ),
-    ]
+  const loadOrdersPage = useCallback(async (page = 1, source = 'manual', detail = '') => {
+    if (!displayId || !currentCompany?.id) return []
 
-    if (!orderIds.length) {
-      return new Map()
+    const targetPage = Math.max(1, Number(page || 1))
+    const requestGeneration = ordersFeedGenerationRef.current
+
+    if (ordersLoadingPagesRef.current.get(targetPage) === requestGeneration) {
+      return []
     }
 
-    const detailedOrderProducts = await orderProductsActions.getItems({
-      'order.id': orderIds,
-      itemsPerPage: Math.max(200, orderIds.length * 20),
-    })
-    const orderProductsByOrderId = new Map()
+    ordersLoadingPagesRef.current.set(targetPage, requestGeneration)
 
-    ;(Array.isArray(detailedOrderProducts) ? detailedOrderProducts : []).forEach(
-      orderProduct => {
-        const orderId = parseEntityId(orderProduct?.order)
+    if (targetPage === 1) {
+      setIsInitialOrdersLoading(true)
+    }
 
-        if (!orderId) {
-          return
+    try {
+      const query = buildDisplayOrdersQueueQuery({
+        companyId: currentCompany.id,
+        dateFilterKey,
+        customDateRange,
+        statusFilter,
+        page: targetPage,
+      })
+
+      if (!query) {
+        return []
+      }
+
+      const response = await api.fetch('/orders', {
+        params: query,
+      })
+
+      if (requestGeneration !== ordersFeedGenerationRef.current) {
+        return []
+      }
+
+      const pageItems = extractCollectionItems(response)
+      const totalItems = extractCollectionTotalItems(response)
+      const nextPages = mergeOrdersPage(ordersPagesRef.current, targetPage, pageItems)
+
+      ordersPagesRef.current = nextPages
+      ordersTotalItemsRef.current = totalItems
+      setOrdersPages(nextPages)
+      noteRefresh(source, `page ${targetPage}${detail ? ` (${detail})` : ''}`)
+
+      return pageItems
+    } catch {
+      if (requestGeneration === ordersFeedGenerationRef.current) {
+        noteRefresh(source, `page ${targetPage} failed`)
+      }
+
+      return []
+    } finally {
+      if (ordersLoadingPagesRef.current.get(targetPage) === requestGeneration) {
+        ordersLoadingPagesRef.current.delete(targetPage)
+
+        if (targetPage === 1) {
+          setIsInitialOrdersLoading(false)
         }
-
-        if (!orderProductsByOrderId.has(orderId)) {
-          orderProductsByOrderId.set(orderId, [])
-        }
-
-        orderProductsByOrderId.get(orderId).push(orderProduct)
-      },
-    )
-
-    return orderProductsByOrderId
-  }, [orderProductsActions])
-
-  const loadDetailedOrdersForOrders = useCallback(async queueOrders => {
-    const normalizedOrders = Array.isArray(queueOrders) ? queueOrders : []
-    const detailedOrders = await Promise.all(
-      normalizedOrders.map(async order => {
-        const orderId = parseEntityId(order?.id || order?.['@id'])
-
-        if (!orderId) {
-          return order
-        }
-
-        try {
-          const detailedOrder = await api.fetch(`orders/${orderId}`)
-
-          if (!detailedOrder || typeof detailedOrder !== 'object') {
-            return order
-          }
-
-          return {
-            ...order,
-            ...detailedOrder,
-          }
-        } catch {
-          return order
-        }
-      }),
-    )
-
-    return detailedOrders
-  }, [])
-
-  const mergeOrdersWithDetailedProducts = useCallback(
-    (queueOrders, orderProductsByOrderId) =>
-      (Array.isArray(queueOrders) ? queueOrders : []).map(order => {
-        const orderId = parseEntityId(order?.id || order?.['@id'])
-        const detailedOrderProducts = orderProductsByOrderId?.get(orderId)
-
-        if (!Array.isArray(detailedOrderProducts) || detailedOrderProducts.length === 0) {
-          return order
-        }
-
-        return {
-          ...order,
-          orderProducts: detailedOrderProducts,
-        }
-      }),
-    [],
-  )
+      }
+    }
+  }, [
+    customDateRange,
+    currentCompany?.id,
+    displayId,
+    noteRefresh,
+    dateFilterKey,
+    statusFilter,
+  ])
 
   const fetchDeliveryMapPayload = useCallback(async () => {
     if (!currentCompany?.id) return null
@@ -743,68 +474,136 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     return getFirstResponseMember(response)
   }, [currentCompany?.id])
 
-  const fetchOrders = useCallback((source = 'manual', detail = '') => {
-    if (!displayId || !currentCompany?.id) return
+  const refreshOrders = useCallback(
+    (source = 'manual', detail = '') => loadOrdersPage(1, source, detail),
+    [loadOrdersPage],
+  )
+  const refreshOrdersOnVisibility = useCallback(
+    () => refreshOrders('visibility', 'browser-focus'),
+    [refreshOrders],
+  )
 
-    setVisibleCount(50)
-    actions
-      .ordersQueue({
-        status: { realStatus: ['open'] },
-        orderType: 'sale',
-        provider: currentCompany.id,
-        itemsPerPage: 50,
-      })
-      .then(async data => {
-        const queueOrders = Array.isArray(data) ? data : []
+  useBrowserVisibilityRefresh(
+    refreshOrdersOnVisibility,
+    Boolean(isFocused && currentCompany?.id),
+  )
 
-        try {
-          const hydratedOrders = tvMode
-            ? await loadDetailedOrdersForOrders(queueOrders)
-            : queueOrders
-          const orderProductsByOrderId =
-            await loadDetailedOrderProductsForOrders(hydratedOrders)
-          setOrders(
-            mergeOrdersWithDetailedProducts(hydratedOrders, orderProductsByOrderId),
-          )
-        } catch {
-          setOrders(queueOrders)
-        }
+  const loadMoreOrders = useCallback(() => {
+    if (!hasMoreOrdersPages(ordersPagesRef.current, ordersTotalItemsRef.current)) {
+      return
+    }
 
-        noteRefresh(source, detail)
-      })
-  }, [
-    actions,
-    currentCompany?.id,
-    displayId,
-    loadDetailedOrderProductsForOrders,
-    loadDetailedOrdersForOrders,
-    mergeOrdersWithDetailedProducts,
-    noteRefresh,
-    tvMode,
-  ])
+    const nextPage = getNextOrdersPageNumber(ordersPagesRef.current)
+    loadOrdersPage(nextPage, 'scroll', 'load-more')
+  }, [loadOrdersPage])
 
   const sortedOrders = useMemo(() => {
-    if (!Array.isArray(orders)) return []
+    const loadedOrders = flattenOrdersPages(ordersPages)
+    if (!Array.isArray(loadedOrders)) return []
 
-    return [...orders]
-      .filter(isDisplayVisibleOrder)
-      .sort((a, b) => {
-        const aTime = new Date(resolveOrderDateValue(a)).getTime()
-        const bTime = new Date(resolveOrderDateValue(b)).getTime()
-        const safeATime = Number.isFinite(aTime) ? aTime : 0
-        const safeBTime = Number.isFinite(bTime) ? bTime : 0
-        return safeATime - safeBTime
-      })
-  }, [orders])
+    return loadedOrders.filter(order => isDisplayVisibleOrder(order, statusFilter))
+  }, [ordersPages, statusFilter])
+  const tvTicketSlots = useMemo(
+    () => buildTvTicketGridSlots(sortedOrders),
+    [sortedOrders],
+  )
+  const tvTicketColumns = useMemo(
+    () => resolveTvTicketGridColumns(tvTicketSlots.length),
+    [tvTicketSlots.length],
+  )
+
+  const showSkeleton =
+    isInitialOrdersLoading &&
+    sortedOrders.length === 0 &&
+    !(tvMode && hasOrderFeedRefreshed)
 
   useEffect(() => {
-    processedConferencePrintEventsRef.current.clear()
-    setPendingConferenceAutoPrintOrderIds([])
-  }, [currentCompany?.id, selectedDisplayId])
+    if (!isFocused || !currentCompany?.id || !selectedDisplayId) {
+      return undefined
+    }
+
+    resetOrdersFeed()
+    refreshOrders('focus', 'screen-focus')
+    return undefined
+  }, [
+    currentCompany?.id,
+    dateFilterKey,
+    customDateRange?.from,
+    customDateRange?.to,
+    isFocused,
+    refreshOrders,
+    resetOrdersFeed,
+    selectedDisplayId,
+    statusFilter,
+  ])
+
+  useEffect(() => {
+    if (!isFocused || !currentCompany?.id || !selectedDisplayId) {
+      return undefined
+    }
+
+    const refreshIntervalMs = websocketConnected ? 30000 : 20000
+
+    const interval = setInterval(() => {
+      refreshOrders(
+        'interval',
+        websocketConnected ? 'connected-poll' : 'fallback-poll',
+      )
+    }, refreshIntervalMs)
+
+    return () => clearInterval(interval)
+  }, [
+    currentCompany?.id,
+    isFocused,
+    refreshOrders,
+    selectedDisplayId,
+    websocketConnected,
+  ])
 
   const listCount = sortedOrders.length
+  const topCounterValue = resolveOrdersTopCounterValue(ordersTotalItemsRef.current)
+  const headerDisplayTitle =
+    String(
+      display?.display ||
+      global.t?.t('configs', 'title', 'displayDetails') ||
+      'Display Details',
+    ).trim() || 'Display Details'
   const shouldRenderDeliveryMap =
     tvMode && hasOrderFeedRefreshed && !showSkeleton && listCount === 0
+
+  useLayoutEffect(() => {
+    if (tvMode) {
+      return undefined
+    }
+
+    navigation.setOptions({
+      headerTitleAlign: 'left',
+      headerTitle: () => (
+        <View style={styles.headerTitleWrap}>
+          <Text numberOfLines={1} style={styles.headerTitleText}>
+            {headerDisplayTitle}
+          </Text>
+          <View style={styles.headerCountBubble}>
+            {isInitialOrdersLoading && listCount === 0 ? (
+              <View style={styles.headerCountSkeleton} />
+            ) : (
+              <Text style={styles.headerCountText}>{topCounterValue}</Text>
+            )}
+          </View>
+        </View>
+      ),
+    })
+
+    return undefined
+  }, [
+    headerDisplayTitle,
+    isInitialOrdersLoading,
+    listCount,
+    navigation,
+    styles,
+    topCounterValue,
+    tvMode,
+  ])
 
   useEffect(() => {
     if (!shouldRenderDeliveryMap) {
@@ -827,7 +626,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       .catch(() => {
         if (cancelled) return
         setDeliveryMapPayload(null)
-        setDeliveryMapError('Nao foi possivel carregar as entregas recentes.')
+        setDeliveryMapError(global.t?.t('display', 'message', 'unableLoadRecentDeliveries'))
       })
       .finally(() => {
         if (!cancelled) setDeliveryMapLoading(false)
@@ -838,41 +637,30 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     }
   }, [fetchDeliveryMapPayload, shouldRenderDeliveryMap])
 
-  const tvPageItems = useMemo(() => {
-    if (!useTvPagedLayout || !tvLayout) return []
+  const operationalInsightsFilters = useMemo(() => {
+    if (!currentCompany?.id) return null
 
-    return buildTvPageItems(
-      sortedOrders,
-      tvLayout.charsPerLine,
-    )
-  }, [sortedOrders, tvLayout, useTvPagedLayout])
+    const dateRange = getDateRange('today', null, {
+      relativeMode: 'rolling',
+      useCurrentMoment: true,
+    })
 
-  const tvPages = useMemo(() => {
-    if (!useTvPagedLayout || !tvLayout) return []
+    return {
+      provider: `/people/${currentCompany.id}`,
+      orderType: 'sale',
+      ...(dateRange?.after ? { 'orderDate[after]': dateRange.after } : {}),
+      ...(dateRange?.before ? { 'orderDate[before]': dateRange.before } : {}),
+    }
+  }, [currentCompany?.id])
 
-    return chunkItems(tvPageItems, tvLayout.cardsPerPage).map(items => ({
-      items,
-      totalUnits: items.reduce(
-        (total, segment) => total + Number(segment?.totalUnits || 0),
-        0,
-      ),
-    }))
-  }, [tvLayout, tvPageItems, useTvPagedLayout])
+  const selectedStatusLabel =
+    DISPLAY_ORDER_STATUS_OPTIONS.find(option => option.key === statusFilter)?.label ||
+    DISPLAY_ORDER_STATUS_OPTIONS[0].label
 
-  const currentTvPage = useMemo(() => {
-    if (!tvPages.length) return null
-    return tvPages[Math.min(tvCurrentPage, tvPages.length - 1)] || null
-  }, [tvCurrentPage, tvPages])
-
-  const tvPageRotationMs = useMemo(() => {
-    if (!currentTvPage) return TV_BASE_PAGE_ROTATION_MS
-
-    return clamp(
-      TV_BASE_PAGE_ROTATION_MS + (Number(currentTvPage.totalUnits || 0) * 420),
-      TV_BASE_PAGE_ROTATION_MS,
-      TV_MAX_PAGE_ROTATION_MS,
-    )
-  }, [currentTvPage])
+  const handleStatusFilterChange = useCallback(optionKey => {
+    setStatusFilter(resolveDisplayOrderStatusFilter(optionKey))
+    return true
+  }, [])
 
   const hasQueueRefreshMessage = useMemo(
     () =>
@@ -951,61 +739,24 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
     ].filter(Boolean)
 
     const refreshTimeout = setTimeout(() => {
-      fetchOrders('socket', refreshSources.join('+'))
+      refreshOrders('socket', refreshSources.join('+'))
     }, 220)
 
     return () => clearTimeout(refreshTimeout)
   }, [
     actions,
     currentCompany?.id,
-    fetchOrders,
     hasOrderRefreshMessage,
     hasQueueRefreshMessage,
     ordersActions,
     ordersMessages,
     queueMessages,
+    refreshOrders,
   ])
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchOrders('focus', 'screen-focus')
-      const refreshIntervalMs = websocketConnected ? 30000 : 20000
-
-      const interval = setInterval(() => {
-        fetchOrders(
-          'interval',
-          websocketConnected ? 'connected-poll' : 'fallback-poll',
-        )
-      }, refreshIntervalMs)
-
-      return () => clearInterval(interval)
-    }, [fetchOrders, websocketConnected]),
-  )
-
-  useEffect(() => {
-    if (!useTvPagedLayout) return
-
-    setTvCurrentPage(previousPage =>
-      previousPage >= tvPages.length ? 0 : previousPage,
-    )
-  }, [tvPages.length, useTvPagedLayout])
-
-  useEffect(() => {
-    if (!useTvPagedLayout || tvPages.length <= 1) {
-      return
-    }
-
-    const timer = setTimeout(() => {
-      setTvCurrentPage(previousPage => (previousPage + 1) % tvPages.length)
-    }, tvPageRotationMs)
-
-    return () => clearTimeout(timer)
-  }, [tvPageRotationMs, tvPages.length, tvCurrentPage, useTvPagedLayout])
 
   const renderOrderCard = useCallback(
     (itemOrRenderInfo, cardStyle = null) => {
       const compactMode = useCompactTvStyles
-      const shouldUseTvPagedCardFrame = useTvPagedLayout
       const normalizedItem =
         itemOrRenderInfo?.item &&
         !itemOrRenderInfo?.order &&
@@ -1014,48 +765,99 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
           : itemOrRenderInfo
 
       const order = normalizedItem?.order || normalizedItem
-      const displayedOrderProducts = Array.isArray(normalizedItem?.products)
-        ? normalizedItem.products
-        : null
       const statusVisual = getStatusVisual(order, ppcColors)
-      const visibleOrderProducts = displayedOrderProducts || order?.orderProducts
-      const hasVisibleProducts =
-        Array.isArray(visibleOrderProducts) && visibleOrderProducts.length > 0
+      const orderId = parseEntityId(order?.id)
+      const visibleOrderProducts = Array.isArray(order?.orderProducts)
+        ? order.orderProducts
+        : []
+
+      if (!tvMode) {
+        return (
+          <View
+            key={normalizedItem?.key || `order-card-${orderId || 0}`}
+            style={[
+              styles.orderCard,
+              cardStyle,
+            ]}
+          >
+            <Pressable
+              style={styles.orderCardPressable}
+              onPress={() => {
+                navigation.navigate('DisplayOrderConference', {
+                  id: orderId,
+                  displayId: parseEntityId(display?.id) || parseEntityId(displayId),
+                  displayType: DISPLAY_TYPE_CONFERENCE,
+                  kds: true,
+                  hideBottomToolBar: true,
+                  queueIdentificationMode: displayPresentation.queueIdentificationMode,
+                  statusIndicatorMode: displayPresentation.statusIndicatorMode,
+                  showUnitQuantity: displayPresentation.showUnitQuantity,
+                  showGroupNames: displayPresentation.showGroupNames,
+                })
+              }}
+            >
+              <View
+                style={[
+                  styles.orderAccentBar,
+                  { backgroundColor: statusVisual.textColor },
+                ]}
+              />
+              <View style={styles.orderCardInner}>
+                <OrderHeader
+                  order={order}
+                  isKds={false}
+                  showPricing={false}
+                  showWaitingTime={false}
+                  metaText={order?.client?.name || ''}
+                />
+              </View>
+            </Pressable>
+          </View>
+        )
+      }
+
+      const hasVisibleProducts = visibleOrderProducts.length > 0
+      const orderItemsTotal = resolveOrderItemsTotal(
+        visibleOrderProducts,
+        order?.status?.color,
+      )
       const productsContent = hasVisibleProducts ? (
         <View style={[styles.productsContent, compactMode && styles.tvProductsContent]}>
+          {tvMode ? (
+            <View style={styles.orderItemsHeader}>
+              <Text style={styles.orderItemsHeaderText}>
+                {`ITENS DO PEDIDO (${orderItemsTotal})`}
+              </Text>
+            </View>
+          ) : null}
           <OrderProducts
             order={order}
-            orderProducts={displayedOrderProducts}
             styles={orderProductsStyles}
             showDetails
+            showDescriptions={!tvMode}
+            showPricing={false}
             maxCards={tvMode ? null : 5}
+            showHierarchyGuides={
+              isConferenceDisplayType(currentDisplayType)
+            }
+            queueIdentificationMode={displayPresentation.queueIdentificationMode}
+            statusIndicatorMode={displayPresentation.statusIndicatorMode}
+            showUnitQuantity={displayPresentation.showUnitQuantity}
+            showGroupNames={displayPresentation.showGroupNames}
           />
         </View>
       ) : null
-      const ticketSummary = resolveDisplayTicketSummary(order)
 
       return (
         <View
           key={normalizedItem?.key || `order-card-${parseEntityId(order?.id) || 0}`}
           style={[
             styles.orderCard,
-            shouldUseTvPagedCardFrame && styles.tvOrderCard,
-            tvMode && tvCardMaxHeight ? { maxHeight: tvCardMaxHeight } : null,
             cardStyle,
           ]}
         >
           <Pressable
             style={styles.orderCardPressable}
-            onPress={() => {
-              ordersActions.syncOrder?.(order)
-              navigation.navigate('OrderDetails', {
-                ...buildOrderDetailsRouteParams(order),
-                kds: true,
-                displayType: display?.displayType || route.params?.displayType,
-                displayId: parseEntityId(display?.id) || parseEntityId(displayId),
-                hideBottomToolBar: tvMode,
-              })
-            }}
           >
             <View
               style={[
@@ -1070,7 +872,7 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
                 isKds
                 orderHeaderProps={{
                   showWaitingTime: false,
-                  metaText: ticketSummary.clientName,
+                  metaText: order?.client?.name || '',
                 }}
                 showActions={false}
                 showBackButton={false}
@@ -1091,23 +893,6 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
               )}
             </View>
           </Pressable>
-          {!tvMode && (
-            <View style={styles.orderActions}>
-              <PrintButton
-                job={{ type: 'order', orderId: parseEntityId(order?.id) || order?.id }}
-                store="orders"
-                label="Imprimir pedido"
-                iconColor={ppcColors.pillTextDark}
-                style={styles.printActionButton}
-                printerSelection={{
-                  enabled: true,
-                  context: 'display',
-                  display,
-                  displayId: display?.id,
-                }}
-              />
-            </View>
-          )}
         </View>
       );
     },
@@ -1115,16 +900,25 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
       display?.displayType,
       display?.id,
       displayId,
+      displayPresentation,
       navigation,
       orderProductsStyles,
       ppcColors,
       route.params?.displayType,
       styles,
       tvMode,
-      tvCardMaxHeight,
       useCompactTvStyles,
-      useTvPagedLayout,
     ],
+  )
+  const renderTvTicketSlot = useCallback(
+    ({item}) => {
+      if (!item?.order) {
+        return <View style={[styles.orderCard, styles.tvTicketEmptySlot]} />
+      }
+
+      return renderOrderCard(item.order)
+    },
+    [renderOrderCard, styles],
   )
 
   return (
@@ -1144,52 +938,40 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 
       {!tvMode && (
         <>
-          <View
-            style={styles.summaryCard}
-          >
-            <View style={styles.summaryHeader}>
-              <View style={styles.summaryIdentity}>
-                <View style={styles.summaryIconWrap}>
-                  <MaterialCommunityIcons
-                    name={display?.displayType === 'products' ? 'silverware-fork-knife' : 'receipt-text'}
-                    size={18}
-                    color={display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo}
-                  />
-                </View>
-                <View style={styles.summaryTitleWrap}>
-                  <Text numberOfLines={1} style={styles.summaryTitle}>
-                    {String(display?.display || 'Display')}
-                  </Text>
-                  <Text style={styles.summarySubtitle}>Pedidos na fila</Text>
-                </View>
+          <View style={styles.filtersCard}>
+            <View style={styles.filtersRow}>
+              <View style={styles.filterPeriodColumn}>
+                <DateShortcutFilter
+                  value={dateFilterKey}
+                  onChange={setDateFilterKey}
+                  customRange={customDateRange}
+                  onCustomRangeChange={setCustomDateRange}
+                  colors={ppcColors}
+                  dense
+                  labelCaption="Período"
+                />
               </View>
 
-              <View style={styles.countBubble}>
-                {isLoading ? (
-                  <View style={styles.countBubbleSkeleton} />
-                ) : (
-                  <Text style={styles.countBubbleText}>{listCount}</Text>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.summaryFooter}>
-              <View style={styles.summaryTypePill}>
-                <Text
-                  style={[
-                    styles.summaryTypeText,
-                    { color: display?.displayType === 'products' ? ppcColors.accent : ppcColors.accentInfo },
-                  ]}
-                >
-                  {String(display?.displayType || 'orders').toUpperCase()}
-                </Text>
+              <View style={styles.filterOptionColumn}>
+                <CompactFilterSelector
+                  accentColor={ppcColors.accentInfo}
+                  dense
+                  active={statusFilter !== 'all'}
+                  icon="filter"
+                  label={selectedStatusLabel}
+                  labelCaption="Status"
+                  options={DISPLAY_ORDER_STATUS_OPTIONS}
+                  selectedKey={statusFilter}
+                  title="Status"
+                  onSelect={handleStatusFilterChange}
+                />
               </View>
             </View>
           </View>
 
           <View style={styles.sectionTitleRow}>
             <View style={styles.sectionLine} />
-            <Text style={styles.sectionTitle}>LISTA DE PEDIDOS</Text>
+            <Text style={styles.sectionTitle}>{global.t?.t('display', 'title', 'orderList')}</Text>
             <View style={styles.sectionLine} />
           </View>
         </>
@@ -1219,49 +1001,50 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
             </View>
           ))}
         </View>
-      ) : shouldRenderDeliveryMap ? (
-        <DisplayDeliveryMap
-          payload={deliveryMapPayload}
-          isLoading={deliveryMapLoading}
-          error={deliveryMapError}
-          ppcColors={ppcColors}
-          tvMode={tvMode}
-        />
-      ) : useTvPagedLayout ? (
-        <View
-          style={[
-            styles.tvPageViewport,
-            tvLayout ? { height: tvLayout.availableHeight } : null,
-          ]}
-        >
-          <View style={styles.tvPageGrid}>
-            {(currentTvPage?.items || []).map(segment =>
-              renderOrderCard(segment, {
-                width: tvLayout?.cardWidth,
-                height: tvLayout?.cardHeight,
-                marginBottom: 0,
-                flexGrow: 0,
-                flexShrink: 0,
-              }),
-            )}
+      ) : tvMode ? (
+        shouldRenderDeliveryMap ? (
+          <View style={styles.tvMapStage}>
+            <DisplayDeliveryMap
+              payload={deliveryMapPayload}
+              isLoading={deliveryMapLoading}
+              error={deliveryMapError}
+              ppcColors={ppcColors}
+              tvMode={tvMode}
+            />
+
+            <OperationalInsightsDock
+              filters={operationalInsightsFilters || null}
+              ppcColors={ppcColors}
+              periodLabel={global.t?.t('display', 'subtitle', 'today')}
+            />
           </View>
-        </View>
+        ) : (
+          <FlatList
+            data={tvTicketSlots}
+            key={`tv-ticket-cols-${tvTicketColumns}`}
+            numColumns={tvTicketColumns}
+            keyExtractor={item => item.key}
+            renderItem={renderTvTicketSlot}
+            columnWrapperStyle={styles.tvColumnWrapper}
+            contentContainerStyle={styles.tvTicketGrid}
+            onEndReached={loadMoreOrders}
+            onEndReachedThreshold={0.3}
+          />
+        )
       ) : (
         <FlatList
-          data={(tvMode ? sortedOrders : sortedOrders.slice(0, visibleCount))}
-          key={`orders-cols-${columns}-size-${displaySize}`}
+          data={sortedOrders}
+          key={`orders-cols-${columns}`}
           numColumns={columns}
           keyExtractor={item => String(item.id)}
           renderItem={renderOrderCard}
           columnWrapperStyle={
             columns > 1
-              ? (tvMode ? styles.tvColumnWrapper : styles.columnWrapper)
+              ? styles.columnWrapper
               : null
           }
-          contentContainerStyle={tvMode ? styles.tvList : styles.list}
-          onEndReached={() => {
-            if (visibleCount < sortedOrders.length) setVisibleCount(v => v + 50)
-          }}
+          contentContainerStyle={styles.list}
+          onEndReached={loadMoreOrders}
           onEndReachedThreshold={0.3}
         />
       )}
@@ -1279,3 +1062,4 @@ const Orders = ({ display = {}, isTvDisplay = false }) => {
 }
 
 export default Orders
+// TODO(store-first): quando este arquivo for mexido, mover a leitura para stores, remover api.fetch e evitar repassar dados em objetos quando o store ja resolver isso.

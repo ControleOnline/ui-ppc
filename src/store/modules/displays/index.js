@@ -49,8 +49,8 @@ export default {
       {
         list: [
           { label: "displayType.production", value: "production" },
-          { label: "displayType.delivery", value: "delivery" },
-          { label: "displayType.display", value: "display" },
+          { label: "displayType.conference", value: "conference" },
+          { label: "displayType.tracking", value: "tracking" },
         ],
         sortable: true,
         name: "displayType",

@@ -4,10 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useStore } from '@store';
-import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
+import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import DisplayCard from '@controleonline/ui-ppc/src/react/components/DisplayCard';
 import { api } from '@controleonline/ui-common/src/api';
-import { env } from '@env';
+import {app_type} from '@appType';
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme';
 import createStyles from './displayPage.styles';
 import {
@@ -17,6 +17,7 @@ import {
   normalizeEntityId,
   resolveForcedDisplayId,
 } from '@controleonline/ui-ppc/src/react/utils/forcedDisplay';
+import { DISPLAY_TYPE_PRODUCTION } from '@controleonline/ui-ppc/src/react/utils/displayTypes';
 
 const BRAND_LOGO = require('@assets/ppc/logo 512x512 r.png');
 
@@ -93,7 +94,7 @@ const DisplaysPage = () => {
       }
     }
 
-    const displays = await actions.getItems({ company: currentCompany.id, itemsPerPage: 50 });
+    const displays = await actions.getItems({ company: currentCompany.id});
     const displayIds = (Array.isArray(displays) ? displays : [])
       .map(row => normalizeEntityId(row?.id || row?.['@id'] || row))
       .filter(Boolean);
@@ -104,7 +105,6 @@ const DisplaysPage = () => {
     }
 
     const linked = await displayQueuesActions.getItems({
-      itemsPerPage: 1000,
       pagination: false,
     });
     const linkedRows = Array.isArray(linked) ? linked : [];
@@ -155,7 +155,7 @@ const DisplaysPage = () => {
   const addDisplay = useCallback(() => {
     navigation.navigate('DisplayForm', {
       display: null,
-      display_type: 'orders',
+      display_type: DISPLAY_TYPE_PRODUCTION,
     });
   }, [navigation]);
 
@@ -168,7 +168,7 @@ const DisplaysPage = () => {
           ppcColorsOverride={ppcColors}
           onPress={() => openDisplay(item)}
           onLinked={refreshDisplays}
-          editable={env.APP_TYPE === 'MANAGER'}
+          editable={app_type === 'MANAGER'}
         />
       </View>
     ),
@@ -197,7 +197,7 @@ const DisplaysPage = () => {
               <Text style={styles.countNumber}>{items?.length || 0} {global.t?.t('products','label','enabled')}</Text>
             </View>
 
-            {env.APP_TYPE === 'MANAGER' && (
+            {app_type === 'MANAGER' && (
               <Pressable style={styles.addButton} onPress={addDisplay}>
                 <Icon name="plus" size={24} color={ppcColors.pillTextDark} />
               </Pressable>
@@ -252,3 +252,4 @@ const DisplaysPage = () => {
 
 
 export default DisplaysPage;
+// TODO(store-first): quando este arquivo for mexido, mover a leitura para stores, remover api.fetch e evitar repassar dados em objetos quando o store ja resolver isso.

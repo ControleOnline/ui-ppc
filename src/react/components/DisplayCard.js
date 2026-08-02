@@ -7,12 +7,25 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import QueuesList from './QueuesList';
 import { useStore } from '@store';
-import { env } from '@env';
+import {app_type} from '@appType';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
 import { withOpacity } from '@controleonline/../../src/styles/branding';
-import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
+import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
+import {
+  DISPLAY_TYPE_CONFERENCE,
+  DISPLAY_TYPE_OPTIONS,
+  isConferenceDisplayType,
+  isProductionDisplayType,
+  normalizeDisplayType,
+  resolveDisplayTypeLabel,
+} from '@controleonline/ui-ppc/src/react/utils/displayTypes';
 import createStyles from './DisplayCard.styles';
+import {
+  QUEUE_IDENTIFICATION_OPTIONS,
+  STATUS_INDICATOR_OPTIONS,
+  resolveDisplayPresentation,
+} from '@controleonline/ui-ppc/src/react/utils/displayPresentation';
 
 import {
   inlineStyle_778_8,
@@ -22,13 +35,15 @@ import {
 } from './DisplayCard.styles';
 
 const iconByType = {
-  products: 'silverware-fork-knife',
-  orders: 'receipt-text',
+  production: 'silverware-fork-knife',
+  conference: 'receipt-text',
+  tracking: 'map-clock-outline',
 };
 
 const typeAccentByType = {
-  products: '#FACC15',
-  orders: '#38BDF8',
+  production: '#FACC15',
+  conference: '#38BDF8',
+  tracking: '#10B981',
 };
 
 const getTitleStyleByName = (name) => {
@@ -120,7 +135,21 @@ export default function DisplayCard({
   );
   const [modalVisible, setModalVisible] = useState(false);
   const [editDisplay, setEditDisplay] = useState(item.display);
-  const [editType, setEditType] = useState(item.displayType);
+  const displayType = normalizeDisplayType(item.displayType);
+  const [editType, setEditType] = useState(displayType);
+  const initialPresentation = resolveDisplayPresentation(item);
+  const [editQueueIdentificationMode, setEditQueueIdentificationMode] = useState(
+    initialPresentation.queueIdentificationMode,
+  );
+  const [editStatusIndicatorMode, setEditStatusIndicatorMode] = useState(
+    initialPresentation.statusIndicatorMode,
+  );
+  const [editShowUnitQuantity, setEditShowUnitQuantity] = useState(
+    initialPresentation.showUnitQuantity,
+  );
+  const [editShowGroupNames, setEditShowGroupNames] = useState(
+    initialPresentation.showGroupNames,
+  );
 
   const [linkingQueue, setLinkingQueue] = useState(false);
   const [linkModalVisible, setLinkModalVisible] = useState(false);
@@ -133,6 +162,17 @@ export default function DisplayCard({
   const [deletingDisplay, setDeletingDisplay] = useState(false);
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
   const [confirmUnlinkVisible, setConfirmUnlinkVisible] = useState(false);
+
+  const openDisplayEditor = useCallback(() => {
+    const presentation = resolveDisplayPresentation(item);
+    setEditDisplay(item.display);
+    setEditType(normalizeDisplayType(item.displayType));
+    setEditQueueIdentificationMode(presentation.queueIdentificationMode);
+    setEditStatusIndicatorMode(presentation.statusIndicatorMode);
+    setEditShowUnitQuantity(presentation.showUnitQuantity);
+    setEditShowGroupNames(presentation.showGroupNames);
+    setModalVisible(true);
+  }, [item]);
 
   const getId = (value) => {
     return extractDisplayId(value);
@@ -173,7 +213,6 @@ export default function DisplayCard({
       if (!displayId) return [];
       const linked = await displayQueuesStore.actions.getItems({
         display: `/displays/${displayId}`,
-        itemsPerPage: 1000,
         pagination: false,
       });
       return normalizeDisplayQueues(linked);
@@ -184,7 +223,7 @@ export default function DisplayCard({
   const shapeQueuesForCard = useCallback(
     (rows) => {
       const normalized = normalizeDisplayQueues(rows);
-      if (item.displayType === 'products') return normalized.slice(0, 1);
+      if (isProductionDisplayType(item.displayType)) return normalized.slice(0, 1);
       return normalized;
     },
     [item.displayType]
@@ -278,13 +317,34 @@ export default function DisplayCard({
 
   const saveDisplay = useCallback(async () => {
     try {
-      await actions.save({ id: item.id, display: editDisplay, displayType: editType });
+      await actions.save({
+        id: item.id,
+        display: editDisplay,
+        displayType: editType,
+        queueIdentificationMode: editQueueIdentificationMode,
+        statusIndicatorMode: editStatusIndicatorMode,
+        showUnitQuantity: editShowUnitQuantity,
+        showGroupNames: editShowGroupNames,
+      });
+      await Promise.resolve(onLinked?.()).catch(() => null);
       setModalVisible(false);
       showSuccessToast('Display atualizado com sucesso.');
     } catch (err) {
       showErrorToast(getApiErrorMessage(err, 'Nao foi possivel salvar o display.'));
     }
-  }, [actions, editDisplay, editType, item.id, showErrorToast, showSuccessToast]);
+  }, [
+    actions,
+    editDisplay,
+    editQueueIdentificationMode,
+    editShowUnitQuantity,
+    editShowGroupNames,
+    editStatusIndicatorMode,
+    editType,
+    item.id,
+    onLinked,
+    showErrorToast,
+    showSuccessToast,
+  ]);
 
   const deleteDisplay = useCallback(async () => {
     const displayId = getId(item);
@@ -327,7 +387,6 @@ export default function DisplayCard({
       const companyIri = `/people/${currentCompany.id}`;
       let resultByIri = await queuesStore.actions.getItems({
         company: companyIri,
-        itemsPerPage: 1000,
         pagination: false,
       });
       let optionsByIri = Array.isArray(resultByIri) ? resultByIri : [];
@@ -335,14 +394,12 @@ export default function DisplayCard({
       // Fallback for APIs that still filter by numeric id.
       let resultById = await queuesStore.actions.getItems({
         company: currentCompany.id,
-        itemsPerPage: 1000,
         pagination: false,
       });
       let optionsById = Array.isArray(resultById) ? resultById : [];
 
       // Keep previous behavior as last fallback: load all queues.
       let resultAll = await queuesStore.actions.getItems({
-        itemsPerPage: 1000,
         pagination: false,
       });
       let optionsAll = Array.isArray(resultAll) ? resultAll : [];
@@ -403,7 +460,7 @@ export default function DisplayCard({
       const displayId = getId(item);
       if (!displayId || !selectedQueue) return;
 
-      if (item.displayType === 'products' && queues.length > 0) {
+      if (isProductionDisplayType(item.displayType) && queues.length > 0) {
         const existingQueue = queues[0]?.queue;
         setLinkModalVisible(false);
         navigation.navigate('QueueAddProducts', {
@@ -668,12 +725,12 @@ export default function DisplayCard({
   ]);
 
   const accent =
-    (item.displayType === 'orders' ? ppcColors.accentInfo : ppcColors.accent) ||
-    typeAccentByType[item.displayType] ||
+    (isConferenceDisplayType(displayType) ? ppcColors.accentInfo : ppcColors.accent) ||
+    typeAccentByType[displayType] ||
     '#FACC15';
   const accentSoft = isDark ? withOpacity(accent, 0.75) : withOpacity(accent, 0.54);
   const titleSizing = getTitleStyleByName(item.display);
-  const canManageQueue = env.APP_TYPE === 'MANAGER' && item.displayType === 'products';
+  const canManageQueue = app_type === 'MANAGER' && isProductionDisplayType(displayType);
   const hasLinkedQueue = Array.isArray(queues) && queues.length > 0;
 
   return (
@@ -689,19 +746,19 @@ export default function DisplayCard({
             <View style={styles.headerRow}>
               <View style={styles.iconWrap}>
                 <MaterialCommunityIcons
-                  name={iconByType[item.displayType] || 'monitor'}
+                  name={iconByType[displayType] || 'monitor'}
                   size={22}
                   color={accent}
                 />
               </View>
               <View style={styles.titleRow}>
                 <PaperText style={[styles.displayTitle, titleSizing]}>{item.display}</PaperText>
-                {env.APP_TYPE === 'MANAGER' && (
+                {app_type === 'MANAGER' && (
                   <View style={styles.cardActions}>
                     <TouchableOpacity
                       onPress={(event) => {
                         event?.stopPropagation?.();
-                        setModalVisible(true);
+                        openDisplayEditor();
                       }}
                       style={styles.editIcon}
                     >
@@ -725,7 +782,7 @@ export default function DisplayCard({
             <View style={styles.footerRow}>
               <View style={styles.typePill}>
                 <PaperText style={[styles.displayType, { color: accent }]}>
-                  {String(item.displayType || '').toUpperCase()}
+                  {resolveDisplayTypeLabel(displayType).toUpperCase()}
                 </PaperText>
               </View>
 
@@ -876,7 +933,7 @@ export default function DisplayCard({
           </View>
         </View>
       </AnimatedModal>
-      {env.APP_TYPE === 'MANAGER' && (
+      {app_type === 'MANAGER' && (
         <AnimatedModal
           visible={modalVisible}
           onRequestClose={() => setModalVisible(false)}
@@ -893,7 +950,7 @@ export default function DisplayCard({
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
+            <ScrollView style={styles.modalBody}>
               <Text style={styles.modalLabel}>{global.t?.t('products','label','displayName')}</Text>
               <TextInput
                 style={styles.modalInput}
@@ -904,38 +961,54 @@ export default function DisplayCard({
               />
 
               <Text style={styles.modalLabel}>{global.t?.t('products','label','displayType')}</Text>
-              <RadioButton.Group onValueChange={setEditType} value={editType}>
-                <View
-                  style={[
-                    styles.radioItemWrap,
-                    editType === 'orders' && styles.radioItemWrapSelected,
-                  ]}
-                >
-                  <RadioButton.Item
-                    label="Orders"
-                    value="orders"
-                    color={ppcColors.accentInfo}
-                    uncheckedColor={ppcColors.borderSoft}
-                    labelStyle={styles.radioLabel}
-                    style={styles.radioItem}
-                  />
-                </View>
-                <View
-                  style={[
-                    styles.radioItemWrap,
-                    editType === 'products' && styles.radioItemWrapSelected,
-                  ]}
-                >
-                  <RadioButton.Item
-                    label="Products"
-                    value="products"
-                    color={ppcColors.accent}
-                    uncheckedColor={ppcColors.borderSoft}
-                    labelStyle={styles.radioLabel}
-                    style={styles.radioItem}
-                  />
-                </View>
+              <RadioButton.Group onValueChange={value => setEditType(normalizeDisplayType(value))} value={editType}>
+                {DISPLAY_TYPE_OPTIONS.map(option => (
+                  <View
+                    key={option.value}
+                    style={[
+                      styles.radioItemWrap,
+                      editType === option.value && styles.radioItemWrapSelected,
+                    ]}
+                  >
+                    <RadioButton.Item
+                      label={option.label}
+                      value={option.value}
+                      color={option.value === DISPLAY_TYPE_CONFERENCE ? ppcColors.accentInfo : ppcColors.accent}
+                      uncheckedColor={ppcColors.borderSoft}
+                      labelStyle={styles.radioLabel}
+                      style={styles.radioItem}
+                    />
+                  </View>
+                ))}
               </RadioButton.Group>
+
+              {!isProductionDisplayType(editType) && (
+                <>
+                  <Text style={styles.modalLabel}>Apresentação operacional</Text>
+                  <Text style={styles.modalLabel}>Identificação da fila</Text>
+                  <RadioButton.Group onValueChange={setEditQueueIdentificationMode} value={editQueueIdentificationMode}>
+                    {QUEUE_IDENTIFICATION_OPTIONS.map(option => (
+                      <RadioButton.Item key={option.value} label={option.label} value={option.value} color={ppcColors.accent} />
+                    ))}
+                  </RadioButton.Group>
+                  <Text style={styles.modalLabel}>Indicador do status</Text>
+                  <RadioButton.Group onValueChange={setEditStatusIndicatorMode} value={editStatusIndicatorMode}>
+                    {STATUS_INDICATOR_OPTIONS.map(option => (
+                      <RadioButton.Item key={option.value} label={option.label} value={option.value} color={ppcColors.accent} />
+                    ))}
+                  </RadioButton.Group>
+                  <Text style={styles.modalLabel}>Quantidade quando houver 1 unidade</Text>
+                  <RadioButton.Group onValueChange={value => setEditShowUnitQuantity(value === 'show')} value={editShowUnitQuantity ? 'show' : 'hide'}>
+                    <RadioButton.Item label="Ocultar 1x" value="hide" color={ppcColors.accent} />
+                    <RadioButton.Item label="Mostrar 1x" value="show" color={ppcColors.accent} />
+                  </RadioButton.Group>
+                  <Text style={styles.modalLabel}>Nomes dos grupos</Text>
+                  <RadioButton.Group onValueChange={value => setEditShowGroupNames(value === 'groups')} value={editShowGroupNames ? 'groups' : 'hide'}>
+                    <RadioButton.Item label="Ocultar todos" value="hide" color={ppcColors.accent} />
+                    <RadioButton.Item label="Respeitar configuração de cada grupo" value="groups" color={ppcColors.accent} />
+                  </RadioButton.Group>
+                </>
+              )}
 
               <TouchableOpacity
                 style={[styles.dangerOutlineButton, deletingDisplay && styles.buttonDisabled]}
@@ -946,7 +1019,7 @@ export default function DisplayCard({
                   {deletingDisplay ? 'Excluindo...' : 'Excluir display'}
                 </Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
 
             <View style={styles.modalFooter}>
               <TouchableOpacity

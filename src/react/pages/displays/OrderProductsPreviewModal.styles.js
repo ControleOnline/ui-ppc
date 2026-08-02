@@ -35,6 +35,7 @@ const createStyles = ppcColors =>
             flex: 1,
         },
         scrollContent: {
+            flexGrow: 1,
             paddingHorizontal: 16,
             paddingTop: 10,
             paddingBottom: 20,
