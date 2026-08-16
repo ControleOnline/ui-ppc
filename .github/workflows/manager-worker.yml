@@ -5,7 +5,7 @@ on:
     branches: [master, dev, staging]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: write
 
@@ -142,3 +142,26 @@ jobs:
           gh_token: ${{ secrets.GH_TOKEN }}
           issue_number: ${{ needs.manager.outputs.issue_number }}
           base_branch: master
+
+  # Em push para master: bump patch + cria tag vX.Y.Z (dispara publish-npm.yml)
+  # Ignora commits de release ([skip bump]) para evitar loop.
+  version-tag:
+    name: Bump version + tag
+    if: github.ref == 'refs/heads/master' && !contains(github.event.head_commit.message, '[skip bump]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Bump patch + tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm version patch -m "chore(release): %s [skip bump]"
+          git push origin HEAD:master --follow-tags

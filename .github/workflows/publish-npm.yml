@@ -1,0 +1,40 @@
+name: Publish Package to npmjs
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Ensure npm 11.5.1+ (OIDC support)
+        run: |
+          npm install -g npm@latest
+          echo "node=$(node -v) npm=$(npm -v)"
+
+      - name: Prepare registry (OIDC only — no classic token)
+        run: |
+          unset NODE_AUTH_TOKEN NPM_TOKEN || true
+          rm -f .npmrc "$HOME/.npmrc" || true
+          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
+          npm config set registry https://registry.npmjs.org/
+
+      - name: Publish to npmjs (Trusted Publishing / OIDC)
+        run: |
+          unset NODE_AUTH_TOKEN NPM_TOKEN || true
+          npm publish --access public
