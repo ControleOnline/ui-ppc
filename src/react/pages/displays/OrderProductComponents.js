@@ -90,9 +90,12 @@ const mergeOrderProduct = (baseOrderProduct, detailedOrderProduct) => {
         return baseOrderProduct;
     }
 
+    // Preserve persisted OrderProduct identity (ui-ppc#4). Never lose id/@id from the base node.
     const mergedOrderProduct = {
         ...baseOrderProduct,
         ...detailedOrderProduct,
+        id: baseOrderProduct?.id ?? detailedOrderProduct?.id,
+        '@id': baseOrderProduct?.['@id'] ?? detailedOrderProduct?.['@id'],
         order: mergeNestedEntity(baseOrderProduct?.order, detailedOrderProduct?.order),
         product: mergeNestedEntity(baseOrderProduct?.product, detailedOrderProduct?.product),
         category: mergeNestedEntity(baseOrderProduct?.category, detailedOrderProduct?.category),
@@ -301,6 +304,25 @@ const OrderProductComponents = ({ order_product, ppcColorsOverride = null }) => 
 
     if (!resolvedOrderProduct) {
         return null;
+    }
+
+    // Acceptance (ui-ppc#4): never render a knowingly incomplete tree.
+    // When details are required and still loading without detailed metadata, show loading only.
+    const hasDetailedMetadata = hasDetailedOrderProductMetadata([resolvedOrderProduct]);
+    const waitingForCompletePayload =
+        Boolean(shouldFetchDetails) &&
+        Boolean(isLoadingDetails) &&
+        !hasDetailedMetadata;
+
+    if (waitingForCompletePayload) {
+        return (
+            <View style={styles.wrap}>
+                <View style={styles.loadingWrap}>
+                    <ActivityIndicator size="small" color={ppcColors.accent} />
+                    <Text style={styles.loadingText}>Carregando detalhes...</Text>
+                </View>
+            </View>
+        );
     }
 
     return (
