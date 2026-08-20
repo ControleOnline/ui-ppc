@@ -5,6 +5,10 @@ import {
   normalizeOrderProductQuantity,
   toOrderProductEntityId,
 } from '@controleonline/ui-orders/src/react/components/OrderProducts.utils'
+import {
+  hasProductionStage as orderProductHasProductionStage,
+  NO_PRODUCTION_STAGE_LABEL,
+} from '@controleonline/ui-ppc/src/react/utils/productionItemPolicy'
 
 const CHECKED_STATUSES = new Set(['conferido', 'checked'])
 
@@ -71,6 +75,8 @@ const createConferenceTarget = ({
   const required = normalizeOrderProductQuantity(orderProduct?.quantity || entry?.quantity || card?.quantity)
   const sku = getOrderProductSku(orderProduct)
 
+  const hasProductionStage = orderProductHasProductionStage(orderProduct)
+
   return {
     card,
     entry,
@@ -82,6 +88,8 @@ const createConferenceTarget = ({
     scanKeys: queueIds.length ? queueIds : (sku ? [sku] : []),
     sku,
     statusColor: getOrderProductStatusColor(orderProduct, fallbackColor),
+    hasProductionStage,
+    productionStageLabel: hasProductionStage ? null : NO_PRODUCTION_STAGE_LABEL,
   }
 }
 
@@ -146,13 +154,27 @@ export const buildConferenceTargets = (orderProducts, fallbackColor = '#334155')
 export const buildConferencePresentationCards = (
   orderProducts,
   fallbackColor = '#334155',
-) => buildOperationalOrderProductCards(
-  normalizeConferenceOrderProducts(orderProducts),
-  {
-    fallbackColor,
-    resolveItemColor: item => getOrderProductStatusColor(item, fallbackColor),
-  },
-)
+) => {
+  const cards = buildOperationalOrderProductCards(
+    normalizeConferenceOrderProducts(orderProducts),
+    {
+      fallbackColor,
+      resolveItemColor: item => getOrderProductStatusColor(item, fallbackColor),
+    },
+  )
+
+  // Annotate root presentation with production-stage metadata (ui-ppc#11).
+  // Items without OrderProductQueue remain visible and are labeled "sem etapa produtiva".
+  return (Array.isArray(cards) ? cards : []).map(card => {
+    const root = card?.rootItem || null
+    const withStage = root ? orderProductHasProductionStage(root) : true
+    return {
+      ...card,
+      hasProductionStage: withStage,
+      productionStageLabel: withStage ? null : NO_PRODUCTION_STAGE_LABEL,
+    }
+  })
+}
 
 const findConferenceEntryPath = (groups, targetEntry, path = []) => {
   const normalizedGroups = Array.isArray(groups) ? groups : []
