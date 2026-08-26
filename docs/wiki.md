@@ -1,1 +1,1 @@
-https://github.com/ControleOnline/ui-pcp/wiki
+https://github.com/ControleOnline/ui-ppc/wiki
