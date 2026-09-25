@@ -6,35 +6,39 @@ on:
       - 'v*'
 
 permissions:
-  id-token: write
   contents: read
+  id-token: write
 
 jobs:
   publish:
+    if: github.repository_owner == 'ControleOnline'
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
-
+          node-version: 24
+      - name: Validate release tag and provenance repository
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+        run: |
+          node <<'NODE'
+          const pkg = require('./package.json');
+          const expectedUrl = `https://github.com/${process.env.EXPECTED_REPOSITORY}`;
+          if (process.env.RELEASE_TAG !== `v${pkg.version}`) {
+            throw new Error(`Tag ${process.env.RELEASE_TAG} does not match package version ${pkg.version}`);
+          }
+          if (pkg.repository?.url !== expectedUrl) {
+            throw new Error(`package.json repository.url must be ${expectedUrl}; got ${pkg.repository?.url}`);
+          }
+          NODE
       - name: Ensure npm 11.5.1+ (OIDC support)
         run: |
-          npm install -g npm@latest
-          echo "node=$(node -v) npm=$(npm -v)"
-
-      - name: Prepare registry (OIDC only — no classic token)
-        run: |
-          unset NODE_AUTH_TOKEN NPM_TOKEN || true
-          rm -f .npmrc "$HOME/.npmrc" || true
-          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
-          npm config set registry https://registry.npmjs.org/
-
-      - name: Publish to npmjs (Trusted Publishing / OIDC)
-        run: |
-          unset NODE_AUTH_TOKEN NPM_TOKEN || true
-          npm publish --access public
+          npm install --global npm@latest
+          npm --version
+      - name: Publish to npmjs with trusted publishing
+        run: npm publish --access public --loglevel verbose
