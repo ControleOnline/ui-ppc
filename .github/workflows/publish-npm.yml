@@ -2,47 +2,29 @@ name: Publish Package to npmjs
 
 on:
   push:
-  workflow_dispatch:
-    inputs:
-      release_tag:
-        description: Existing version tag to publish
-        required: true
-        type: string
 
 permissions:
   contents: write
   id-token: write
 
 concurrency:
-  group: npm-release-${{ github.repository }}-${{ github.ref }}
+  group: ${{ github.repository }}-npm-release
   cancel-in-progress: false
 
 jobs:
   publish:
-    if: >-
-      github.repository_owner == 'ControleOnline' &&
-      (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') ||
-       (github.ref_type == 'branch' && (github.ref_name == 'dev' || github.ref_name == 'master')))
+    if: ${{ github.repository_owner == 'ControleOnline' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.release_tag || github.ref }}
+          ref: ${{ github.ref }}
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Ensure npm 11.5.1+ (OIDC support)
-        run: |
-          npm install --global npm@latest
-          npm --version
       - name: Validate package metadata and create version tag
         id: release
         env:
-          EVENT_NAME: ${{ github.event_name }}
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
-          REQUESTED_TAG: ${{ inputs.release_tag }}
           EXPECTED_REPOSITORY: ${{ github.repository }}
         run: |
           node <<'NODE'
@@ -54,11 +36,7 @@ jobs:
           if (pkg.repository?.url !== expectedUrl) throw new Error(`repository.url must be ${expectedUrl}; got ${pkg.repository?.url}`);
           const sourceSha = cp.execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim();
           let tag = '';
-          if (process.env.EVENT_NAME === 'workflow_dispatch') {
-            tag = process.env.REQUESTED_TAG || '';
-            if (!tag || tag !== `v${pkg.version}`) throw new Error(`Requested tag must equal v${pkg.version}`);
-            cp.execFileSync('git', ['rev-parse', '--verify', `refs/tags/${tag}`], {stdio:'ignore'});
-          } else if (process.env.REF_TYPE === 'tag') {
+          if (process.env.REF_TYPE === 'tag') {
             tag = process.env.REF_NAME;
             if (tag !== `v${pkg.version}`) throw new Error(`Tag ${tag} does not match package version ${pkg.version}`);
           } else {
@@ -85,10 +63,18 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_tag=${tag}\n`);
           console.log(`Validated ${pkg.name}@${pkg.version} from ${sourceSha}; release tag ${tag}`);
           NODE
+      - uses: actions/setup-node@v4
+        if: steps.release.outputs.release_tag != ''
+        with:
+          node-version: 24
+      - name: Ensure npm 11.5.1+ (OIDC support)
+        if: steps.release.outputs.release_tag != ''
+        run: |
+          npm install --global npm@latest
+          npm --version
       - name: Skip if version is already on npm
         id: registry
         if: steps.release.outputs.release_tag != ''
-        env:
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
