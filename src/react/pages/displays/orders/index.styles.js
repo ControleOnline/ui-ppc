@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native'
-import { withOpacity } from '@controleonline/../../src/styles/branding'
+import { withOpacity } from '@controleonline/ui-layout/src/styles/branding'
 const TV_LAYOUT_GAP = 8
 
 const createStyles = ppcColors =>
