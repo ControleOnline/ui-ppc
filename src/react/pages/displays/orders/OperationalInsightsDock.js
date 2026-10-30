@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { withOpacity } from '@controleonline/../../src/styles/branding'
+import { withOpacity } from '@controleonline/ui-layout/src/styles/branding'
 
 import { buildOperationalInsightsSlides } from './operationalInsights.utils'
 import OperationalInsightsSlide from './OperationalInsightsSlide'

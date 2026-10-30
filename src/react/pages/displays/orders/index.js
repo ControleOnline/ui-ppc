@@ -26,7 +26,7 @@ import OrderHeader, {
 import OrderProducts from '@controleonline/ui-orders/src/react/components/OrderProducts'
 import OrderStackedTopBar from '@controleonline/ui-orders/src/react/pages/orders/sales/components/OrderStackedTopBar'
 import { useDisplayTheme } from '@controleonline/ui-ppc/src/react/theme/displayTheme'
-import { withOpacity } from '@controleonline/../../src/styles/branding'
+import { withOpacity } from '@controleonline/ui-layout/src/styles/branding'
 import { normalizeEntityId } from '@controleonline/ui-common/src/react/utils/paymentDevices'
 import {
   DEFAULT_DATE_FILTER_KEY,

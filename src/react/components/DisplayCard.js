@@ -9,7 +9,7 @@ import QueuesList from './QueuesList';
 import { useStore } from '@store';
 import {app_type} from '@appType';
 import { usePpcTheme } from '@controleonline/ui-ppc/src/react/theme/ppcTheme';
-import { withOpacity } from '@controleonline/../../src/styles/branding';
+import { withOpacity } from '@controleonline/ui-layout/src/styles/branding';
 import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
 import {
