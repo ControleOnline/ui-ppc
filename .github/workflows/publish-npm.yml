@@ -2,39 +2,90 @@ name: Publish Package to npmjs
 
 on:
   push:
-    tags:
-      - 'v*'
 
 permissions:
+  contents: write
   id-token: write
-  contents: read
+
+concurrency:
+  group: ${{ github.repository }}-npm-release
+  cancel-in-progress: false
 
 jobs:
   publish:
+    if: ${{ github.repository_owner == 'ControleOnline' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
         with:
-          node-version: '24'
-
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+      - name: Validate package metadata and create version tag
+        id: release
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const cp = require('node:child_process');
+          const pkg = require('./package.json');
+          const expectedUrl = `https://github.com/${process.env.EXPECTED_REPOSITORY}`;
+          if (!/^\d+\.\d+\.\d+$/.test(String(pkg.version))) throw new Error(`Expected stable X.Y.Z, got ${pkg.version}`);
+          if (pkg.repository?.url !== expectedUrl) throw new Error(`repository.url must be ${expectedUrl}; got ${pkg.repository?.url}`);
+          const sourceSha = cp.execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim();
+          let tag = '';
+          if (process.env.REF_TYPE === 'tag') {
+            tag = process.env.REF_NAME;
+            if (tag !== `v${pkg.version}`) throw new Error(`Tag ${tag} does not match package version ${pkg.version}`);
+          } else {
+            let previous = '';
+            try { previous = JSON.parse(cp.execFileSync('git', ['show', `${sourceSha}^:package.json`], {encoding:'utf8'})).version || ''; } catch {}
+            if (previous === pkg.version) { fs.appendFileSync(process.env.GITHUB_OUTPUT, 'release_tag=\n'); process.exit(0); }
+            const parts = String(pkg.version).split('.').map(Number);
+            if (previous) {
+              const old = String(previous).split('.').map(Number);
+              let cmp = 0; for (let i=0;i<3;i++) { if ((parts[i]||0)!==(old[i]||0)) { cmp=(parts[i]||0)>(old[i]||0)?1:-1; break; } }
+              if (cmp <= 0) throw new Error(`Version ${pkg.version} must be greater than first-parent version ${previous}`);
+            }
+            tag = `v${pkg.version}`;
+            const existing = cp.spawnSync('git', ['ls-remote', '--exit-code', '--refs', 'origin', `refs/tags/${tag}`], {encoding:'utf8'});
+            if (existing.status === 0) {
+              cp.execFileSync('git', ['fetch', 'origin', `refs/tags/${tag}:refs/tags/${tag}`], {stdio:'inherit'});
+              const tagged = cp.execFileSync('git', ['rev-parse', `${tag}^{commit}`], {encoding:'utf8'}).trim();
+              if (tagged !== sourceSha) throw new Error(`Immutable tag ${tag} already points at ${tagged}, not ${sourceSha}`);
+            } else {
+              cp.execFileSync('git', ['config', 'user.name', 'github-actions[bot]']);
+              cp.execFileSync('git', ['config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com']);
+              cp.execFileSync('git', ['tag', '-a', tag, sourceSha, '-m', `Release ${pkg.name}@${pkg.version}`], {stdio:'inherit'});
+              cp.execFileSync('git', ['push', 'origin', `refs/tags/${tag}`], {stdio:'inherit'});
+            }
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_tag=${tag}\n`);
+          console.log(`Validated ${pkg.name}@${pkg.version} from ${sourceSha}; release tag ${tag}`);
+          NODE
+      - uses: actions/setup-node@v4
+        if: steps.release.outputs.release_tag != ''
+        with:
+          node-version: 24
       - name: Ensure npm 11.5.1+ (OIDC support)
+        if: steps.release.outputs.release_tag != ''
         run: |
-          npm install -g npm@latest
-          echo "node=$(node -v) npm=$(npm -v)"
-
-      - name: Prepare registry (OIDC only — no classic token)
+          npm install --global npm@latest
+          npm --version
+      - name: Skip if version is already on npm
+        id: registry
+        if: steps.release.outputs.release_tag != ''
         run: |
-          unset NODE_AUTH_TOKEN NPM_TOKEN || true
-          rm -f .npmrc "$HOME/.npmrc" || true
-          npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
-          npm config set registry https://registry.npmjs.org/
-
-      - name: Publish to npmjs (Trusted Publishing / OIDC)
-        run: |
-          unset NODE_AUTH_TOKEN NPM_TOKEN || true
-          npm publish --access public
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+            echo 'published=true' >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION is already published; skipping duplicate publish"
+          else
+            echo 'published=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish to npmjs with trusted publishing
+        if: steps.release.outputs.release_tag != '' && steps.registry.outputs.published != 'true'
+        run: npm publish --access public --loglevel verbose
