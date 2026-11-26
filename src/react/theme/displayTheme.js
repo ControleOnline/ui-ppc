@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { useStore } from '@store';
-import { colors as fallbackColors } from '@controleonline/../../src/styles/colors';
+import { colors as fallbackColors } from '@controleonline/ui-layout/src/styles/colors';
 import {
   resolveThemePalette,
   withOpacity,
-} from '@controleonline/../../src/styles/branding';
+} from '@controleonline/ui-layout/src/styles/branding';
 
 export const buildDisplayTheme = (palette = {}, themeColors = {}) => {
   const accent = themeColors['ppc-accent'] || palette.primary;
