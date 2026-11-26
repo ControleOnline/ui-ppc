@@ -336,4 +336,26 @@ describe('orderConference', () => {
       complete: true,
     })
   })
+
+
+  it('marks targets without queue as sem etapa produtiva', () => {
+    const targets = buildConferenceTargets([
+      createProduct({
+        id: 50,
+        orderProductQueues: [{ id: 1 }],
+      }),
+      createProduct({
+        id: 51,
+        sku: 'NO-STAGE',
+      }),
+    ])
+
+    expect(targets.find(t => t.orderProductId === '50')?.hasProductionStage).toBe(true)
+    expect(targets.find(t => t.orderProductId === '50')?.productionStageLabel).toBeNull()
+    expect(targets.find(t => t.orderProductId === '51')?.hasProductionStage).toBe(false)
+    expect(targets.find(t => t.orderProductId === '51')?.productionStageLabel).toBe(
+      'sem etapa produtiva',
+    )
+  })
+
 })
